@@ -6,7 +6,7 @@ Kit 自带 skill 不放在这里，避免被全局安装命令误识别；它们
 
 Skill 的职责不是替代 CLI，而是帮助 Agent 更可靠地理解用户意图、生成配置、组织规则和调用 StarWork 工具。
 
-Skill 的安装、Hub 管理、Pack 推荐和项目分发规则见 `product/core/skill-management-spec.md`。一句话边界：Skill 负责判断和生成方案，CLI 负责执行和校验。
+Skill 的安装、项目中心管理、Pack 推荐和项目分发规则见 `product/core/skill-management-spec.md`。一句话边界：Skill 负责判断和生成方案，CLI 负责执行和校验。
 
 ## 路由规则
 
@@ -22,4 +22,4 @@ Skill 的安装、Hub 管理、Pack 推荐和项目分发规则见 `product/core
 - `starworkDoctor/`：帮助 Agent 基于 `starwork doctor --json` 的探测结果，对当前工作区或历史模板做理性诊断；用户明确要求升级时，继续确认目录语义并生成 `starwork upgrade --blueprint` 升级施工图。详细 SPEC 见 `starworkDoctor-spec.md`。
 - `starworkMultiagent/`：帮助 Agent 把“常用智能体 / 当前会话职责 / 多 Agent 分工 / 共享输出”翻译成安全的 `starwork multiagent` 命令组合。详细 SPEC 见 `starworkMultiagent-spec.md`。
 
-`starworkAudit` 是 Hub Kit 自带 skill，源码在 `product/kit-skills/starworkAudit/`；规格仍保留在 `starworkAudit-spec.md`。
+`starworkAudit` 是项目中心工作台模板自带 skill，源码在 `product/kit-skills/starworkAudit/`；规格仍保留在 `starworkAudit-spec.md`。

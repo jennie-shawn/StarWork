@@ -1,18 +1,19 @@
 {
   "language": "zh",
-  "name": "多项目中枢管理 Pack",
+  "name": "项目中心管理 Pack",
   "paths": {
-    "projects": "projects/",
-    "coordination": "projects/coordination/",
+    "projects": "项目/",
+    "coordination": "项目/协作/",
     "incoming": ".incoming/",
-    "identity": "identity/",
-    "lessons": "lessons/",
-    "knowledge": "knowledge/",
-    "skills": "skills/"
+    "identity": "身份/",
+    "lessons": "教训/",
+    "knowledge": "知识/",
+    "skills": "技能/",
+    "workspace": "工作区/"
   },
   "overrides": {
-    "formal_source": "projects/",
-    "business_work_area": "projects/coordination/"
+    "formal_source": "项目/",
+    "business_work_area": "项目/协作/"
   },
   "rules": [
     { "slot": "pack.hub-management.overview", "from": "rules/zh/overview.md" },
@@ -20,8 +21,8 @@
   ],
   "templates": [],
   "seed": [
-    { "from": "seed/zh/projects/registry.json", "to": "projects/registry.json", "on_conflict": "create_new" },
-    { "from": "seed/zh/projects/coordination/README.md", "to": "projects/coordination/README.md", "on_conflict": "create_new" },
+    { "from": "seed/zh/projects/registry.json", "to": "项目/registry.json", "on_conflict": "create_new" },
+    { "from": "seed/zh/projects/coordination/README.md", "to": "项目/协作/README.md", "on_conflict": "create_new" },
     { "from": "seed/zh/.incoming/README.md", "to": ".incoming/README.md", "on_conflict": "create_new" }
   ]
 }

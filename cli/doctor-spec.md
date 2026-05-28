@@ -343,14 +343,14 @@ v0.1 先检查确定性 capability。
 
 对新版 `hub` 工作台，v0.1 应至少检查：
 
-- `projects/registry.json`
-- `projects/coordination/`
+- 项目注册表：中文默认 `项目/registry.json`，英文默认 `projects/registry.json`
+- 项目协作路由：中文默认 `项目/协作/`，英文默认 `projects/coordination/`
 - `.incoming/`
-- `identity/`
-- `lessons/`
-- `knowledge/`
-- `skills/registry.json`
-- `workspace/`
+- 共享身份：中文默认 `身份/`，英文默认 `identity/`
+- 共享教训：中文默认 `教训/`，英文默认 `lessons/`
+- 共享知识：中文默认 `知识/`，英文默认 `knowledge/`
+- 托管 Skill 注册表：中文默认 `技能/registry.json`，英文默认 `skills/registry.json`
+- 草稿和实验区：中文默认 `工作区/`，英文默认 `workspace/`
 - `.starwork/handoff/`
 
 Hub 不再检查单项目式的项目状态和当前工作入口。

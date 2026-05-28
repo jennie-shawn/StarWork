@@ -14,7 +14,7 @@ const WORKSPACE_TYPES = {
     label: "项目工作台",
     kit: "project",
     defaultPack: "general",
-    description: "适合具体项目执行；可独立使用，也可由 Hub 管理。"
+    description: "适合具体项目执行；可独立使用，也可加入项目中心。"
   },
   "single-light": {
     label: "项目工作台",
@@ -23,7 +23,7 @@ const WORKSPACE_TYPES = {
     description: "兼容别名：等同于 project。"
   },
   hub: {
-    label: "多项目管理中枢",
+    label: "项目中心",
     kit: "hub",
     defaultPack: "hub-management",
     description: "适合统一管理身份、教训、知识、skills 和多个项目。"
@@ -36,14 +36,14 @@ const SPAWN_MODES = {
     workspaceType: "project",
     kit: "project",
     formalSource: "输出/确认成果/",
-    businessWorkArea: "参考资料/"
+    businessWorkArea: "输出/草稿/"
   },
   starter: {
     label: "轻量项目",
     workspaceType: "project",
     kit: "project",
     formalSource: "输出/确认成果/",
-    businessWorkArea: "参考资料/"
+    businessWorkArea: "输出/草稿/"
   }
 };
 
@@ -52,17 +52,19 @@ const SPAWN_MODE_LANGUAGE_OVERRIDES = {
     project: {
       label: "Project workspace",
       formalSource: "outputs/final/",
-      businessWorkArea: "references/"
+      businessWorkArea: "outputs/drafts/"
     },
     starter: {
       label: "Project workspace",
       formalSource: "outputs/final/",
-      businessWorkArea: "references/"
+      businessWorkArea: "outputs/drafts/"
     }
   }
 };
 
 const HUB_STANDARD_PATHS = {
+  identity: "identity/",
+  lessons: "lessons/",
   projectRegistry: "projects/registry.json",
   coordination: "projects/coordination/",
   localHandoff: ".starwork/handoff/",
@@ -72,10 +74,25 @@ const HUB_STANDARD_PATHS = {
   knowledge: "knowledge/"
 };
 
+const HUB_LANGUAGE_PATHS = {
+  zh: {
+    identity: "身份/",
+    lessons: "教训/",
+    projectRegistry: "项目/registry.json",
+    coordination: "项目/协作/",
+    localHandoff: ".starwork/handoff/",
+    incoming: ".incoming/",
+    formalSkills: "技能/",
+    draftsAndExperiments: "工作区/",
+    knowledge: "知识/"
+  },
+  en: HUB_STANDARD_PATHS
+};
+
 const PACK_LABELS = {
   general: "通用工作",
   "content-creator": "自媒体内容创作",
-  "hub-management": "多项目中枢管理"
+  "hub-management": "项目中心管理"
 };
 
 const ADAPTERS = {
@@ -106,7 +123,7 @@ const KIT_BUNDLED_SKILLS = {
       sourceKind: "kit",
       type: "kit-bundled",
       distribution: "copy",
-      reason: "Hub Kit 自带：用于生成和定制卫星项目。",
+      reason: "项目中心自带：用于从项目中心创建和定制项目工作台。",
       install: [
         { agent: "hub", path: path.join("skills", "starworkSpawn"), mode: "copy" },
         { agent: "codex", path: path.join(".agents", "skills", "starworkSpawn"), mode: "symlink", source: path.join("skills", "starworkSpawn") },
@@ -120,7 +137,7 @@ const KIT_BUNDLED_SKILLS = {
       sourceKind: "kit",
       type: "kit-bundled",
       distribution: "copy",
-      reason: "Hub Kit 自带：用于巡检和修复卫星项目。",
+      reason: "项目中心自带：用于巡检和修复中心管理的项目工作台。",
       install: [
         { agent: "hub", path: path.join("skills", "starworkAudit"), mode: "copy" },
         { agent: "codex", path: path.join(".agents", "skills", "starworkAudit"), mode: "symlink", source: path.join("skills", "starworkAudit") },
@@ -277,9 +294,9 @@ async function init(argv) {
   console.log("下一步建议：");
   console.log(`1. 运行 starwork doctor --target ${plan.targetDir}`);
   if (workspaceType === "hub") {
-    console.log("2. 打开 README.md 和 AGENTS.md，确认这个 Hub 的管理边界。");
+    console.log("2. 打开 README.md 和 AGENTS.md，确认这个项目中心的管理边界。");
     console.log("3. 需要创建项目时，先用 starworkSpawn 设计，或直接运行 starwork spawn。");
-    console.log("4. 创建项目后，运行 starwork audit 巡检 Hub 里的项目登记。");
+    console.log("4. 创建项目后，运行 starwork audit 巡检项目中心里的项目登记。");
   } else {
     console.log("2. 打开 AGENTS.md，确认 AI 入口规则。");
     console.log("3. 如需生成特定 AI 工具适配文件，运行 starwork adapt。");
@@ -342,7 +359,7 @@ async function spawnWorkspace(argv) {
   printSpawnPlan(plan, options.dryRun);
   if (options.dryRun) return;
 
-  await confirmOrThrow(options, "是否从中枢生成新项目工作台？");
+  await confirmOrThrow(options, "是否从项目中心创建新项目工作台？");
   applyPlan(plan);
   console.log("");
   console.log("StarWork 项目工作台已生成。");
@@ -424,9 +441,9 @@ function collectAuditResult(options = {}) {
     language: hubState.language || null
   };
   if (hubState.workspace_type === "hub" && hubState.kit === "hub") {
-    auditAddCheck(result, "hub.workspace_type", "pass", "Hub workspace state is valid", ".starwork/workspace.json");
+    auditAddCheck(result, "hub.workspace_type", "pass", "Project Center workspace state is valid", ".starwork/workspace.json");
   } else {
-    auditAddCheck(result, "hub.workspace_type", "fail", "audit 必须从 Hub 工作台执行。", ".starwork/workspace.json");
+    auditAddCheck(result, "hub.workspace_type", "fail", "audit 必须从项目中心执行。", ".starwork/workspace.json");
     return finalizeAuditResult(result, options);
   }
 
@@ -436,7 +453,7 @@ function collectAuditResult(options = {}) {
     summary: hubDoctor.summary
   };
   result.hub.ok = hubDoctor.ok;
-  auditAddCheck(result, "hub.doctor", hubDoctor.ok ? "pass" : "fail", hubDoctor.ok ? "Hub doctor passed" : "Hub doctor has blocking issues", hubRoot);
+  auditAddCheck(result, "hub.doctor", hubDoctor.ok ? "pass" : "fail", hubDoctor.ok ? "Project Center doctor passed" : "Project Center doctor has blocking issues", hubRoot);
 
   const hubPaths = getHubPaths(hubState);
   const registryRelativePath = hubPaths.projectRegistry;
@@ -463,7 +480,7 @@ function collectAuditResult(options = {}) {
     ? allProjects.filter((project) => getRegistryProjectId(project) === options.project)
     : allProjects;
   if (options.project && projects.length === 0) {
-    auditAddCheck(result, "registry.project.exists", "fail", `Hub registry 中不存在项目：${options.project}`, registryRelativePath);
+    auditAddCheck(result, "registry.project.exists", "fail", `项目中心登记表中不存在项目：${options.project}`, registryRelativePath);
     return finalizeAuditResult(result, options);
   }
 
@@ -506,11 +523,11 @@ function collectAuditProjectResult({ hubRoot, registryProject, options }) {
     return result;
   }
   if (!fs.existsSync(projectPath) || !fs.statSync(projectPath).isDirectory()) {
-    auditAddProjectCheck(result, "satellite.path.exists", "fail", `Satellite path 不存在或不是目录：${projectPath}`, projectPath);
+    auditAddProjectCheck(result, "satellite.path.exists", "fail", `项目目录不存在或不是目录：${projectPath}`, projectPath);
     return result;
   }
   result.reachable = true;
-  auditAddProjectCheck(result, "satellite.path.exists", "pass", "Satellite path exists", projectPath);
+  auditAddProjectCheck(result, "satellite.path.exists", "pass", "Project workspace path exists", projectPath);
 
   let state;
   try {
@@ -522,23 +539,24 @@ function collectAuditProjectResult({ hubRoot, registryProject, options }) {
   result.workspace_type = state.workspace_type || null;
   result.kit = state.kit || null;
   result.language = state.language || "zh";
-  if (state.workspace_type === "project" && state.kit === "project" && state.hub?.project_id) {
-    auditAddProjectCheck(result, "satellite.binding.exists", "pass", "Project has Hub binding", ".starwork/workspace.json");
+  const projectCenter = getProjectCenterBinding(state);
+  if (state.workspace_type === "project" && state.kit === "project" && projectCenter?.project_id) {
+    auditAddProjectCheck(result, "satellite.binding.exists", "pass", "Project has Project Center connection", ".starwork/workspace.json");
   } else if (state.workspace_type === "satellite-starter") {
     result.legacy_signals.push(state.workspace_type);
-    auditAddProjectCheck(result, "satellite.legacy_type", "warn", `检测到兼容期旧 Satellite 类型：${state.workspace_type}`, ".starwork/workspace.json");
+    auditAddProjectCheck(result, "satellite.legacy_type", "warn", `检测到旧的中心管理项目类型：${state.workspace_type}`, ".starwork/workspace.json");
   } else {
-    auditAddProjectCheck(result, "satellite.binding.exists", "fail", "正式 Satellite 应为 project workspace 且带 hub binding。", ".starwork/workspace.json");
+    auditAddProjectCheck(result, "satellite.binding.exists", "fail", "中心管理的项目工作台应为 project workspace，并带 project_center 连接信息。", ".starwork/workspace.json");
   }
-  if (state.hub?.project_id === projectId) {
-    auditAddProjectCheck(result, "satellite.project_id.match", "pass", "Hub project id matches registry", ".starwork/workspace.json");
+  if (projectCenter?.project_id === projectId) {
+    auditAddProjectCheck(result, "satellite.project_id.match", "pass", "Project Center project id matches registry", ".starwork/workspace.json");
   } else {
-    auditAddProjectCheck(result, "satellite.project_id.match", "warn", "Satellite hub.project_id 与 registry id 不一致。", ".starwork/workspace.json");
+    auditAddProjectCheck(result, "satellite.project_id.match", "warn", "项目中心连接里的 project_id 与登记表 ID 不一致。", ".starwork/workspace.json");
   }
-  if (state.hub?.path && path.resolve(state.hub.path) === path.resolve(hubRoot)) {
-    auditAddProjectCheck(result, "satellite.hub_path.match", "pass", "Hub path matches", ".starwork/workspace.json");
+  if (projectCenter?.path && path.resolve(projectCenter.path) === path.resolve(hubRoot)) {
+    auditAddProjectCheck(result, "satellite.hub_path.match", "pass", "Project Center path matches", ".starwork/workspace.json");
   } else {
-    auditAddProjectCheck(result, "satellite.hub_path.match", "warn", "Satellite hub.path 未指向当前 Hub。", ".starwork/workspace.json");
+    auditAddProjectCheck(result, "satellite.hub_path.match", "warn", "项目中心连接路径未指向当前项目中心。", ".starwork/workspace.json");
   }
 
   const sync = readSyncState(projectPath);
@@ -546,12 +564,12 @@ function collectAuditProjectResult({ hubRoot, registryProject, options }) {
     result.sync_ok = true;
     auditAddProjectCheck(result, "satellite.sync.match", "pass", `Sync metadata matches (${sync.source})`, sync.source);
   } else {
-    auditAddProjectCheck(result, "satellite.sync.match", "warn", sync.ok ? "同步元数据与 Hub registry 不一致。" : sync.error, sync.source || ".starwork/sync.json");
+    auditAddProjectCheck(result, "satellite.sync.match", "warn", sync.ok ? "同步信息与项目中心登记表不一致。" : sync.error, sync.source || ".starwork/sync.json");
   }
 
   const doctor = doctorCollect(projectPath);
   result.doctor_ok = doctor.ok;
-  auditAddProjectCheck(result, "satellite.doctor", doctor.ok ? "pass" : "fail", doctor.ok ? "Satellite doctor passed" : "Satellite doctor has blocking issues", projectPath);
+  auditAddProjectCheck(result, "satellite.doctor", doctor.ok ? "pass" : "fail", doctor.ok ? "Project workspace doctor passed" : "Project workspace doctor has blocking issues", projectPath);
   result.doctor = {
     ok: doctor.ok,
     summary: doctor.summary
@@ -1239,6 +1257,7 @@ function buildPackInstallPlan({ workspaceRoot, state, pack }) {
   for (const rolePath of Object.values(pack.paths || {})) {
     actions.push(directoryAction(workspaceRoot, rolePath));
   }
+  actions.push(...buildPackDirectoryActions(workspaceRoot, pack, variables));
 
   for (const seed of pack.seed || []) {
     const source = path.join(pack.__dir, seed.from);
@@ -1278,6 +1297,7 @@ function buildPackInstallPlan({ workspaceRoot, state, pack }) {
       {
         id: pack.id,
         version: pack.version || "0.1.0",
+        paths: pack.paths || {},
         installed_at: new Date().toISOString()
       }
     ],
@@ -1381,7 +1401,7 @@ function validateInitBlueprintForWorkspace(blueprint, workspaceType, workspaceCo
     || (blueprint.agent_rules || []).length
     || (blueprint.seed || []).length
   )) {
-    throw new Error("init blueprint v0.1 暂不支持定制 Hub 目录。Hub 请使用标准 init。");
+    throw new Error("init blueprint v0.1 暂不支持定制项目中心目录。项目中心请使用标准 init。");
   }
 }
 
@@ -1402,6 +1422,19 @@ function resolveInitPackPaths(pack, blueprint, { formalSource, businessWorkArea 
     paths.references = normalizeSafeRelativePath(businessWorkArea, "paths.business_work_area");
   }
   return paths;
+}
+
+function buildPackDirectoryActions(targetDir, pack, variables) {
+  const actions = [];
+  const directories = Array.isArray(pack.directories) ? pack.directories : [];
+  for (const directory of directories) {
+    const relativePath = normalizeSafeRelativePath(directory.path || pack.paths?.[directory.id], `pack ${pack.id} directories.path`);
+    actions.push(directoryAction(targetDir, relativePath));
+    if (directory.readme) {
+      actions.push(fileAction(targetDir, path.join(relativePath, "README.md"), renderText(directory.readme, variables)));
+    }
+  }
+  return actions;
 }
 
 function renderInitBlueprintRuleSlots(blueprint, variables) {
@@ -1949,9 +1982,7 @@ function checkKit(result, workspaceRoot, state) {
   const missing = [];
   for (const source of files) {
     const sourceRelativePath = normalizeRelativePath(path.relative(kitDir, source));
-    const relativePath = effectiveKit === "project"
-      ? mapKitRelativePathForLanguage(sourceRelativePath, state.language || "zh")
-      : sourceRelativePath;
+    const relativePath = mapKitRelativePathForWorkspace(sourceRelativePath, effectiveKit, state.language || "zh");
     if (matchesAnyRemovedPath(relativePath, removedByInitBlueprint)) continue;
     if (!fs.existsSync(path.join(workspaceRoot, relativePath))) {
       missing.push(relativePath);
@@ -1988,24 +2019,43 @@ function checkCoreRoles(result, workspaceRoot, state) {
 function checkHubCoreRoles(result, workspaceRoot, state) {
   if (isHubPreserveNamesUpgradeState(state)) {
     if (state.paths?.formal_source) {
-      checkPathExists(result, workspaceRoot, state.paths.formal_source, "hub.formal_source.exists", "Hub formal source exists", "缺少 Hub 正式事实源。");
+      checkPathExists(result, workspaceRoot, state.paths.formal_source, "hub.formal_source.exists", "Project Center formal source exists", "缺少项目中心正式事实源。");
     }
     if (state.paths?.business_work_area) {
-      checkPathExists(result, workspaceRoot, state.paths.business_work_area, "hub.business_work_area.exists", "Hub business work area exists", "缺少 Hub 当前协调工作区。");
+      checkPathExists(result, workspaceRoot, state.paths.business_work_area, "hub.business_work_area.exists", "Project Center business work area exists", "缺少项目中心当前协调工作区。");
     }
     return;
   }
   const hubPaths = getHubPaths(state);
-  checkPathExists(result, workspaceRoot, hubPaths.projectRegistry, "hub.project_registry.exists", "Hub project registry exists", "缺少 Hub 项目注册表。");
-  checkPathExists(result, workspaceRoot, hubPaths.coordination, "hub.coordination.exists", "Hub coordination layer exists", "缺少 Hub 跨项目协调层。");
-  checkPathExists(result, workspaceRoot, hubPaths.localHandoff, "hub.local_handoff.exists", "Hub local handoff queue exists", "缺少 Hub 本地收发队列。");
-  checkPathExists(result, workspaceRoot, hubPaths.incoming, "hub.incoming.exists", "Hub incoming review queue exists", "缺少 Hub 回写待审区。");
-  checkPathExists(result, workspaceRoot, "identity", "hub.identity.exists", "Hub identity source exists", "缺少 Hub identity/。");
-  checkPathExists(result, workspaceRoot, "lessons", "hub.lessons.exists", "Hub lessons source exists", "缺少 Hub lessons/。");
-  checkPathExists(result, workspaceRoot, hubPaths.knowledge, "hub.knowledge.exists", "Hub knowledge source exists", "缺少 Hub knowledge/。");
-  checkPathExists(result, workspaceRoot, path.join(hubPaths.formalSkills, "registry.json"), "hub.skills_registry.exists", "Hub skill registry exists", "缺少 Hub skills/registry.json。");
-  checkPathExists(result, workspaceRoot, hubPaths.draftsAndExperiments, "hub.workspace.exists", "Hub workspace exists", "缺少 Hub workspace/。");
+  checkPathExists(result, workspaceRoot, hubPaths.projectRegistry, "hub.project_registry.exists", "Project Center project registry exists", "缺少项目中心项目注册表。");
+  checkPathExists(result, workspaceRoot, hubPaths.coordination, "hub.coordination.exists", "Project Center coordination layer exists", "缺少项目中心跨项目协调层。");
+  checkPathExists(result, workspaceRoot, hubPaths.localHandoff, "hub.local_handoff.exists", "Project Center local handoff queue exists", "缺少项目中心本地收发队列。");
+  checkPathExists(result, workspaceRoot, hubPaths.incoming, "hub.incoming.exists", "Project Center incoming review queue exists", "缺少项目中心回写待审区。");
+  checkPathExists(result, workspaceRoot, hubPaths.identity, "hub.identity.exists", "Project Center identity source exists", `缺少项目中心身份目录：${hubPaths.identity}`);
+  checkPathExists(result, workspaceRoot, hubPaths.lessons, "hub.lessons.exists", "Project Center lessons source exists", `缺少项目中心教训目录：${hubPaths.lessons}`);
+  checkPathExists(result, workspaceRoot, hubPaths.knowledge, "hub.knowledge.exists", "Project Center knowledge source exists", "缺少项目中心 knowledge/。");
+  checkPathExists(result, workspaceRoot, path.join(hubPaths.formalSkills, "registry.json"), "hub.skills_registry.exists", "Project Center skill registry exists", "缺少项目中心 skills/registry.json。");
+  checkPathExists(result, workspaceRoot, hubPaths.draftsAndExperiments, "hub.workspace.exists", "Project Center workspace exists", "缺少项目中心 workspace/。");
+  checkHubDuplicateSemanticDirs(result, workspaceRoot);
   checkHubRuleDocumentPaths(result, workspaceRoot);
+}
+
+function checkHubDuplicateSemanticDirs(result, workspaceRoot) {
+  const pairs = [
+    ["identity", "身份", "身份"],
+    ["lessons", "教训", "教训"],
+    ["knowledge", "知识", "知识"],
+    ["projects", "项目", "项目"],
+    ["skills", "技能", "技能"],
+    ["workspace", "工作区", "工作区"]
+  ];
+  for (const [enPath, zhPath, label] of pairs) {
+    const hasEn = fs.existsSync(path.join(workspaceRoot, enPath));
+    const hasZh = fs.existsSync(path.join(workspaceRoot, zhPath));
+    if (hasEn && hasZh) {
+      addCheck(result, "hub.semantic_duplicate_dirs", "warn", `项目中心同时存在 ${enPath}/ 和 ${zhPath}/，它们都像“${label}”目录。请保留与工作台语言一致的一个。`, `${enPath}, ${zhPath}`);
+    }
+  }
 }
 
 function checkHubRuleDocumentPaths(result, workspaceRoot) {
@@ -2024,11 +2074,11 @@ function checkHubRuleDocumentPaths(result, workspaceRoot) {
         result,
         `hub.rules.${relativePath.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.paths`,
         "warn",
-        `${relativePath} 里还写着旧 Hub 路径：${matched.join(", ")}。新版 Hub 使用 projects/、.incoming/ 和 .starwork/handoff/。`,
+        `${relativePath} 里还写着旧项目中心路径：${matched.join(", ")}。新版项目中心使用 projects/、.incoming/ 和 .starwork/handoff/。`,
         relativePath
       );
     } else {
-      addCheck(result, `hub.rules.${relativePath.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.paths`, "pass", `${relativePath} uses current Hub paths`, relativePath);
+      addCheck(result, `hub.rules.${relativePath.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.paths`, "pass", `${relativePath} uses current Project Center paths`, relativePath);
     }
   }
 }
@@ -2110,7 +2160,7 @@ function looksLikeWorkspacePath(raw) {
 function getCoreRolePaths(state) {
   const kit = state.kit || "";
   const language = state.language || "zh";
-  if (kit === "project" || kit.startsWith("satellite-") || state.hub) {
+  if (kit === "project" || kit.startsWith("satellite-") || getProjectCenterBinding(state)) {
     const satellitePaths = getSatellitePaths(language);
     return {
       projectStatus: satellitePaths.projectStatus,
@@ -2126,6 +2176,29 @@ function getCoreRolePaths(state) {
   return {
     projectStatus: "_系统/上下文/项目状态.md",
     currentWork: "_系统/任务/当前工作.md"
+  };
+}
+
+function getProjectCenterBinding(state = {}) {
+  return state.project_center || state.hub || null;
+}
+
+function getHubStandardPaths(language = "en") {
+  return HUB_LANGUAGE_PATHS[language] || HUB_STANDARD_PATHS;
+}
+
+function getHubStatePathsForLanguage(language = "en") {
+  const paths = getHubStandardPaths(language);
+  return {
+    identity: paths.identity,
+    lessons: paths.lessons,
+    project_registry: paths.projectRegistry,
+    coordination: paths.coordination,
+    local_handoff: paths.localHandoff,
+    incoming: paths.incoming,
+    formal_skills: paths.formalSkills,
+    drafts_and_experiments: paths.draftsAndExperiments,
+    knowledge: paths.knowledge
   };
 }
 
@@ -2285,37 +2358,39 @@ function checkSkillInstallations(result, workspaceRoot, state) {
   }
 
   if (state.workspace_type === "hub") {
-    const registryPath = path.join(workspaceRoot, "skills", "registry.json");
+    const hubPaths = getHubPaths(state);
+    const registryRelativePath = path.join(hubPaths.formalSkills, "registry.json");
+    const registryPath = path.join(workspaceRoot, registryRelativePath);
     skills.registry = {
       exists: fs.existsSync(registryPath),
-      path: "skills/registry.json",
+      path: registryRelativePath,
       count: 0
     };
     if (!skills.registry.exists) {
-      addCheck(result, "skills.registry.exists", "warn", "Hub 缺少托管 Skill 注册表。", "skills/registry.json");
+      addCheck(result, "skills.registry.exists", "warn", "项目中心缺少托管 Skill 注册表。", registryRelativePath);
       return;
     }
-    addCheck(result, "skills.registry.exists", "pass", "Hub skill registry exists", "skills/registry.json");
+    addCheck(result, "skills.registry.exists", "pass", "Project Center skill registry exists", registryRelativePath);
     let registry;
     try {
       registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
     } catch (error) {
-      addCheck(result, "skills.registry.parse", "fail", `无法解析 Hub Skill registry：${error.message}`, "skills/registry.json");
+      addCheck(result, "skills.registry.parse", "fail", `无法解析项目中心 Skill registry：${error.message}`, registryRelativePath);
       return;
     }
     if (registry.schema === "starwork.skill_registry.v0.1") {
-      addCheck(result, "skills.registry.schema", "pass", "Hub skill registry schema is valid", "skills/registry.json");
+      addCheck(result, "skills.registry.schema", "pass", "Project Center skill registry schema is valid", registryRelativePath);
     } else {
-      addCheck(result, "skills.registry.schema", "fail", "Hub Skill registry schema 不正确。", "skills/registry.json");
+      addCheck(result, "skills.registry.schema", "fail", "项目中心 Skill registry schema 不正确。", registryRelativePath);
     }
     const registrySkills = Array.isArray(registry.skills) ? registry.skills : [];
     skills.registry.count = registrySkills.length;
     for (const skill of registrySkills) {
       if (!skill?.id) {
-        addCheck(result, "skills.registry.id.exists", "fail", "Hub Skill registry 中存在缺少 id 的条目。", "skills/registry.json");
+        addCheck(result, "skills.registry.id.exists", "fail", "项目中心 Skill registry 中存在缺少 id 的条目。", registryRelativePath);
         continue;
       }
-      checkPathExists(result, workspaceRoot, path.join("skills", skill.id), "skills.registry.source.exists", `Hub skill source exists: ${skill.id}`, `Hub 托管 Skill 缺少目录：skills/${skill.id}`);
+      checkPathExists(result, workspaceRoot, path.join(hubPaths.formalSkills, skill.id), "skills.registry.source.exists", `Project Center skill source exists: ${skill.id}`, `项目中心托管 Skill 缺少目录：${path.join(hubPaths.formalSkills, skill.id)}`);
     }
   }
 }
@@ -2829,7 +2904,7 @@ function buildLegacyReasons({
   }
 
   const workspaceTypeReasons = workspaceType === "hub"
-    ? hubSignals.map((item) => `${item} 表示存在主库或多项目中枢结构`)
+    ? hubSignals.map((item) => `${item} 表示存在类似项目中心的结构`)
     : ["按 Project 工作台候选处理；事项目录只作为历史内容信号，不再决定工作区类型。"];
 
   return {
@@ -2837,7 +2912,7 @@ function buildLegacyReasons({
     workspace_type: uniqueList(workspaceTypeReasons),
     references: uniqueList([...found.referencesZh, ...found.referencesEn, ...signalReferences].map((item) => `${item} 命中参考资料候选信号`)),
     outputs: uniqueList([...found.outputsZh, ...found.outputsEn, ...signalOutputs].map((item) => `${item} 命中成果或输出候选信号`)),
-    hub: hasHubLikeRepository ? uniqueList(hubSignals.map((item) => `${item} 命中主库 / Hub 候选信号`)) : [],
+    hub: hasHubLikeRepository ? uniqueList(hubSignals.map((item) => `${item} 命中项目中心候选信号`)) : [],
     candidate: uniqueList([
       ...signalEntries.map((item) => `${item} 是 Agent 入口信号`),
       ...signalSystems.map((item) => `${item} 是系统目录信号`),
@@ -2889,13 +2964,13 @@ function buildLegacySignals(legacy) {
 }
 
 function addLegacyChecks(result, legacy) {
-  const label = legacy.hubLike ? "主库 / Hub 候选" : "历史模板升级候选";
+  const label = legacy.hubLike ? "项目中心候选" : "历史模板升级候选";
   addCheck(result, "legacy.template.detected", "info", `检测到${label}，置信度：${legacy.confidence}。`, legacy.primaryTrace);
   addCheck(result, "legacy.language.inferred", "info", `推测语言：${legacy.language}。`);
   addCheck(result, "legacy.workspace_type.inferred", "info", `推测工作区类型：${legacy.workspaceType}。`);
 
   if (legacy.hubLike) {
-    addCheck(result, "legacy.hub.detected", "info", `检测到主库 / Hub 信号：${legacy.hubSignals.join(", ")}。`, legacy.hubSignals[0]);
+    addCheck(result, "legacy.hub.detected", "info", `检测到类似项目中心的旧工作区信号：${legacy.hubSignals.join(", ")}。`, legacy.hubSignals[0]);
   }
 
   if (legacy.references.length) {
@@ -2977,7 +3052,7 @@ function printDoctorResult(result, options) {
   }
 
   if (result.upgrade?.candidate) {
-    const legacyLabel = result.upgrade.source === "hub-like-main-repository" ? "多项目主库" : "旧工作区";
+    const legacyLabel = result.upgrade.source === "hub-like-main-repository" ? "像项目中心的旧工作区" : "旧工作区";
     console.log("旧目录识别：");
     console.log(`- 这个目录看起来像一个${legacyLabel}，可以进一步让 AI 帮你判断如何无损整理。`);
     console.log(`- 推测语言：${friendlyLanguage(result.upgrade.inferred.language)}`);
@@ -2999,9 +3074,9 @@ function printDoctorResult(result, options) {
 function friendlyWorkspaceType(type) {
   const labels = {
     project: "一个项目工作台",
-    hub: "一个多项目中枢",
+    hub: "一个项目中心",
     "single-light": "一个项目工作台",
-    "satellite-starter": "一个项目工作台"
+    "satellite-starter": "一个中心管理的项目工作台"
   };
   return labels[type] || "StarWork 工作台";
 }
@@ -3032,11 +3107,11 @@ function friendlyDoctorMessage(message) {
   return String(message || "")
     .replace(/这是一个可升级的历史模板工作区，但缺少 \.starwork\/workspace\.json。/g, "这个目录像旧版工作区，但还缺少 StarWork 工作台身份证（.starwork/workspace.json）。")
     .replace(/检测到历史模板升级候选，置信度：(?:high|medium|low)。/g, "这个目录像旧版工作区，可以进一步判断如何整理。")
-    .replace(/检测到主库 \/ Hub 候选，置信度：(?:high|medium|low)。/g, "这个目录像多项目主库，可以进一步判断如何接入 StarWork。")
+    .replace(/检测到主库 \/ Hub 候选，置信度：(?:high|medium|low)。/g, "这个目录像项目中心，可以进一步判断如何接入 StarWork。")
     .replace(/推测语言：zh。/g, "推测语言：中文。")
     .replace(/推测语言：en。/g, "推测语言：英文。")
     .replace(/推测工作区类型：project。/g, "推测用途：项目工作台。")
-    .replace(/推测工作区类型：hub。/g, "推测用途：多项目中枢。")
+    .replace(/推测工作区类型：hub。/g, "推测用途：项目中心。")
     .replace(/workspace state/g, "工作台身份证")
     .replace(/workspace schema/g, "工作台身份证格式")
     .replace(/workspace core/g, "工作台版本")
@@ -3071,7 +3146,7 @@ async function chooseWorkspaceType(options) {
   }
   return choose("第 1 步：你要创建哪种工作台？", [
     ["project", "项目工作台（推荐）：具体项目执行，资料、草稿、成果分开"],
-    ["hub", "多项目管理中枢：统一维护身份、教训、知识、skills 和项目登记"]
+    ["hub", "项目中心：统一维护身份、教训、知识、skills 和项目登记"]
   ], { defaultIndex: 0 });
 }
 
@@ -3097,7 +3172,7 @@ async function choosePack(workspaceType, workspaceConfig, options) {
   if (workspaceType === "hub") {
     if (!options.yes && process.stdin.isTTY) {
       console.log("");
-      console.log("第 3 步：多项目 Hub 会自动使用 hub-management Pack，不需要再选择场景 Pack。");
+      console.log("第 3 步：项目中心会自动使用项目中心管理能力，不需要再选择场景能力。");
     }
     return workspaceConfig.defaultPack;
   }
@@ -3211,13 +3286,14 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
   for (const source of walkFiles(kitDir)) {
     const sourceRelativePath = normalizeRelativePath(path.relative(kitDir, source));
     if (shouldSkipStandaloneProjectKitFile(sourceRelativePath, workspaceType)) continue;
-    const relativePath = workspaceConfig.kit === "project" || workspaceConfig.kit?.startsWith("satellite-")
-      ? mapKitRelativePathForLanguage(sourceRelativePath, pack.language || "zh")
-      : sourceRelativePath;
+    const relativePath = mapKitRelativePathForWorkspace(sourceRelativePath, workspaceConfig.kit, pack.language || "zh");
     let content = fs.readFileSync(source, "utf8");
     content = renderText(content, variables);
     if (workspaceConfig.kit === "project") {
       content = renderProjectKitContent(relativePath, content, { language: pack.language || "zh", pack });
+    }
+    if (workspaceConfig.kit === "hub") {
+      content = renderHubKitContent(relativePath, content, { language: pack.language || "zh" });
     }
     if (relativePath === "AGENTS.md" && blueprint) {
       content = renderInitBlueprintAgents({
@@ -3238,6 +3314,7 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
   for (const rolePath of Object.values(resolvedPackPaths || {})) {
     actions.push(directoryAction(targetDir, rolePath));
   }
+  actions.push(...buildPackDirectoryActions(targetDir, pack, variables));
   for (const folder of blueprint?.folders || []) {
     actions.push(directoryAction(targetDir, normalizeSafeRelativePath(folder, "init blueprint folders")));
   }
@@ -3263,11 +3340,12 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
   }
 
   const kitSkillPlan = includeSkills
-    ? buildKitSkillPlan({ targetDir, kit: workspaceConfig.kit, installedBy: "starwork init" })
+    ? buildKitSkillPlan({ targetDir, kit: workspaceConfig.kit, language: pack.language || "zh", installedBy: "starwork init" })
     : { actions: [], records: [] };
   actions.push(...kitSkillPlan.actions);
   if (workspaceType === "hub") {
-    actions.push(fileAction(targetDir, path.join("skills", "registry.json"), renderHubSkillRegistry([])));
+    const hubPaths = getHubStandardPaths(pack.language || "zh");
+    actions.push(fileAction(targetDir, path.join(hubPaths.formalSkills, "registry.json"), renderHubSkillRegistry([])));
   }
 
   const workspaceState = {
@@ -3288,13 +3366,7 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
       formal_source: formalSource,
       business_work_area: businessWorkArea,
       ...(workspaceType === "hub" ? {
-        project_registry: HUB_STANDARD_PATHS.projectRegistry,
-        coordination: HUB_STANDARD_PATHS.coordination,
-        local_handoff: HUB_STANDARD_PATHS.localHandoff,
-        incoming: HUB_STANDARD_PATHS.incoming,
-        formal_skills: HUB_STANDARD_PATHS.formalSkills,
-        drafts_and_experiments: HUB_STANDARD_PATHS.draftsAndExperiments,
-        knowledge: HUB_STANDARD_PATHS.knowledge
+        ...getHubStatePathsForLanguage(pack.language || "zh")
       } : {})
     },
     ...(blueprint ? {
@@ -3499,7 +3571,7 @@ function shouldSkipStandaloneProjectKitFile(relativePath, workspaceType) {
     || normalized.startsWith("_系统/主库同步/");
 }
 
-function buildKitSkillPlan({ targetDir, kit, installedBy }) {
+function buildKitSkillPlan({ targetDir, kit, language = "zh", installedBy }) {
   const now = new Date().toISOString();
   const actions = [];
   const records = [];
@@ -3513,19 +3585,20 @@ function buildKitSkillPlan({ targetDir, kit, installedBy }) {
 
     const mounts = [];
     for (const install of skill.install || []) {
+      const installPath = mapKitSkillInstallPath(install.path, kit, language);
       if (install.mode === "copy") {
-        actions.push(...copyDirectoryFiles(PRODUCT_ROOT, skill.source, targetDir, install.path));
+        actions.push(...copyDirectoryFiles(PRODUCT_ROOT, skill.source, targetDir, installPath));
       } else if (install.mode === "symlink") {
         if (!install.source) {
           throw new Error(`Skill ${skill.id} 的 symlink 安装缺少 source。`);
         }
-        actions.push(symlinkAction(targetDir, install.path, path.join(targetDir, install.source)));
+        actions.push(symlinkAction(targetDir, installPath, path.join(targetDir, mapKitSkillInstallPath(install.source, kit, language))));
       } else {
         throw new Error(`Skill ${skill.id} 不支持安装模式：${install.mode}`);
       }
       mounts.push({
         agent: install.agent,
-        path: normalizeRelativePath(install.path),
+        path: normalizeRelativePath(installPath),
         mode: install.mode
       });
     }
@@ -3550,6 +3623,14 @@ function buildKitSkillPlan({ targetDir, kit, installedBy }) {
   return { actions, records };
 }
 
+function mapKitSkillInstallPath(relativePath, kit, language = "zh") {
+  const normalized = normalizeRelativePath(relativePath);
+  if (kit === "hub" && language === "zh") {
+    return normalized.replace(/^skills(?=\/|$)/, "技能");
+  }
+  return normalized;
+}
+
 function renderProjectSkillsManifest(records) {
   return `${JSON.stringify({
     schema: "starwork.project_skills.v0.1",
@@ -3567,10 +3648,10 @@ function renderHubSkillRegistry(skills) {
   }, null, 2)}\n`;
 }
 
-function buildSpawnSkillPlan({ hubRoot, targetDir, blueprint, kit, installedBy }) {
-  const registry = readHubSkillRegistry(hubRoot);
+function buildSpawnSkillPlan({ hubRoot, hubPaths, targetDir, blueprint, kit, language = "zh", installedBy }) {
+  const registry = readHubSkillRegistry(hubRoot, hubPaths);
   const registrySkills = Array.isArray(registry.skills) ? registry.skills : [];
-  const kitPlan = buildKitSkillPlan({ targetDir, kit, installedBy });
+  const kitPlan = buildKitSkillPlan({ targetDir, kit, language, installedBy });
   const kitSkillIds = new Set(kitPlan.records.map((record) => record.id));
   for (const requestedSkill of blueprint?.skills || []) {
     if (requestedSkill.source === "kit" && !kitSkillIds.has(requestedSkill.id)) {
@@ -3585,15 +3666,15 @@ function buildSpawnSkillPlan({ hubRoot, targetDir, blueprint, kit, installedBy }
   for (const selectedSkill of selected) {
     const registrySkill = registrySkills.find((skill) => skill.id === selectedSkill.id);
     if (!registrySkill) {
-      throw new Error(`Hub 托管 Skill 未登记：${selectedSkill.id}`);
+      throw new Error(`项目中心托管 Skill 未登记：${selectedSkill.id}`);
     }
     const distribution = selectedSkill.distribution || registrySkill.distribution?.mode || "symlink";
     if (!["symlink", "copy"].includes(distribution)) {
-      throw new Error(`Hub 托管 Skill ${selectedSkill.id} 的分发模式不支持：${distribution}`);
+      throw new Error(`项目中心托管 Skill ${selectedSkill.id} 的分发模式不支持：${distribution}`);
     }
-    const sourceDir = path.join(hubRoot, "skills", selectedSkill.id);
+    const sourceDir = path.join(hubRoot, hubPaths.formalSkills, selectedSkill.id);
     if (!fs.existsSync(sourceDir)) {
-      throw new Error(`Hub 托管 Skill 缺少目录：skills/${selectedSkill.id}`);
+      throw new Error(`项目中心托管 Skill 缺少目录：skills/${selectedSkill.id}`);
     }
 
     const mounts = [];
@@ -3603,7 +3684,7 @@ function buildSpawnSkillPlan({ hubRoot, targetDir, blueprint, kit, installedBy }
       if (distribution === "symlink") {
         actions.push(symlinkAction(targetDir, target, sourceDir));
       } else {
-        actions.push(...copyDirectoryFiles(hubRoot, path.join("skills", selectedSkill.id), targetDir, target));
+        actions.push(...copyDirectoryFiles(hubRoot, path.join(hubPaths.formalSkills, selectedSkill.id), targetDir, target));
       }
       mounts.push({
         agent,
@@ -3623,7 +3704,7 @@ function buildSpawnSkillPlan({ hubRoot, targetDir, blueprint, kit, installedBy }
       },
       distribution,
       mounts,
-      reason: selectedSkill.reason || registrySkill.description || "Hub 托管 Skill 按本次 spawn 选择分发。",
+      reason: selectedSkill.reason || registrySkill.description || "项目中心托管 Skill 按本次 spawn 选择分发。",
       installed_by: installedBy,
       installed_at: now
     });
@@ -3655,8 +3736,13 @@ function selectSpawnSkills(registrySkills, blueprint) {
   return selected;
 }
 
-function readHubSkillRegistry(hubRoot) {
-  const registryPath = path.join(hubRoot, "skills", "registry.json");
+function readHubSkillRegistry(hubRoot, hubPaths = null) {
+  const registryPath = hubPaths
+    ? path.join(hubRoot, hubPaths.formalSkills, "registry.json")
+    : findFirstExistingPath(hubRoot, [
+      path.join("技能", "registry.json"),
+      path.join("skills", "registry.json")
+    ]);
   if (!fs.existsSync(registryPath)) {
     return {
       schema: "starwork.skill_registry.v0.1",
@@ -3668,15 +3754,23 @@ function readHubSkillRegistry(hubRoot) {
   try {
     registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
   } catch (error) {
-    throw new Error(`无法读取 Hub Skill registry：${error.message}`);
+    throw new Error(`无法读取项目中心 Skill registry：${error.message}`);
   }
   if (registry.schema !== "starwork.skill_registry.v0.1") {
-    throw new Error("Hub Skill registry schema 必须是 starwork.skill_registry.v0.1。");
+    throw new Error("项目中心 Skill registry schema 必须是 starwork.skill_registry.v0.1。");
   }
   if (!Array.isArray(registry.skills)) {
-    throw new Error("Hub Skill registry 的 skills 必须是数组。");
+    throw new Error("项目中心 Skill registry 的 skills 必须是数组。");
   }
   return registry;
+}
+
+function findFirstExistingPath(root, relativePaths) {
+  for (const relativePath of relativePaths) {
+    const fullPath = path.join(root, relativePath);
+    if (fs.existsSync(fullPath)) return fullPath;
+  }
+  return path.join(root, relativePaths[0]);
 }
 
 function resolveHubRoot(hubPath) {
@@ -3686,36 +3780,39 @@ function resolveHubRoot(hubPath) {
 
 function assertHealthyHub(hubRoot, hubState) {
   if (hubState.workspace_type !== "hub" || hubState.kit !== "hub") {
-    throw new Error("spawn 必须从多项目管理中枢工作台执行。请先运行 starwork init --type hub。");
+    throw new Error("spawn 必须从项目中心执行。请先运行 starwork init --type hub 创建项目中心。");
   }
   const health = doctorCollect(hubRoot);
   if (health.summary.fail > 0) {
-    throw new Error("Hub 工作台未通过 doctor 检查，请先修复阻塞问题。");
+    throw new Error("项目中心未通过 doctor 检查，请先修复阻塞问题。");
   }
   const hubPaths = getHubPaths(hubState);
   const required = [
     hubPaths.projectRegistry,
-    "identity",
-    "lessons",
+    hubPaths.identity,
+    hubPaths.lessons,
     hubPaths.formalSkills,
     hubPaths.knowledge
   ];
   for (const relativePath of required) {
     if (!fs.existsSync(path.join(hubRoot, relativePath))) {
-      throw new Error(`Hub 缺少必要资源：${relativePath}`);
+      throw new Error(`项目中心缺少必要资源：${relativePath}`);
     }
   }
 }
 
 function getHubPaths(hubState = {}) {
+  const defaults = getHubStandardPaths(hubState.language || "en");
   return {
-    projectRegistry: hubState.paths?.project_registry || HUB_STANDARD_PATHS.projectRegistry,
-    coordination: hubState.paths?.coordination || HUB_STANDARD_PATHS.coordination,
-    localHandoff: hubState.paths?.local_handoff || HUB_STANDARD_PATHS.localHandoff,
-    incoming: hubState.paths?.incoming || HUB_STANDARD_PATHS.incoming,
-    formalSkills: hubState.paths?.formal_skills || HUB_STANDARD_PATHS.formalSkills,
-    draftsAndExperiments: hubState.paths?.drafts_and_experiments || HUB_STANDARD_PATHS.draftsAndExperiments,
-    knowledge: hubState.paths?.knowledge || HUB_STANDARD_PATHS.knowledge
+    identity: hubState.paths?.identity || defaults.identity,
+    lessons: hubState.paths?.lessons || defaults.lessons,
+    projectRegistry: hubState.paths?.project_registry || defaults.projectRegistry,
+    coordination: hubState.paths?.coordination || defaults.coordination,
+    localHandoff: hubState.paths?.local_handoff || defaults.localHandoff,
+    incoming: hubState.paths?.incoming || defaults.incoming,
+    formalSkills: hubState.paths?.formal_skills || defaults.formalSkills,
+    draftsAndExperiments: hubState.paths?.drafts_and_experiments || defaults.draftsAndExperiments,
+    knowledge: hubState.paths?.knowledge || defaults.knowledge
   };
 }
 
@@ -3861,6 +3958,17 @@ function buildSpawnPlan({ hubRoot, hubState, targetDir, projectName, projectId, 
 
   const now = new Date().toISOString();
   const actions = [];
+  const defaultPack = loadPack("general", language);
+  const packVariables = {
+    workspace: {
+      name: projectName,
+      type: modeConfig.workspaceType
+    },
+    pack: defaultPack,
+    paths: defaultPack.paths || {},
+    overrides: defaultPack.overrides || {}
+  };
+  const packRuleSlots = renderPackRuleSlots(defaultPack, packVariables, "场景规则");
 
   for (const source of walkFiles(kitDir)) {
     const sourceRelativePath = normalizeRelativePath(path.relative(kitDir, source));
@@ -3870,9 +3978,17 @@ function buildSpawnPlan({ hubRoot, hubState, targetDir, projectName, projectId, 
     content = renderSatelliteKitContent(relativePath, content, { language, mode, modeConfig });
     if (normalizeRelativePath(relativePath) === "AGENTS.md") {
       content = ensureBlueprintRulesIndexReference(content, blueprint);
+      if (packRuleSlots.length) {
+        content = ensureRulesIndexReference(content);
+      }
     }
     actions.push(fileAction(targetDir, relativePath, content));
   }
+  for (const rolePath of Object.values(defaultPack.paths || {})) {
+    actions.push(directoryAction(targetDir, rolePath));
+  }
+  actions.push(...buildPackDirectoryActions(targetDir, defaultPack, packVariables));
+  actions.push(...buildRuleSlotActions(targetDir, packRuleSlots));
   actions.push(fileAction(targetDir, path.join(satellitePaths.mainRepoSync, "README.md"), renderSatelliteMainRepoSyncReadme(language)));
   actions.push(fileAction(targetDir, path.join(satellitePaths.identity, "README.md"), renderSatelliteIdentityReadme(language)));
   actions.push(fileAction(targetDir, path.join(satellitePaths.lessons, "README.md"), renderSatelliteLessonsReadme(language)));
@@ -3899,8 +4015,8 @@ function buildSpawnPlan({ hubRoot, hubState, targetDir, projectName, projectId, 
     }));
   }
 
-  actions.push(...copyDirectoryFiles(hubRoot, "identity", targetDir, satellitePaths.identity));
-  actions.push(...copyDirectoryFiles(hubRoot, "lessons", targetDir, satellitePaths.lessons));
+  actions.push(...copyDirectoryFiles(hubRoot, hubPaths.identity, targetDir, satellitePaths.identity));
+  actions.push(...copyDirectoryFiles(hubRoot, hubPaths.lessons, targetDir, satellitePaths.lessons));
   if (fs.existsSync(path.join(hubRoot, ".internal"))) {
     actions.push(...copyDirectoryFiles(hubRoot, ".internal", targetDir, path.join(".starwork", "internal")));
   }
@@ -3913,9 +4029,11 @@ function buildSpawnPlan({ hubRoot, hubState, targetDir, projectName, projectId, 
   actions.push(directoryAction(targetDir, path.join(".claude", "skills")));
   const skillPlan = buildSpawnSkillPlan({
     hubRoot,
+    hubPaths,
     targetDir,
     blueprint,
     kit: modeConfig.kit,
+    language,
     installedBy: blueprint ? "starwork spawn --blueprint" : "starwork spawn"
   });
   actions.push(...skillPlan.actions);
@@ -3925,7 +4043,14 @@ function buildSpawnPlan({ hubRoot, hubState, targetDir, projectName, projectId, 
     core: "0.1",
     workspace_type: modeConfig.workspaceType,
     kit: modeConfig.kit,
-    packs: [],
+    packs: [
+      {
+        id: defaultPack.id,
+        version: defaultPack.version || "0.1.0",
+        paths: defaultPack.paths || {},
+        installed_at: now
+      }
+    ],
     language,
     paths: {
       formal_source: modeConfig.formalSource,
@@ -3947,6 +4072,10 @@ function buildSpawnPlan({ hubRoot, hubState, targetDir, projectName, projectId, 
         }))
       }
     } : {}),
+    project_center: {
+      path: hubRoot,
+      project_id: projectId
+    },
     hub: {
       path: hubRoot,
       project_id: projectId
@@ -3965,12 +4094,12 @@ function buildSpawnPlan({ hubRoot, hubState, targetDir, projectName, projectId, 
     last_sync_at: now,
     resources: {
       identity: {
-        source: "identity/",
+        source: hubPaths.identity,
         target: satellitePaths.identity,
         mode: "snapshot"
       },
       lessons: {
-        source: "lessons/",
+        source: hubPaths.lessons,
         target: satellitePaths.lessons,
         mode: "snapshot"
       },
@@ -4094,6 +4223,35 @@ function getSatellitePaths(language = "zh") {
   };
 }
 
+function mapKitRelativePathForWorkspace(relativePath, kit, language = "zh") {
+  const normalized = normalizeRelativePath(relativePath);
+  if (kit === "project" || kit?.startsWith("satellite-")) {
+    return mapKitRelativePathForLanguage(normalized, language);
+  }
+  if (kit === "hub") {
+    return mapHubRelativePathForLanguage(normalized, language);
+  }
+  return normalized;
+}
+
+function mapHubRelativePathForLanguage(relativePath, language = "zh") {
+  const normalized = normalizeRelativePath(relativePath);
+  if (language !== "zh") return normalized;
+  if (normalized.startsWith(".incoming/")) return normalized;
+  return normalized
+    .split("/")
+    .map((segment) => ({
+      identity: "身份",
+      lessons: "教训",
+      knowledge: "知识",
+      projects: "项目",
+      coordination: "协作",
+      skills: "技能",
+      workspace: "工作区"
+    })[segment] || segment)
+    .join("/");
+}
+
 function mapKitRelativePathForLanguage(relativePath, language = "zh") {
   const normalized = normalizeRelativePath(relativePath);
   if (language !== "en") return normalized;
@@ -4128,7 +4286,7 @@ function renderSatelliteKitContent(relativePath, content, { language, mode, mode
   }
   if (language !== "en") return content;
   if (normalized === "knowledge/README.md") {
-    return "# Knowledge\n\nThis path should be a read-only link to the Hub `knowledge/` directory.\n\nDo not edit shared knowledge directly inside a satellite project. Submit reusable knowledge candidates through the Hub review flow.\n";
+    return "# Knowledge\n\nThis path should be a read-only link to the Project Center `knowledge/` directory.\n\nDo not edit shared knowledge directly inside this project workspace. Submit reusable knowledge candidates through the Project Center review flow.\n";
   }
   if (normalized === "references/README.md") {
     return "# References\n\nStore source materials and reference files for this project here.\n";
@@ -4172,16 +4330,153 @@ function renderProjectKitContent(relativePath, content, { language }) {
   if (normalized === "knowledge/README.md") {
     return renderEnglishProjectKnowledgeReadme();
   }
-  if (normalized === "references/README.md") {
-    return "# References\n\nStore source materials and reference files for this project here.\n";
-  }
-  if (normalized === "outputs/drafts/README.md") {
-    return "# Drafts\n\nStore AI drafts and working drafts here.\n";
-  }
-  if (normalized === "outputs/final/README.md") {
-    return "# Final Outputs\n\nStore user-approved outputs and confirmed deliverables here, unless this project declares another formal source of truth.\n";
-  }
   return content;
+}
+
+function renderHubKitContent(relativePath, content, { language }) {
+  const normalized = normalizeRelativePath(relativePath);
+  if (language === "en") {
+    if (normalized === "AGENTS.md") return renderEnglishHubAgents();
+    if (normalized === "README.md") return renderEnglishHubReadme();
+    if (normalized === "identity/README.md") return "# Identity\n\nThis is the Project Center source for cross-project identity, preferences, and durable context.\n\nDo not write temporary project preferences here. Put reusable candidates through `.incoming/identity/` first.\n";
+    if (normalized === "lessons/README.md") return "# Lessons\n\nThis is the Project Center source for reusable lessons across projects.\n\nDo not record ordinary project progress here. Put reusable candidates through `.incoming/lessons/` first.\n";
+    if (normalized === "knowledge/README.md") return "# Knowledge\n\nThis is the Project Center source for shared cross-project knowledge.\n\nManaged project workspaces should treat this as read-only by default. Put reusable knowledge candidates through `.incoming/knowledge/` first.\n";
+    if (normalized === "projects/README.md") return "# Projects\n\nThis directory records the Project Center project list and cross-project coordination layer.\n";
+    if (normalized === "projects/coordination/README.md") return "# Coordination\n\nUse this directory for central cross-project coordination.\n\n`messages/` records queued, delivered, acknowledged, and closed states. The Project Center local inbox and outbox live in `.starwork/handoff/`.\n";
+    if (normalized === "skills/README.md") return "# Skills\n\nThis directory stores Project Center managed skills.\n\n`registry.json` is the list used by `starwork spawn` when distributing selected skills to project workspaces.\n";
+    if (normalized === "workspace/README.md") return "# Workspace\n\nThis is the Project Center area for drafts, experiments, and general capability development.\n\nMove mature assets into `skills/`, `lessons/`, `identity/`, or `knowledge/` only after review.\n";
+    if (normalized === ".incoming/README.md") return "# Incoming\n\nThis hidden queue stores candidates proposed by managed projects before they are reviewed and merged into shared Project Center assets.\n";
+    return content;
+  }
+  if (normalized === "AGENTS.md") return renderChineseHubAgents();
+  if (normalized === "README.md") return renderChineseHubReadme();
+  return content;
+}
+
+function renderChineseHubAgents() {
+  return `# StarWork 项目中心规则
+
+## 开始前先读
+
+1. \`项目/registry.json\`
+2. \`项目/协作/README.md\`
+3. \`技能/registry.json\`
+4. \`.incoming/\`
+5. \`工作区/README.md\`
+
+## 项目中心职责
+
+- 维护跨项目共享身份、教训、知识和正式技能。
+- 维护项目注册表和跨项目联络中央路由。
+- 审核中心管理项目工作台的回写候选。
+- 在 \`工作区/\` 中开发通用规则草稿、实验和技能原型。
+
+## 写入边界
+
+- 项目注册信息写入 \`项目/registry.json\`。
+- 跨项目中央路由写入 \`项目/协作/\`。
+- 项目中心自己的本地收发队列写入 \`.starwork/handoff/\`。
+- 候选共享内容先写入 \`.incoming/\`，审核后再合并。
+- 草稿、实验和未定稿通用能力只能先写入 \`工作区/\`。
+- 正式共享资产写入 \`身份/\`、\`教训/\`、\`知识/\`、\`技能/\`。
+- 具体项目的进度正文留在各自项目工作台内，不复制进项目中心。
+
+## 需要确认
+
+- 修改身份、教训、共享知识或正式技能。
+- 合并 \`.incoming/\` 中的候选内容。
+- 创建、暂停或归档项目注册。
+`;
+}
+
+function renderChineseHubReadme() {
+  return `# 项目中心
+
+适合希望统一管理多个项目工作台的用户。项目中心是共享资产、项目注册、跨项目路由、回写审核和通用能力草稿的管理层，不是具体项目工作台。
+
+## 包含
+
+- \`AGENTS.md\`
+- \`.starwork/workspace.json\`
+- \`.starwork/skills.json\`
+- \`.starwork/handoff/\`
+- \`.internal/\`
+- \`.incoming/\`
+- \`项目/registry.json\`
+- \`项目/协作/\`
+- \`身份/\`
+- \`教训/\`
+- \`知识/\`
+- \`技能/\`
+- \`工作区/\`
+
+隐藏机制目录保持英文。用户可见目录使用中文，避免同一个项目中心里同时出现中英文同义目录。
+
+从项目中心创建项目工作台应由 \`starwork spawn\` 完成。
+`;
+}
+
+function renderEnglishHubAgents() {
+  return `# StarWork Project Center Rules
+
+## Read First
+
+1. \`projects/registry.json\`
+2. \`projects/coordination/README.md\`
+3. \`skills/registry.json\`
+4. \`.incoming/\`
+5. \`workspace/README.md\`
+
+## Project Center Responsibilities
+
+- Maintain shared identity, lessons, knowledge, and formal skills.
+- Maintain the project registry and central cross-project coordination route.
+- Review write-back candidates from managed project workspaces.
+- Use \`workspace/\` for general rule drafts, experiments, and skill prototypes.
+
+## Write Boundaries
+
+- Project registration belongs in \`projects/registry.json\`.
+- Central cross-project coordination belongs in \`projects/coordination/\`.
+- The Project Center local inbox and outbox live in \`.starwork/handoff/\`.
+- Shared candidates go to \`.incoming/\` before review and merge.
+- Drafts and experiments go to \`workspace/\`.
+- Formal shared assets belong in \`identity/\`, \`lessons/\`, \`knowledge/\`, and \`skills/\`.
+- Detailed project progress stays inside each project workspace.
+
+## Confirmation Required
+
+- Changing identity, lessons, shared knowledge, or formal skills.
+- Merging candidates from \`.incoming/\`.
+- Creating, pausing, or archiving project registrations.
+`;
+}
+
+function renderEnglishHubReadme() {
+  return `# Project Center
+
+The Project Center manages shared assets, project registration, cross-project routing, write-back review, and general capability drafts. It is not a concrete project workspace.
+
+## Includes
+
+- \`AGENTS.md\`
+- \`.starwork/workspace.json\`
+- \`.starwork/skills.json\`
+- \`.starwork/handoff/\`
+- \`.internal/\`
+- \`.incoming/\`
+- \`projects/registry.json\`
+- \`projects/coordination/\`
+- \`identity/\`
+- \`lessons/\`
+- \`knowledge/\`
+- \`skills/\`
+- \`workspace/\`
+
+Hidden mechanism directories stay in English. User-visible directories follow the workspace language and should not duplicate the same meaning in two languages.
+
+Use \`starwork spawn\` to create managed project workspaces from this Project Center.
+`;
 }
 
 function renderEnglishProjectAgents() {
@@ -4198,7 +4493,7 @@ function renderEnglishProjectAgents() {
 - Read \`_system/identity/README.md\` when user preferences, communication style, domain background, or long-term context may matter.
 - Read \`_system/lessons/README.md\` before repeated, risky, or pattern-sensitive work.
 - Read \`knowledge/README.md\` when project knowledge or reusable references may matter.
-- Read Hub sync docs only if this workspace is connected to a Hub.
+- Read Project Center sync docs only if this workspace is connected to a Project Center.
 
 ## File Boundaries
 
@@ -4207,9 +4502,8 @@ function renderEnglishProjectAgents() {
 - User preferences, communication style, and durable background belong in \`_system/identity/README.md\`.
 - Reusable lessons that should change future behavior belong in \`_system/lessons/README.md\`.
 - Project knowledge or knowledge indexes belong in \`knowledge/\`.
-- Source materials belong in \`references/\`.
-- AI drafts belong in \`outputs/drafts/\`.
-- User-approved outputs belong in the project-declared formal source of truth.
+- Concrete business directories are defined by installed Packs or user customizations.
+- Source materials, drafts, and approved outputs follow Pack rules or the path mapping in \`.starwork/workspace.json\`.
 - StarWork mechanism state belongs in \`.starwork/\`.
 
 ## Workflow
@@ -4230,7 +4524,7 @@ function renderEnglishProjectAgents() {
 function renderEnglishProjectReadme() {
   return `# StarWork Project Workspace
 
-This is a project workspace for concrete work. It can be used independently. If a Hub creates it later, \`starwork spawn\` adds Hub sync files separately.
+This is a project workspace for concrete work. It can be used independently. If a Project Center creates it later, \`starwork spawn\` adds Project Center sync files separately.
 
 ## Main Paths
 
@@ -4239,9 +4533,8 @@ This is a project workspace for concrete work. It can be used independently. If 
 - \`_system/identity/\`: durable user and project context
 - \`_system/lessons/\`: reusable lessons
 - \`knowledge/\`: local project knowledge entry or index
-- \`references/\`: source materials
-- \`outputs/drafts/\`: drafts
-- \`outputs/final/\`: confirmed outputs
+
+Concrete business directories are created by Packs or user customizations. The default General Work Pack creates \`references/\`, \`outputs/drafts/\`, and \`outputs/final/\`; they are not part of the base Project Kit.
 
 ## Not Included By Default
 
@@ -4357,7 +4650,7 @@ This is the local knowledge entry or index for this project.
 
 - Record reusable project knowledge, source indexes, and reference entry points here.
 - Do not record ordinary progress summaries here.
-- If this workspace is later connected to a Hub, this path may become a shared knowledge entry or read-only link.
+- If this workspace is later connected to a Project Center, this path may become a shared knowledge entry or read-only link.
 `;
 }
 
@@ -4375,7 +4668,7 @@ function renderEnglishSatelliteAgents(mode) {
 - Read \`_system/identity/README.md\` when user preferences, communication style, domain background, or long-term context may matter.
 - Read \`_system/lessons/README.md\` before repeated, risky, or pattern-sensitive work.
 - Read \`knowledge/README.md\` when project knowledge or reusable references may matter.
-- Read \`_system/main-repo-sync/README.md\` only when shared Hub resources, skills, or cross-project coordination are involved.
+- Read \`_system/main-repo-sync/README.md\` only when shared Project Center resources, skills, or cross-project coordination are involved.
 
 ## Write Boundaries
 
@@ -4384,20 +4677,19 @@ function renderEnglishSatelliteAgents(mode) {
 - Identity belongs in \`_system/identity/\` and is read-only by default.
 - Lessons belong in \`_system/lessons/\`.
 - Shared knowledge is mounted at \`knowledge/\` and is read-only by default.
-- Source materials belong in \`references/\`.
-- AI drafts belong in \`outputs/drafts/\`.
-- User-approved outputs belong in the project-declared formal source of truth.
+- Concrete business directories come from the installed Pack and \`.starwork/workspace.json\`.
+- Source materials, drafts, and approved outputs follow Pack rules.
 - Local cross-project inbox, outbox, sent, and archived records live in \`.starwork/handoff/\`.
-- Hub central routing lives in \`projects/coordination/\`.
+- Project Center central routing lives in \`projects/coordination/\`.
 
 ## Workflow
 
 - Keep project facts separate from command output and temporary explanations.
-- Use handoff records for Hub communication; do not write project progress into the Hub registry.
+- Use handoff records for Project Center communication; do not write project progress into the Project Center registry.
 
 ## Confirmation Required
 
-- Changing identity, lessons, shared knowledge, or Hub sync content.
+- Changing identity, lessons, shared knowledge, or Project Center sync content.
 - Promoting drafts into the formal source of truth.
 `;
 }
@@ -4416,38 +4708,37 @@ function renderChineseSatelliteAgents() {
 - 涉及用户偏好、沟通方式、领域背景或长期上下文时，读 \`_系统/身份/README.md\`
 - 做重复性、风险较高或容易踩坑的工作前，读 \`_系统/教训/README.md\`
 - 需要共享知识或可复用参考时，读 \`知识/README.md\`
-- 只有涉及 Hub 资源、共享 skill 或跨项目协同时，才读 \`_系统/主库同步/README.md\`
+- 只有涉及项目中心资源、共享 skill 或跨项目协同时，才读 \`_系统/主库同步/README.md\`
 
 ## 文件边界
 
 - 项目状态写入 \`_系统/上下文/当前项目.md\`
 - 当前执行记录写入 \`_系统/任务/当前工作.md\`
-- 身份和长期偏好默认来自 Hub 快照，放在 \`_系统/身份/\`
-- 可复用教训默认来自 Hub 快照，项目候选教训放在 \`_系统/教训/\`
+- 身份和长期偏好默认来自项目中心快照，放在 \`_系统/身份/\`
+- 可复用教训默认来自项目中心快照，项目候选教训放在 \`_系统/教训/\`
 - 共享知识挂载在 \`知识/\`，默认只读
-- 原始资料放入 \`参考资料/\`
-- AI 草稿放入 \`输出/草稿/\`
-- 用户确认后的成果放入项目声明的正式事实源
+- 具体业务目录由已安装 Pack 和 \`.starwork/workspace.json\` 决定
+- 原始资料、AI 草稿和确认成果按 Pack 规则处理
 - 跨项目联络的本地收发记录放入 \`.starwork/handoff/\`
 
 ## 工作方式
 
-- 项目进度留在本项目，不写进 Hub 项目注册表
-- 与 Hub 沟通通过联络和回写流程处理，不直接改写 Hub 正式资源
+- 项目进度留在本项目，不写进项目中心登记表
+- 与项目中心沟通通过联络和回写流程处理，不直接改写项目中心正式资源
 - 不把命令执行结果、临时解释或初始化记录写入项目事实源
 
 ## 需要确认
 
-- 修改身份、教训、共享知识或 Hub 同步内容
+- 修改身份、教训、共享知识或项目中心同步内容
 - 将草稿晋升为正式事实源
 - 改变工作台结构或顶层业务目录
 `;
 }
 
 function renderEnglishSatelliteReadme(mode, modeConfig) {
-  return `# StarWork Satellite Workspace
+  return `# StarWork Project Workspace
 
-This is a project workspace created and registered by a Hub.
+This project workspace was created from and registered in a Project Center.
 
 ## Includes
 
@@ -4456,27 +4747,25 @@ This is a project workspace created and registered by a Hub.
 - \`_system/main-repo-sync/\`
 - \`.starwork/handoff/\`
 - \`knowledge/\`
-- \`references/\`
-- \`outputs/\`
-When connected to a Hub, shared identity, lessons, knowledge, skills, and project registration come from the Hub. This project keeps its own work, drafts, and confirmed outputs.
+- General Pack business directories such as \`references/\` and \`outputs/\`
+When connected to a Project Center, shared identity, lessons, knowledge, skills, and project registration come from the Project Center. This project keeps its own work, drafts, and confirmed outputs.
 `;
 }
 
 function renderChineseSatelliteReadme(modeConfig) {
-  return `# StarWork 卫星项目工作台
+  return `# StarWork 项目工作台
 
-这是由 Hub 创建和登记的具体项目工作台。Hub 提供共享身份、教训、知识和部分 skills；项目自己的状态、资料、草稿和确认成果仍留在本项目。
+这是由项目中心创建和登记的具体项目工作台。项目中心提供共享身份、教训、知识和部分 skills；项目自己的状态、资料、草稿和确认成果仍留在本项目。
 
 ## 主要路径
 
 - \`_系统/上下文/当前项目.md\`：项目状态
 - \`_系统/任务/当前工作.md\`：当前工作
-- \`_系统/主库同步/\`：本项目与 Hub 的关系说明
-- \`_系统/身份/\`：来自 Hub 的身份快照和项目候选更新
-- \`_系统/教训/\`：来自 Hub 的教训快照和项目候选教训
-- \`知识/\`：指向 Hub 共享知识的只读入口
-- \`参考资料/\`：本项目资料
-- \`输出/\`：本项目草稿和确认成果
+- \`_系统/主库同步/\`：本项目与项目中心的关系说明
+- \`_系统/身份/\`：来自项目中心的身份快照和项目候选更新
+- \`_系统/教训/\`：来自项目中心的教训快照和项目候选教训
+- \`知识/\`：指向项目中心共享知识的只读入口
+- General Pack 创建的 \`参考资料/\` 和 \`输出/\` 等业务目录
 
 正式成果默认放在 \`${modeConfig.formalSource}\`，当前工作资料默认放在 \`${modeConfig.businessWorkArea}\`。
 `;
@@ -4484,35 +4773,35 @@ function renderChineseSatelliteReadme(modeConfig) {
 
 function renderSatelliteMainRepoSyncReadme(language) {
   if (language !== "en") {
-    return `# 主库同步
+    return `# 项目中心同步
 
-这里说明本卫星项目与 Hub 的关系。
+这里说明本项目工作台与项目中心的关系。
 
-Hub 不是本项目的上级工作文件夹，也不承载本项目的进度正文。本项目自己的状态、当前工作、资料、草稿和确认成果都留在本项目内。
+项目中心不是本项目的上级工作文件夹，也不承载本项目的进度正文。本项目自己的状态、当前工作、资料、草稿和确认成果都留在本项目内。
 
 | 本地路径 | 来源 | 规则 |
 |---|---|---|
-| \`_系统/身份/\` | Hub \`identity/\` | 默认只读；修改稳定身份前需要确认。 |
-| \`_系统/教训/\` | Hub \`lessons/\` | 项目候选教训可先留在本项目，确认后再提交 Hub 审核。 |
-| \`.starwork/internal/\` | Hub 内部协议 | 稳定协议快照。 |
-| \`知识/\` | Hub \`knowledge/\` | 只读链接。 |
-| \`.agents/skills/\` 和 \`.claude/skills/\` | Hub 或 Kit skills | 只挂载本项目需要的部分。 |
+| \`_系统/身份/\` | 项目中心 \`身份/\` | 默认只读；修改稳定身份前需要确认。 |
+| \`_系统/教训/\` | 项目中心 \`教训/\` | 项目候选教训可先留在本项目，确认后再提交项目中心审核。 |
+| \`.starwork/internal/\` | 项目中心内部协议 | 稳定协议快照。 |
+| \`知识/\` | 项目中心 \`知识/\` | 只读链接。 |
+| \`.agents/skills/\` 和 \`.claude/skills/\` | 项目中心或工作台自带技能 | 只挂载本项目需要的部分。 |
 | \`.starwork/handoff/\` | 本项目 | 跨项目联络的本地收发队列。 |
 `;
   }
-  return `# Hub Sync
+  return `# Project Center Sync
 
-This folder explains the relationship between this satellite project and its Hub.
+This folder explains the relationship between this project workspace and its Project Center.
 
-The Hub is not a parent work folder and should not receive project progress bodies. This project keeps its own status, current work, references, drafts, and final outputs.
+The Project Center is not a parent work folder and should not receive project progress bodies. This project keeps its own status, current work, references, drafts, and final outputs.
 
 | Local path | Source | Rule |
 |---|---|---|
-| \`_system/identity/\` | Hub \`identity/\` | Read-only by default. |
-| \`_system/lessons/\` | Hub \`lessons/\` | Project candidates may be reviewed before Hub merge. |
-| \`.internal/\` | Hub internal protocols | Stable protocol snapshot. |
-| \`knowledge/\` | Hub \`knowledge/\` | Read-only link. |
-| \`.agents/skills/\` and \`.claude/skills/\` | Hub or kit skills | Selected mounts only. |
+| \`_system/identity/\` | Project Center \`identity/\` | Read-only by default. |
+| \`_system/lessons/\` | Project Center \`lessons/\` | Project candidates may be reviewed before Project Center merge. |
+| \`.internal/\` | Project Center internal protocols | Stable protocol snapshot. |
+| \`knowledge/\` | Project Center \`knowledge/\` | Read-only link. |
+| \`.agents/skills/\` and \`.claude/skills/\` | Project Center or bundled skills | Selected mounts only. |
 | \`.starwork/handoff/\` | This project | Local cross-project inbox and outbox. |
 `;
 }
@@ -4521,16 +4810,16 @@ function renderSatelliteIdentityReadme(language) {
   if (language !== "en") {
     return `# 身份
 
-这里放置来自 Hub 的身份、偏好和长期上下文快照，也可以暂存本项目发现的候选更新。
+这里放置来自项目中心的身份、偏好和长期上下文快照，也可以暂存本项目发现的候选更新。
 
-默认先按只读处理。需要修改稳定身份或偏好时，先确认，再通过 Hub 回写或审核流程处理。
+默认先按只读处理。需要修改稳定身份或偏好时，先确认，再通过项目中心回写或审核流程处理。
 `;
   }
   return `# Identity
 
-This folder contains Hub identity snapshots and project-local identity candidates.
+This folder contains Project Center identity snapshots and project-local identity candidates.
 
-Treat Hub identity as read-only by default. Ask before changing stable identity or preferences, then route confirmed updates through the Hub review flow.
+Treat Project Center identity as read-only by default. Ask before changing stable identity or preferences, then route confirmed updates through the Project Center review flow.
 `;
 }
 
@@ -4538,16 +4827,16 @@ function renderSatelliteLessonsReadme(language) {
   if (language !== "en") {
     return `# 教训
 
-这里放置来自 Hub 的跨项目教训快照，也可以暂存本项目发现的候选教训。
+这里放置来自项目中心的跨项目教训快照，也可以暂存本项目发现的候选教训。
 
-不要记录普通进度摘要。确认具有复用价值后，再通过 Hub 回写或审核流程处理。
+不要记录普通进度摘要。确认具有复用价值后，再通过项目中心回写或审核流程处理。
 `;
   }
   return `# Lessons
 
-This folder contains Hub lesson snapshots and project-local lesson candidates.
+This folder contains Project Center lesson snapshots and project-local lesson candidates.
 
-Do not record ordinary progress summaries here. Route reusable, behavior-changing lessons through the Hub review flow after confirmation.
+Do not record ordinary progress summaries here. Route reusable, behavior-changing lessons through the Project Center review flow after confirmation.
 `;
 }
 
@@ -4629,7 +4918,7 @@ function readProjectRegistry(registryPath) {
     }
     return registry;
   } catch (error) {
-    throw new Error(`无法读取 Hub 项目注册表：${error.message}`);
+    throw new Error(`无法读取项目中心项目注册表：${error.message}`);
   }
 }
 
@@ -4688,12 +4977,12 @@ function auditPublicResult(result) {
 
 function printAuditResult(result) {
   console.log("");
-  console.log("StarWork Hub 巡检结果");
+  console.log("StarWork 项目中心巡检结果");
   console.log("");
-  console.log(`Hub 目录：${result.hub.path}`);
+  console.log(`项目中心目录：${result.hub.path}`);
   console.log("");
   console.log("巡检概览：");
-  console.log(`- Hub 自身：${result.hub.ok ? "通过" : "需要处理"}`);
+  console.log(`- 项目中心自身：${result.hub.ok ? "通过" : "需要处理"}`);
   console.log(`- 项目登记表：${result.registry.ok ? "可读取" : "需要处理"}${result.registry.path ? `（${result.registry.path}）` : ""}`);
   console.log(`- 已登记项目：${result.summary.projects_total} 个`);
   console.log(`- 本次检查项目：${result.summary.projects_checked} 个`);
@@ -4705,7 +4994,7 @@ function printAuditResult(result) {
   const hubProblems = result.checks.filter((check) => check.level !== "pass" && check.id.startsWith("hub."));
   const registryProblems = result.checks.filter((check) => check.level !== "pass" && check.id.startsWith("registry."));
   if (hubProblems.length) {
-    console.log("Hub 自身问题：");
+    console.log("项目中心自身问题：");
     hubProblems.forEach((check) => console.log(`- ${friendlyCheckLevel(check.level)}：${friendlyAuditMessage(check.message)}${check.trace ? `（${check.trace}）` : ""}`));
     console.log("");
   }
@@ -4731,21 +5020,22 @@ function printAuditResult(result) {
 
   console.log("");
   console.log("结论：");
-  console.log(result.ok ? "这个 Hub 和已登记项目目前结构完整，可以继续使用。" : "这个 Hub 或部分项目存在需要处理的问题。可把 JSON 结果交给 starworkAudit 生成保守修复方案。");
+  console.log(result.ok ? "这个项目中心和已登记项目目前结构完整，可以继续使用。" : "这个项目中心或部分项目存在需要处理的问题。可把 JSON 结果交给 starworkAudit 生成保守修复方案。");
 }
 
 function friendlyAuditMessage(message) {
   return String(message || "")
-    .replace(/Hub workspace state is valid/g, "Hub 工作台身份证有效")
-    .replace(/Hub doctor passed/g, "Hub 结构检查通过")
-    .replace(/Hub doctor has blocking issues/g, "Hub 结构检查有阻塞问题")
+    .replace(/Project Center workspace state is valid/g, "项目中心工作台身份证有效")
+    .replace(/Project Center doctor passed/g, "项目中心结构检查通过")
+    .replace(/Project Center doctor has blocking issues/g, "项目中心结构检查有阻塞问题")
     .replace(/No duplicate project ids/g, "项目 ID 没有重复")
-    .replace(/Satellite path exists/g, "项目目录存在")
-    .replace(/Project has Hub binding/g, "项目已经绑定到 Hub")
-    .replace(/Hub project id matches registry/g, "项目 ID 和登记表一致")
-    .replace(/Hub path matches/g, "Hub 路径一致")
-    .replace(/Satellite doctor passed/g, "项目结构检查通过")
-    .replace(/Satellite doctor has blocking issues/g, "项目结构检查有阻塞问题")
+    .replace(/Project workspace path exists/g, "项目目录存在")
+    .replace(/Project has Project Center connection/g, "项目已经加入项目中心")
+    .replace(/Project Center project id matches registry/g, "项目 ID 和登记表一致")
+    .replace(/Project Center path matches/g, "项目中心路径一致")
+    .replace(/Project workspace doctor passed/g, "项目结构检查通过")
+    .replace(/Project workspace doctor has blocking issues/g, "项目结构检查有阻塞问题")
+    .replace(/Hub/g, "项目中心")
     .replace(/workspace state/g, "工作台身份证")
     .replace(/workspace/g, "工作台")
     .replace(/Satellite/g, "项目")
@@ -4802,7 +5092,7 @@ function buildRepairPlan(blueprint) {
   const hubRoot = requireWorkspaceRoot(path.resolve(blueprint.source.hub));
   const hubState = readWorkspaceState(hubRoot);
   if (hubState.workspace_type !== "hub") {
-    throw new Error("repair blueprint source.hub 必须指向 Hub 工作台。");
+    throw new Error("repair blueprint source.hub 必须指向项目中心。");
   }
   const hubPaths = getHubPaths(hubState);
   const registryPath = path.join(hubRoot, hubPaths.projectRegistry);
@@ -4852,7 +5142,7 @@ function resolveRepairTargetRoot({ hubRoot, projectMap, action }) {
   if (action.target === "hub" || !action.target) return hubRoot;
   if (action.target !== "satellite") throw new Error(`repair action target 不支持：${action.target}`);
   const project = projectMap.get(action.project_id);
-  if (!project?.path) throw new Error(`Hub registry 中不存在项目或路径：${action.project_id}`);
+  if (!project?.path) throw new Error(`项目中心登记表中不存在项目或路径：${action.project_id}`);
   const projectRoot = path.resolve(project.path);
   if (!fs.existsSync(projectRoot)) throw new Error(`项目路径不存在：${projectRoot}`);
   return projectRoot;
@@ -4939,10 +5229,10 @@ function repairPlanResult(plan, dryRun) {
 function ensureProjectCanBeRegistered(registry, projectId, targetPath) {
   const projects = Array.isArray(registry.projects) ? registry.projects : [];
   if (projects.some((project) => project?.id === projectId)) {
-    throw new Error(`Hub registry 已存在项目 ID：${projectId}`);
+    throw new Error(`项目中心登记表已存在项目 ID：${projectId}`);
   }
   if (projects.some((project) => project?.path && path.resolve(project.path) === targetPath)) {
-    throw new Error(`Hub registry 已存在目标路径：${targetPath}`);
+    throw new Error(`项目中心登记表已存在目标路径：${targetPath}`);
   }
 }
 
@@ -4965,7 +5255,7 @@ ${description}
 ## Project Info
 
 - Project ID: ${projectId}
-- Hub: ${hubRoot}
+- Project Center: ${hubRoot}
 ${agreements}
 
 ## Current Stage
@@ -4983,8 +5273,8 @@ TBD.
 
 ## Risks
 
-- Do not treat the Hub project registry as project progress.
-- Hub sync resources are read-only by default; project updates should use handoff or writeback flows.
+- Do not treat the Project Center registry as project progress.
+- Project Center sync resources are read-only by default; project updates should use handoff or writeback flows.
 
 ## Next Step
 
@@ -5008,7 +5298,7 @@ ${description}
 ## 项目信息
 
 - 项目 ID：${projectId}
-- Hub：${hubRoot}
+- 项目中心：${hubRoot}
 ${agreements}
 
 ## 当前阶段
@@ -5026,7 +5316,7 @@ ${agreements}
 
 ## 风险
 
-- 不要把 Hub 的项目注册表当成项目进度正文。
+- 不要把项目中心的项目注册表当成项目进度正文。
 - 主库同步资源默认只读，项目内更新应走跨项目联络或回写流程。
 
 ## 下一步
@@ -5462,6 +5752,7 @@ function mergePackLanguage(basePack, languagePack, requestedLanguage) {
       ...(languagePack.overrides || {})
     },
     rules: languagePack.rules || basePack.rules || [],
+    directories: languagePack.directories || basePack.directories || [],
     templates: languagePack.templates || basePack.templates || [],
     seed: languagePack.seed || basePack.seed || []
   };
@@ -5687,9 +5978,9 @@ function printSpawnPlan(plan, dryRun) {
   const dirs = plan.actions.filter((action) => action.type === "directory" && action.mode === "create");
 
   console.log("");
-  console.log(dryRun ? "生成项目预览（dry run）：" : "生成项目计划：");
+  console.log(dryRun ? "从项目中心创建项目工作台预览（dry run）：" : "从项目中心创建项目工作台计划：");
   console.log("");
-  console.log(`Hub：${plan.hubRoot}`);
+  console.log(`项目中心：${plan.hubRoot}`);
   console.log(`项目名称：${plan.projectName}`);
   console.log(`项目 ID：${plan.projectId}`);
   console.log(`目标目录：${plan.targetDir}`);
@@ -5718,12 +6009,12 @@ function printSpawnPlan(plan, dryRun) {
     console.log("");
   }
   if (links.length) {
-    console.log("将挂载 Hub 共享资源：");
+    console.log("将挂载项目中心共享资源：");
     links.forEach((action) => console.log(`- ${action.relativePath} -> ${action.sourcePath}`));
     console.log("");
   }
   if (overwrites.length) {
-    console.log("将在 Hub 中更新：");
+    console.log("将在项目中心中更新：");
     overwrites.forEach((action) => console.log(`- ${action.relativePath}`));
     console.log("");
   }
@@ -5742,7 +6033,7 @@ function printUpgradePlan(plan, dryRun) {
   console.log(`升级方案：${plan.blueprint.__path}`);
   console.log(`策略：${plan.strategy}`);
   console.log(`工作台类型：${friendlyWorkspaceType(plan.workspaceType)}`);
-  console.log(`基础结构：${plan.kit === "hub" ? "多项目中枢" : "项目工作台"}`);
+  console.log(`基础结构：${plan.kit === "hub" ? "项目中心" : "项目工作台"}`);
   console.log(`语言：${friendlyLanguage(plan.language)}`);
   console.log(`场景能力：${plan.pack ? friendlyPackName(plan.pack.id || plan.pack.name) : "不额外安装"}`);
   console.log(`正式成果会放在：${plan.blueprint.paths.formal_source}`);
@@ -5866,10 +6157,10 @@ Usage:
   starwork <command> [options]
 
 Commands:
-  init             创建项目工作台或多项目 Hub。
+  init             创建项目工作台或项目中心。
   doctor           检查工作台是否完整，也能识别旧目录的整理线索。
-  spawn            从健康 Hub 生成新的项目工作台。
-  audit            从 Hub 巡检已登记项目。
+  spawn            从项目中心创建新的项目工作台。
+  audit            从项目中心巡检已登记项目。
   repair           按确认过的修复方案处理项目问题。
   upgrade          按确认过的升级方案整理旧工作区。
   adapt            生成不同 AI 工具需要的入口文件。
@@ -5910,11 +6201,12 @@ function printInitHelp() {
 Usage:
   starwork init [options]
 
-创建一个 StarWork 工作台。v0.1 中，普通项目默认加入通用工作能力；
-多项目 Hub 会自动加入多项目管理能力。
+创建一个 StarWork 工作台。v0.1 中，项目工作台默认加入通用工作能力；
+项目中心会自动加入项目中心管理能力。
 
 Options:
   --type <project|hub>
+      project 创建项目工作台；hub 创建项目中心
   --pack <general|content-creator|hub-management|path>
   --language <zh|en>
   --name <name>
@@ -5940,12 +6232,15 @@ Usage:
   starwork spawn --hub <hub-path> --name <project-name> --target <path> [options]
   starwork spawn --hub <hub-path> --target <path> --blueprint <blueprint.json> [options]
 
+从项目中心创建一个新的项目工作台。命令参数仍叫 --hub，用来兼容内部字段和旧脚本。
+
 Options:
   --hub <path>
   --blueprint <path>
   --name <name>
   --target <path>
   --mode <project>
+      project 创建项目工作台；starter 是兼容旧参数，等同于 project
   --language <zh|en>
   --id <project-id>
   --status <active|paused>

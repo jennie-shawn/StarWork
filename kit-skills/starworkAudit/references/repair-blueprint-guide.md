@@ -4,16 +4,16 @@
 
 ## 输出位置
 
-repair blueprint 和配套规则是 StarWork 巡检 / 修复过程材料，只能写入 Hub 的机制目录：
+repair blueprint 和配套规则是 StarWork 巡检 / 修复过程材料，只能写入项目中心的机制目录：
 
 ```text
-<hub>/.starwork/audit-runs/<YYYY-MM-DD-or-run-id>/
+<project-center>/.starwork/audit-runs/<YYYY-MM-DD-or-run-id>/
 ├── audit-result.json
 ├── repair-blueprint.json
 └── rules/
 ```
 
-不要写入 Hub 或 Satellite 的业务工作区，例如：
+不要写入项目中心或项目工作台的业务工作区，例如：
 
 - `workspace/`
 - `输出/`、`outputs/`

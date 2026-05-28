@@ -1,16 +1,16 @@
 ---
 name: starworkAudit
-description: 'Diagnose `starwork audit --json` Hub/Satellite findings, prioritize issues, ask repair questions, and draft conservative `starwork repair --blueprint` plans.'
+description: 'Diagnose `starwork audit --json` Project Center and managed project findings, prioritize issues, ask repair questions, and draft conservative `starwork repair --blueprint` plans.'
 ---
 
 # starworkAudit
 
-使用这个 skill，把 `starwork audit --json` 暴露的 Hub 与项目巡检事实整理成清晰报告；当用户明确要求修复时，生成 `repair-blueprint.json`，交给 `starwork repair --blueprint` 执行。
+使用这个 skill，把 `starwork audit --json` 暴露的项目中心与项目工作台巡检事实整理成清晰报告；当用户明确要求修复时，生成 `repair-blueprint.json`，交给 `starwork repair --blueprint` 执行。
 
 `starworkAudit` 不是 `starwork audit` 命令本身，也不是 `starwork repair` 执行器。
 
 ```text
-starwork audit = Hub 巡检器，只列事实
+starwork audit = 项目中心巡检器，只列事实
 starworkAudit = 巡检诊断师 + repair blueprint 设计师
 starwork repair = 修复蓝图执行器
 ```
@@ -26,13 +26,13 @@ starwork audit --hub <hub-path> --json --inventory-depth all
 2. 先给用户一句话结论：
 
 ```text
-这个 Hub 登记了 8 个项目，其中 7 个可访问，1 个路径失效。当前最优先处理路径失效和同步关系问题，规则更新可以放在第二批。
+这个项目中心登记了 8 个项目，其中 7 个可访问，1 个路径失效。当前最优先处理路径失效和同步关系问题，规则更新可以放在第二批。
 ```
 
 3. 按严重程度分组：
 
 - `blocking`：路径失效、不是 StarWork、workspace state 无法解析。
-- `high`：Hub path / project_id / sync metadata 不一致。
+- `high`：项目中心路径、project_id 或同步信息不一致。
 - `repairable`：缺 `.starwork/handoff/`、缺 state.json、规则插槽缺失。
 - `notice`：长期未更新、旧路径残留、联络队列积压。
 
@@ -58,7 +58,7 @@ starwork audit --hub <hub-path> --json --inventory-depth all
 
 `starworkAudit` 产生的是巡检和修复过程材料，不是项目业务内容。
 
-当需要落地 `audit-result.json`、`repair-blueprint.json`、规则片段或临时说明时，只能写入 Hub 的 StarWork 机制目录：
+当需要落地 `audit-result.json`、`repair-blueprint.json`、规则片段或临时说明时，只能写入项目中心的 StarWork 机制目录：
 
 ```text
 <hub>/.starwork/audit-runs/<YYYY-MM-DD-or-run-id>/
@@ -69,8 +69,8 @@ starwork audit --hub <hub-path> --json --inventory-depth all
 
 禁止写入：
 
-- Hub `workspace/`
-- Satellite `workspace/`
+- 项目中心 `工作区/` 或 `workspace/`
+- 项目工作台 `workspace/`
 - `输出/`、`outputs/`
 - `知识/`、`knowledge/`
 - `参考资料/`、`references/`
@@ -85,7 +85,7 @@ starwork audit --hub <hub-path> --json --inventory-depth all
 - 不移动用户内容。
 - 不合并 `.incoming/`。
 - 不修改 identity / lessons / knowledge 正文。
-- 不把旧 `project` 作为新标准；它只是 legacy Project Satellite + historical 事项-content signal 信号。
+- 不把旧 `project` 作为新标准；它只是旧中心管理项目 + 历史事项内容信号。
 
 ## 参考
 

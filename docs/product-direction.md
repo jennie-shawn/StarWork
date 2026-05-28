@@ -57,11 +57,11 @@ CLI v0.1 安装与适配
 
 - Core v0.1 协议入口与五类 Kit 结构。
 - `starwork init`、`starwork spawn`、`starwork doctor`、`starwork upgrade`、`starwork adapt`、`starwork pack install` 第一版。
-- `starwork spawn --blueprint` 第一版，可按工作台定制单生成定制化卫星项目。
+- `starwork spawn --blueprint` 第一版，可按工作台定制单从项目中心创建定制化项目工作台。
 - `starworkSpawn` skill 第一版，用于帮助 Agent 设计 Spawn Blueprint。
 - `starworkInit` skill 第一版，用于帮助 Agent 采访用户并生成初始化建议。
 - `starworkDoctor` 第一版，用于把历史模板诊断和升级蓝图生成交给 Agent 判断，再由 CLI 保守执行。
-- Skill 管理与分发第一版：系统 Skill、Kit 自带 Skill、Hub 托管 Skill、Pack 自带 Skill 和项目本地 Skill 已有基本边界。
+- Skill 管理与分发第一版：系统 Skill、工作台模板自带 Skill、项目中心托管 Skill、Pack 自带 Skill 和项目本地 Skill 已有基本边界。
 - 公开 A 测分发入口：GitHub `jennie-shawn/StarWork` 与 npm `@jennie-shawn/starwork`。
 - Pack 源包结构：语言无关业务角色 + `languages/` 多语言落地配置。
 

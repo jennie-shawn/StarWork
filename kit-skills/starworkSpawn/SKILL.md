@@ -1,11 +1,11 @@
 ---
 name: starworkSpawn
-description: 'Design customized Satellite workspaces for `starwork spawn --blueprint`: choose mode/language, draft blueprint.json, rules, seed files, and validation steps.'
+description: 'Design customized project workspaces created from a Project Center with `starwork spawn --blueprint`: choose language, draft blueprint.json, rules, seed files, and validation steps.'
 ---
 
 # starworkSpawn
 
-使用这个 skill，把用户的项目想法转成 StarWork Spawn Blueprint（工作台定制单）。
+使用这个 skill，把用户的项目想法转成 StarWork Spawn Blueprint（从项目中心创建项目工作台的定制单）。
 
 Spawn Blueprint 是一个小型配置包：
 
@@ -13,7 +13,7 @@ Spawn Blueprint 是一个小型配置包：
 - `rules/*.md`：项目专属 Agent 规则
 - `seed/**`：可选的初始化占位文件
 
-Blueprint 由 `starwork spawn --blueprint` 执行。除非用户明确要求落地文件，否则这个 skill 只负责设计，不直接修改用户的 Hub 或目标工作区。
+Blueprint 由 `starwork spawn --blueprint` 执行。除非用户明确要求落地文件，否则这个 skill 只负责设计，不直接修改用户的项目中心或目标工作区。
 
 ## 参考
 
@@ -30,11 +30,12 @@ Blueprint 由 `starwork spawn --blueprint` 执行。除非用户明确要求落�
 1. 识别用户要创建的工作台。
    - 项目是什么？
    - 这是怎样的具体项目？
-   - 是否需要事项、决策、交接记录或跨会话追踪？
+   - 是否需要专门的资料区、草稿区、交付区或跨会话追踪？
 
 2. 选择基础模式。
    - 需要多阶段交接或多条推进线时，也使用 `project`，再通过 blueprint 定制目录和规则。
-   - 一个明确事务、主要只需要资料和成果输出时，使用 `starter`。
+   - `starter` 是旧兼容参数，不主动推荐；新项目默认使用 `project`。
+   - 默认会叠加 General Pack；`参考资料/` 和 `输出/` 这类业务目录来自 Pack，不是 Project Kit 固定结构。
 
 3. 判断应该用 Blueprint 还是 Pack。
    - 一次性项目定制，用 Blueprint。
@@ -81,10 +82,10 @@ Blueprint 由 `starwork spawn --blueprint` 执行。除非用户明确要求落�
 
 ## 约束
 
-- `blueprint.json` 不写 Hub 路径和 target 路径，它们属于 CLI 参数。
+- `blueprint.json` 不写项目中心路径和 target 路径，它们属于 CLI 参数。
 - 不覆盖用户文件。
 - 不修改 Kit 源目录。
-- 不直接写 Hub，除非通过 `starwork spawn` 的 registry 登记行为。
+- 不直接写项目中心，除非通过 `starwork spawn` 的 registry 登记行为。
 - 不删除 `AGENTS.md`、`.starwork/`、`.core-sync.json`、系统目录、共享知识挂载或 skill 链接。
 - 除非用户有明确理由，否则优先新增清晰目录，而不是重命名系统目录。
 - Markdown 规则要具体、可执行，避免泛泛的效率建议。
@@ -103,7 +104,7 @@ Blueprint 由 `starwork spawn --blueprint` 执行。除非用户明确要求落�
   },
   "paths": {
     "formal_source": "交付物/确认版本/",
-    "business_work_area": "事项/"
+    "business_work_area": "资料库/"
   },
   "folders": [
     "资料库/",

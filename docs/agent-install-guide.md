@@ -107,7 +107,7 @@ StarWork CLI 和 Skills 已安装完成。你是否需要我继续帮你创建�
 
 如果用户回答“需要”，进入 `starworkInit` skill 流程，由 `starworkInit` 采访用户并决定：
 
-- 创建 Project 工作区，还是 Hub 工作区。
+- 创建项目工作台，还是项目中心。
 - 使用中文还是英文。
 - 使用哪个目标路径。
 - 是否只是 dry-run 预览。

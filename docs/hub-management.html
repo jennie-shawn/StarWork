@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>StarWork 多项目中枢管理机制</title>
+  <title>StarWork 项目中心管理机制</title>
   <style>
     :root {
       --paper: #f7f4ec;
@@ -387,23 +387,23 @@
     <section class="hero">
       <div class="hero-copy">
         <div>
-          <p class="kicker">Hub + Satellite</p>
-          <h1>多项目中枢管理机制</h1>
-          <p class="subtitle">这页给第一次听 StarWork 多项目机制的人看：中枢不是一个巨大的项目文件夹，而是共享规则、知识、身份、技能和项目登记的管理层；真正的项目执行留在各自的卫星项目里。</p>
+          <p class="kicker">项目中心 + 项目工作台</p>
+          <h1>项目中心管理机制</h1>
+          <p class="subtitle">这页给第一次听 StarWork 多项目机制的人看：项目中心不是一个巨大的项目文件夹，而是共享规则、知识、身份、技能和项目登记的管理层；真正的项目执行留在各自的中心管理的项目工作台里。</p>
         </div>
 
         <div class="quick-row">
-          <div class="quick"><b>Hub 管共享</b><span>统一维护身份、教训、知识、skills、项目注册和跨项目联络。</span></div>
-          <div class="quick"><b>Satellite 管执行</b><span>每个具体项目维护自己的状态、事项、过程材料和正式成果。</span></div>
-          <div class="quick"><b>Registry 管发现</b><span>中枢只登记项目在哪里、是否活跃，不吞掉项目进度正文。</span></div>
+          <div class="quick"><b>项目中心管共享</b><span>统一维护身份、教训、知识、skills、项目注册和跨项目联络。</span></div>
+          <div class="quick"><b>项目工作台管执行</b><span>每个具体项目维护自己的状态、事项、过程材料和正式成果。</span></div>
+          <div class="quick"><b>Registry 管发现</b><span>项目中心只登记项目在哪里、是否活跃，不吞掉项目进度正文。</span></div>
           <div class="quick"><b>联络单管通信</b><span>项目之间的请求、同步、依赖和交接，用联络单留痕。</span></div>
         </div>
       </div>
 
-      <div class="hero-board" aria-label="Hub 与 Satellite 关系图">
+      <div class="hero-board" aria-label="项目中心 与 项目工作台 关系图">
         <svg viewBox="0 0 640 620" role="img" aria-labelledby="diagram-title diagram-desc">
-          <title id="diagram-title">StarWork Hub 和 Satellite 关系</title>
-          <desc id="diagram-desc">Hub 位于上方，维护共享资源和项目注册表，通过 spawn 生成多个项目；项目之间通过联络单通信，候选公共内容回写到 incoming，但项目事实留在本地。</desc>
+          <title id="diagram-title">StarWork 项目中心和项目工作台 关系</title>
+          <desc id="diagram-desc">项目中心 位于上方，维护共享资源和项目注册表，通过 spawn 生成多个项目；项目之间通过联络单通信，候选公共内容回写到 incoming，但项目事实留在本地。</desc>
           <defs>
             <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z" fill="#286d4a"></path>
@@ -417,7 +417,7 @@
           </defs>
 
           <rect x="42" y="26" width="556" height="176" rx="16" fill="#d8eadc" stroke="#1d211d" stroke-width="3"></rect>
-          <text x="320" y="70" text-anchor="middle" font-size="28" font-weight="900" fill="#1d211d">Hub 多项目中枢</text>
+          <text x="320" y="70" text-anchor="middle" font-size="28" font-weight="900" fill="#1d211d">项目中心 项目中心</text>
           <text x="320" y="104" text-anchor="middle" font-size="15" fill="#62675f">共享机制和项目发现层</text>
 
           <g font-size="14" fill="#1d211d">
@@ -483,33 +483,33 @@
       </div>
 
       <div class="callout">
-        <p><strong>多项目中枢</strong>就是一个“项目控制塔”：它不替每个项目干活，而是统一维护跨项目可复用的身份、经验、知识、skills 和项目登记；每个具体项目仍然在自己的工作台里独立推进。</p>
+        <p><strong>项目中心</strong>就是一个“项目控制塔”：它不替每个项目干活，而是统一维护跨项目可复用的身份、经验、知识、skills 和项目登记；每个具体项目仍然在自己的工作台里独立推进。</p>
       </div>
     </section>
 
     <section class="section">
       <div class="section-header">
         <h2>三个角色</h2>
-        <p class="section-note">理解这套机制，只要先分清 Hub、Satellite、Registry 三件事。</p>
+        <p class="section-note">理解这套机制，只要先分清 项目中心、项目工作台、Registry 三件事。</p>
       </div>
 
       <div class="grid-3">
         <article class="panel green">
-          <span class="tag">01 / Hub</span>
-          <h3>多项目中枢</h3>
+          <span class="tag">01 / 项目中心</span>
+          <h3>项目中心</h3>
           <p>维护跨项目共享的东西：身份、教训、知识、skills、项目注册表、跨项目联络和回写审核。它是共享机制层，不是某个业务项目本身。</p>
         </article>
 
         <article class="panel blue">
-          <span class="tag">02 / Satellite</span>
-          <h3>卫星项目</h3>
+          <span class="tag">02 / 项目工作台</span>
+          <h3>中心管理的项目工作台</h3>
           <p>每个具体项目自己的工作台。项目状态、当前工作、事项、资料、过程材料、正式成果，都留在这里独立维护。</p>
         </article>
 
         <article class="panel amber">
           <span class="tag">03 / Registry</span>
           <h3>项目注册表</h3>
-          <p>Hub 里的项目清单。它记录项目 ID、名称、路径、状态、Core 版本和同步元数据，但不保存项目进度正文。</p>
+          <p>项目中心 里的项目清单。它记录项目 ID、名称、路径、状态、Core 版本和同步元数据，但不保存项目进度正文。</p>
         </article>
       </div>
     </section>
@@ -526,7 +526,7 @@
           <ul>
             <li>每个项目都会复制一份身份、教训和规则，越来越不一致。</li>
             <li>共享知识和项目草稿混在一起，不知道哪里才是事实源。</li>
-            <li>中枢会变成巨大的进度数据库，项目越多越难读。</li>
+            <li>项目中心会变成巨大的进度数据库，项目越多越难读。</li>
             <li>一个项目的临时判断容易污染所有项目的公共规则。</li>
           </ul>
         </article>
@@ -534,10 +534,10 @@
         <article class="panel">
           <h3>分开以后</h3>
           <ul>
-            <li>Hub 只维护可复用、可审计、跨项目共享的内容。</li>
-            <li>Satellite 只维护项目自己的执行事实和产出。</li>
+            <li>项目中心只维护可复用、可审计、跨项目共享的内容。</li>
+            <li>项目工作台 只维护项目自己的执行事实和产出。</li>
             <li>项目发现靠 registry，项目进度仍然留在项目里。</li>
-            <li>可复用经验先进入回写审核，确认后再进入 Hub。</li>
+            <li>可复用经验先进入回写审核，确认后再进入 项目中心。</li>
           </ul>
         </article>
       </div>
@@ -546,26 +546,26 @@
     <section class="section">
       <div class="section-header">
         <h2>实际怎么工作</h2>
-        <p class="section-note">用户感知上是“先建中枢，再从中枢创建项目”。CLI 内部负责检查、生成、登记和同步元数据。</p>
+        <p class="section-note">用户感知上是“先建项目中心，再从项目中心创建项目”。CLI 内部负责检查、生成、登记和同步元数据。</p>
       </div>
 
       <div class="flow">
         <div class="flow-step">
           <span class="tag">Step 1</span>
-          <h3>创建 Hub</h3>
-          <p>用 <code>starwork init --type hub</code> 建立多项目中枢。这里放共享身份、教训、知识、skills 和项目注册表。</p>
+          <h3>创建 项目中心</h3>
+          <p>用 <code>starwork init --type hub</code> 建立项目中心。这里放共享身份、教训、知识、skills 和项目注册表。</p>
         </div>
         <div class="arrow">→</div>
         <div class="flow-step">
           <span class="tag">Step 2</span>
           <h3>生成项目</h3>
-          <p>用 <code>starwork spawn</code> 从 Hub 创建 Satellite。CLI 会复制快照、挂载共享资源，并写入同步元数据。</p>
+          <p>用 <code>starwork spawn</code> 从项目中心创建 项目工作台。CLI 会复制快照、挂载共享资源，并写入同步元数据。</p>
         </div>
         <div class="arrow">→</div>
         <div class="flow-step">
           <span class="tag">Step 3</span>
           <h3>项目内推进</h3>
-          <p>Agent 在 Satellite 内维护项目状态、事项、资料和成果。Hub 只知道项目在哪里、是否活跃、如何同步。</p>
+          <p>Agent 在 项目工作台 内维护项目状态、事项、资料和成果。项目中心只知道项目在哪里、是否活跃、如何同步。</p>
         </div>
       </div>
 
@@ -585,7 +585,7 @@ starwork doctor --target ~/projects/content-site</pre>
     <section class="section">
       <div class="section-header">
         <h2>哪些内容放哪里</h2>
-        <p class="section-note">这张表是解释边界最有用的部分：Hub 不是所有内容的收纳箱，Satellite 也不是孤岛。</p>
+        <p class="section-note">这张表是解释边界最有用的部分：项目中心不是所有内容的收纳箱，项目工作台 也不是孤岛。</p>
       </div>
 
       <div class="table-wrap">
@@ -593,8 +593,8 @@ starwork doctor --target ~/projects/content-site</pre>
           <thead>
             <tr>
               <th>内容</th>
-              <th>放在 Hub</th>
-              <th>放在 Satellite</th>
+              <th>放在 项目中心</th>
+              <th>放在 项目工作台</th>
               <th>原因</th>
             </tr>
           </thead>
@@ -603,13 +603,13 @@ starwork doctor --target ~/projects/content-site</pre>
               <td>长期身份、偏好、工作方式</td>
               <td><code>identity/</code></td>
               <td>初始化快照或只读参考</td>
-              <td>这是跨项目稳定资源，应由中枢统一维护。</td>
+              <td>这是跨项目稳定资源，应由项目中心统一维护。</td>
             </tr>
             <tr>
               <td>跨项目教训</td>
               <td><code>lessons/</code></td>
               <td>本项目候选教训</td>
-              <td>项目里先沉淀，确认可复用后再回写到 Hub。</td>
+              <td>项目里先沉淀，确认可复用后再回写到 项目中心。</td>
             </tr>
             <tr>
               <td>共享知识库</td>
@@ -633,19 +633,19 @@ starwork doctor --target ~/projects/content-site</pre>
               <td>项目产物、资料、事项</td>
               <td>不存正文</td>
               <td><code>输出/</code>、<code>参考资料/</code>、<code>事项/</code></td>
-              <td>这些是具体项目的执行内容，不属于中枢公共层。</td>
+              <td>这些是具体项目的执行内容，不属于项目中心公共层。</td>
             </tr>
             <tr>
               <td>可复用更新建议</td>
               <td><code>.incoming/</code> 审核后合并</td>
               <td>发起候选回写</td>
-              <td>先审核再进入 Hub，避免项目临时经验污染公共资源。</td>
+              <td>先审核再进入 项目中心，避免项目临时经验污染公共资源。</td>
             </tr>
             <tr>
               <td>项目之间的请求、同步和交接</td>
               <td><code>projects/coordination/</code></td>
               <td><code>.starwork/handoff/</code></td>
-              <td>联络单负责“项目和项目怎么说话”，不替代项目状态，也不直接改变 Hub 正式知识。</td>
+              <td>联络单负责“项目和项目怎么说话”，不替代项目状态，也不直接改变 项目中心 正式知识。</td>
             </tr>
           </tbody>
         </table>
@@ -662,13 +662,13 @@ starwork doctor --target ~/projects/content-site</pre>
         <article class="panel green">
           <span class="tag">它是什么</span>
           <h3>项目之间的正式留言</h3>
-          <p>当项目 A 需要项目 B 提供信息、同步进展、确认边界、交接材料，或者向 Hub 说明一个跨项目事项时，就写联络单。它应该有明确发送方、接收方、背景、请求、截止时间和期望回复。</p>
+          <p>当项目 A 需要项目 B 提供信息、同步进展、确认边界、交接材料，或者向 项目中心 说明一个跨项目事项时，就写联络单。它应该有明确发送方、接收方、背景、请求、截止时间和期望回复。</p>
         </article>
 
         <article class="panel amber">
           <span class="tag">它不是什么</span>
           <h3>不是项目进度，也不是知识回写</h3>
-          <p>联络单不存项目完整进度，项目进度仍在项目自己的状态和事项里；它也不直接把内容合并进 Hub 的身份、教训或知识。可复用内容仍应走 <code>.incoming/</code> 审核。</p>
+          <p>联络单不存项目完整进度，项目进度仍在项目自己的状态和事项里；它也不直接把内容合并进 项目中心的身份、教训或知识。可复用内容仍应走 <code>.incoming/</code> 审核。</p>
         </article>
       </div>
 
@@ -681,8 +681,8 @@ starwork doctor --target ~/projects/content-site</pre>
         <div class="arrow">→</div>
         <div class="flow-step">
           <span class="tag">路由</span>
-          <h3>Hub 留痕和分发</h3>
-          <p>Hub 的联络入口记录这次跨项目通信，帮助未来查到“哪个项目找过哪个项目”。</p>
+          <h3>项目中心 留痕和分发</h3>
+          <p>项目中心的联络入口记录这次跨项目通信，帮助未来查到“哪个项目找过哪个项目”。</p>
         </div>
         <div class="arrow">→</div>
         <div class="flow-step">
@@ -693,35 +693,35 @@ starwork doctor --target ~/projects/content-site</pre>
       </div>
 
       <div class="callout">
-        <p>可以把 registry 理解成“通讯录”，把联络单理解成“正式邮件”，把 <code>.incoming</code> 理解成“投稿审核箱”。三者都和中枢有关，但职责完全不同。</p>
+        <p>可以把 registry 理解成“通讯录”，把联络单理解成“正式邮件”，把 <code>.incoming</code> 理解成“投稿审核箱”。三者都和项目中心有关，但职责完全不同。</p>
       </div>
     </section>
 
     <section class="section">
       <div class="section-header">
         <h2>容易误解的点</h2>
-        <p class="section-note">这几个边界要讲清楚，别人就不容易把 Hub 理解成“更大的项目文件夹”。</p>
+        <p class="section-note">这几个边界要讲清楚，别人就不容易把 项目中心 理解成“更大的项目文件夹”。</p>
       </div>
 
       <div class="grid-2">
         <article class="panel">
-          <h3>Hub 不是项目进度数据库</h3>
-          <p>Hub 的 <code>projects/registry.json</code> 只回答“有哪些项目、在哪里、什么状态”。具体进度、事项、判断和产物仍在各自 Satellite。</p>
+          <h3>项目中心不是项目进度数据库</h3>
+          <p>项目中心的项目注册表只回答“有哪些项目、在哪里、什么状态”。具体进度、事项、判断和产物仍在各自项目工作台。</p>
         </article>
 
         <article class="panel">
-          <h3>Satellite 不是 Hub 的子目录</h3>
-          <p>Satellite 是独立工作台，可以在任意路径。它通过 <code>.core-sync.json</code> 记录来源 Hub、共享资源和同步关系。</p>
+          <h3>项目工作台不是项目中心的子目录</h3>
+          <p>项目工作台是独立工作台，可以在任意路径。它通过 <code>.core-sync.json</code> 记录来源项目中心、共享资源和同步关系。</p>
         </article>
 
         <article class="panel">
           <h3>共享资源不是随便改</h3>
-          <p>知识和 skills 默认来自 Hub。项目内如果产生可复用内容，应先走候选回写和审核，而不是直接改 Hub 正式内容。</p>
+          <p>知识和 skills 默认来自项目中心。项目内如果产生可复用内容，应先走候选回写和审核，而不是直接改项目中心正式内容。</p>
         </article>
 
         <article class="panel">
           <h3>spawn 不是 init 的替代品</h3>
-          <p><code>init</code> 创建当前工作台，<code>spawn</code> 从已有 Hub 创建并登记一个新项目。它们处理的是不同层级的问题。</p>
+          <p><code>init</code> 创建当前工作台，<code>spawn</code> 从已有项目中心创建并登记一个新项目。它们处理的是不同层级的问题。</p>
         </article>
 
         <article class="panel">
@@ -743,7 +743,7 @@ starwork doctor --target ~/projects/content-site</pre>
       </div>
 
       <div class="callout">
-        <p>StarWork 的多项目机制采用 Hub + Satellite：Hub 是中枢，负责共享身份、教训、知识、skills、项目注册和联络入口；Satellite 是具体项目，负责自己的状态、事项、资料和成果。Hub 通过 registry 找到项目，通过 spawn 创建项目，通过联络单协调项目之间的请求和交接，通过 .incoming 接收候选回写，但不会把项目进度正文吞进中枢。</p>
+        <p>StarWork 的多项目机制由项目中心和项目工作台组成：项目中心负责共享身份、教训、知识、skills、项目注册和联络入口；项目工作台是具体项目，负责自己的状态、资料和成果。项目中心通过 registry 找到项目，通过 spawn 创建项目，通过联络单协调项目之间的请求和交接，通过 .incoming 接收候选回写，但不会把项目进度正文吞进项目中心。</p>
       </div>
     </section>
   </main>

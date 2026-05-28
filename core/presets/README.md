@@ -1,6 +1,6 @@
 # Presets
 
-Presets 是组装面向用户的 Core 工作区的配方。
+Presets 是组装 StarWork 工作台的内部配方，普通用户通常不需要直接理解或选择。
 
 一个 preset 会选择：
 
@@ -16,12 +16,21 @@ Presets 主要供 CLI 和 kit 生成使用。
 - `project.yaml`
 - `hub.yaml`
 
-`project` 和 `hub` 是正式 v0.1 主入口。
+`project` 和 `hub` 是正式 v0.1 主入口：
 
-旧 `local-starter` 已从 Core 正式材料中移除；CLI 如遇到旧别名，会映射到新的 `project` 结构。`satellite-starter` 暂时只作为待讨论的卫星项目结构参考，不作为 `init` 主入口。
+- `project`：项目工作台。
+- `hub`：项目中心。
+
+旧 `local-starter` 已从 Core 正式材料中移除；CLI 如遇到旧别名，会映射到新的 `project` 结构。
+
+旧 `satellite-starter` 已降级到 `core/legacy/`。中心管理的项目不再由独立 Kit 表达，而是：
+
+```text
+project 工作台 + project_center 连接信息
+```
 
 ## 命名原则
 
-Preset ID 不携带语言标签，只表达工作区形态。
+Preset ID 不携带语言标签，只表达内部工作区形态。
 
 当前 v0.1 的正式 preset 默认使用中文 profile。英文 profile 通过 CLI 语言参数映射，不再维护独立的 `local-starter` 参考 Kit。

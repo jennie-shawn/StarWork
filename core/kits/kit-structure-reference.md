@@ -12,8 +12,8 @@ v0.1 只保留两类正式 Kit：
 
 | Kit | 定位 |
 |---|---|
-| `project` | 具体项目工作台；可独立使用，也可由 Hub 管理。 |
-| `hub` | 多项目管理中枢；维护共享身份、教训、知识、skills、项目注册和联络路由。 |
+| `project` | 项目工作台；可独立使用，也可加入项目中心。 |
+| `hub` | 项目中心；维护共享身份、教训、知识、skills、项目注册和联络路由。 |
 
 旧事项分叉不再作为 Kit、Preset 或 CLI 兼容入口保留。历史项目里如果已经有 `事项/` 或 `matters/`，Doctor 只把它暴露为历史内容信号，后续由 AI 判断如何无损整理。
 
@@ -21,11 +21,10 @@ v0.1 只保留两类正式 Kit：
 
 | 层级 | 放什么 | 不放什么 |
 |---|---|---|
-| `.starwork/` | StarWork 机制运行状态、manifest、队列、安装记录、缓存和报告。 | 项目业务事实、草稿、正式成果、Hub 共享资产正文。 |
-| `_系统/` 或 `_system/` | 项目协作事实，例如项目状态、当前工作、身份、教训、决策和协作索引。Satellite 可额外包含 Hub 同步说明。 | StarWork 机制缓存、投递队列、安装 manifest。 |
-| `参考资料/` / `references/` | 当前项目输入资料。 | Pack 安装记录或 CLI 缓存。 |
-| `输出/` / `outputs/` | 当前项目草稿和用户确认成果。 | StarWork 机制报告，除非用户确认晋升为项目成果。 |
-| `identity/`、`lessons/`、`knowledge/`、`skills/` | Hub 共享资产或项目本地上下文资产。 | 机制队列和缓存。 |
+| `.starwork/` | StarWork 机制运行状态、manifest、队列、安装记录、缓存和报告。 | 项目业务事实、草稿、正式成果、项目中心共享资产正文。 |
+| `_系统/` 或 `_system/` | 项目协作事实，例如项目状态、当前工作、身份、教训、决策和协作索引。中心管理的项目可额外包含项目中心同步说明。 | StarWork 机制缓存、投递队列、安装 manifest。 |
+| Pack 业务目录 | 由 Pack 定义的项目输入、草稿、成果或场景流程目录。默认 General Pack 会创建 `参考资料/` / `references/` 与 `输出/` / `outputs/`。 | Core Kit 固定结构、StarWork 机制报告或 CLI 缓存。 |
+| `identity/`、`lessons/`、`knowledge/`、`skills/` | 项目中心共享资产或项目本地上下文资产。 | 机制队列和缓存。 |
 | `.agents/`、`.claude/`、`.obsidian/` | 外部工具入口和配置。 | StarWork 自有机制事实源。 |
 
 ## 通用 `.starwork/`
@@ -41,7 +40,7 @@ v0.1 只保留两类正式 Kit：
 └── cache/
 ```
 
-接入 Hub 的 Project 额外包含：
+加入项目中心的 Project 额外包含：
 
 ```text
 .starwork/
@@ -53,8 +52,8 @@ v0.1 只保留两类正式 Kit：
 其中：
 
 - `handoff/` 是本地跨项目收发队列。
-- `sync.json` 是主库同步元数据，替代 legacy `.core-sync.json`。
-- `internal/` 是主库内部协议快照，替代 legacy `.internal/`。
+- `sync.json` 是项目中心同步元数据，替代 legacy `.core-sync.json`。
+- `internal/` 是项目中心内部协议快照，替代 legacy `.internal/`。
 
 ## `project`
 
@@ -76,11 +75,7 @@ v0.1 只保留两类正式 Kit：
 │   │   └── 当前工作.md
 │   ├── 身份/
 │   └── 教训/
-├── 知识/
-├── 参考资料/
-└── 输出/
-    ├── 草稿/
-    └── 确认成果/
+└── 知识/
 ```
 
 英文镜像结构：
@@ -101,20 +96,46 @@ v0.1 只保留两类正式 Kit：
 │   │   └── current-work.md
 │   ├── identity/
 │   └── lessons/
-├── knowledge/
-├── references/
-└── outputs/
-    ├── drafts/
-    └── final/
+└── knowledge/
 ```
 
 Project 不默认创建事项目录。需要多推进线时，先通过 Pack、Skill 或用户自定义目录表达，不再切 Kit。
 
-独立 Project 也不默认创建 `_系统/主库同步/`、`_system/main-repo-sync/`、`.core-sync.json` 或 `.internal/`。这些只在 Hub 生成 Satellite 或升级接入 Hub 时由 CLI 叠加。
+Project Kit 也不直接拥有 `参考资料/` / `references/` 或 `输出/` / `outputs/`。普通初始化仍会看到这些目录，是因为默认安装的 General Pack 负责创建它们。
+
+独立 Project 也不默认创建 `_系统/主库同步/`、`_system/main-repo-sync/`、`.core-sync.json` 或 `.internal/`。这些只在项目中心创建项目工作台或升级接入项目中心时由 CLI 叠加。
 
 ## `hub`
 
-Hub Kit 统一使用英文协议路径，中文用户通过中文 README、AGENTS 和规则文案理解。
+项目中心 Kit 的机制目录保持英文，用户可见目录按工作台语言生成。源码中的 `core/kits/hub/` 保留一套英文基准路径，CLI 会在中文项目中心生成时映射为中文可见目录。
+
+中文项目中心目标结构：
+
+```text
+.
+├── AGENTS.md
+├── README.md
+├── .starwork/
+│   ├── workspace.json
+│   ├── skills.json
+│   └── handoff/
+├── .incoming/
+├── .internal/
+├── 身份/
+├── 教训/
+├── 知识/
+├── 项目/
+│   ├── README.md
+│   ├── registry.json
+│   └── 协作/
+├── 技能/
+│   ├── README.md
+│   └── registry.json
+└── 工作区/
+    └── README.md
+```
+
+英文 Project Center 目标结构：
 
 ```text
 .
@@ -140,4 +161,6 @@ Hub Kit 统一使用英文协议路径，中文用户通过中文 README、AGENT
     └── README.md
 ```
 
-Hub 不维护项目状态和当前工作入口。Hub 只记录项目在哪里、共享资源在哪里、跨项目联络如何路由。
+项目中心不维护具体项目状态和当前工作入口。项目中心只记录项目在哪里、共享资源在哪里、跨项目联络如何路由。
+
+同一语义只能有一个可见目录：中文项目中心不应同时出现 `知识/` 和 `knowledge/`，英文 Project Center 不应同时出现 `knowledge/` 和 `知识/`。

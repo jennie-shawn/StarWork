@@ -1,10 +1,29 @@
 id: hub
-name: 多项目管理中枢
+name: 项目中心
 core: "0.1"
 profile: zh
 capabilities:
   - skill-mount
 formal_source_default: projects/
+paths:
+  zh:
+    identity: 身份/
+    lessons: 教训/
+    project_registry: 项目/registry.json
+    coordination: 项目/协作/
+    incoming: .incoming/
+    formal_skills: 技能/
+    drafts_and_experiments: 工作区/
+    knowledge: 知识/
+  en:
+    identity: identity/
+    lessons: lessons/
+    project_registry: projects/registry.json
+    coordination: projects/coordination/
+    incoming: .incoming/
+    formal_skills: skills/
+    drafts_and_experiments: workspace/
+    knowledge: knowledge/
 description: >
-  面向需要建立主库 / 中枢的用户。中枢维护共享身份、教训、
-  knowledge、skills、项目注册表和跨项目联络机制；不直接创建卫星项目。
+  面向需要同时管理多个项目的用户。项目中心维护共享身份、教训、
+  知识、技能、项目注册表和跨项目联络机制；不直接承载项目进度正文。

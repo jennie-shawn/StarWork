@@ -477,7 +477,7 @@
         <article class="panel">
           <span class="badge">状态</span>
           <h3>alpha.13</h3>
-          <p>当前 npm latest 为 <code>@jennie-shawn/starwork@0.1.0-alpha.13</code>。已收敛为 Project Kit 与 Hub Kit 两类结构，补齐 Hub 侧 <code>audit</code> / <code>repair</code> 链路，修正系统级 Skill 与 Kit 自带 Skill 的分发边界，并为 <code>multiagent bind</code> 增加 Codex 宿主会话命名增强。</p>
+          <p>当前 npm latest 为 <code>@jennie-shawn/starwork@0.1.0-alpha.13</code>。已收敛为 Project Kit 与 项目中心 Kit 两类结构，补齐 项目中心 侧 <code>audit</code> / <code>repair</code> 链路，修正系统级 Skill 与 Kit 自带 Skill 的分发边界，并为 <code>multiagent bind</code> 增加 Codex 宿主会话命名增强。</p>
         </article>
       </div>
     </section>
@@ -503,19 +503,19 @@
           <tr>
             <td><strong><code>starwork init</code></strong></td>
             <td>从空目录创建 StarWork 工作台。</td>
-            <td>初始化项目工作台或 Hub；创建基础目录、写入工作台身份证、AI 使用说明和入口规则。</td>
+            <td>初始化项目工作台或 项目中心；创建基础目录、写入工作台身份证、AI 使用说明和入口规则。</td>
             <td><code>--type</code>、<code>--pack</code>、<code>--language</code>、<code>--target</code>、<code>--dry-run</code>、<code>--yes</code></td>
             <td>标准工作台目录、<code>.starwork/workspace.json</code>、<code>.starwork/skills.json</code>、<code>AGENTS.md</code> 和必要入口文件。</td>
-            <td>不负责升级已有旧模板；不处理多项目卫星项目创建。</td>
+            <td>不负责升级已有旧模板；不处理多项目中心管理的项目工作台创建。</td>
             <td><span class="status done">已实现</span></td>
           </tr>
           <tr>
             <td><strong><code>starwork spawn</code></strong></td>
-            <td>从 Hub 生成 Satellite 项目。</td>
-            <td>从健康 Hub 创建项目工作台；回写项目注册表；支持按定制方案生成目录、初始文件、规则和 Hub 托管的 AI 使用说明。</td>
+            <td>从 项目中心 生成 项目工作台 项目。</td>
+            <td>从健康 项目中心创建项目工作台；回写项目注册表；支持按定制方案生成目录、初始文件、规则和 项目中心 托管的 AI 使用说明。</td>
             <td><code>--hub</code>、<code>--target</code>、<code>--mode</code>、<code>--name</code>、<code>--id</code>、<code>--blueprint</code></td>
-            <td>项目工作台、<code>.core-sync.json</code>、Hub 项目登记记录、共享资源挂载、项目 AI 使用说明清单。</td>
-            <td>不安装业务场景能力；不写入非空目标目录；只从 Hub 派生项目。</td>
+            <td>项目工作台、<code>.core-sync.json</code>、项目中心 项目登记记录、共享资源挂载、项目 AI 使用说明清单。</td>
+            <td>不安装业务场景能力；不写入非空目标目录；只从 项目中心 派生项目。</td>
             <td><span class="status done">已实现</span></td>
           </tr>
           <tr>
@@ -532,7 +532,7 @@
             <td>按升级蓝图执行历史模板升级。</td>
             <td>读取 <code>starworkDoctor</code> 生成的升级方案；支持预览、路径安全校验、工作台身份证写入、缺失入口文件补齐、规则注入和旧主库保留原目录名接入。</td>
             <td><code>--target</code>、<code>--blueprint</code>、<code>--dry-run</code>、<code>--yes</code>、<code>--json</code></td>
-            <td>可被 StarWork 接管的工作台，保留旧目录名和历史文件；Hub-like 旧主库不创建重复标准目录。</td>
+            <td>可被 StarWork 接管的工作台，保留旧目录名和历史文件；类似项目中心的旧主库不创建重复标准目录。</td>
             <td>不自动生成升级方案；不处理已是 StarWork 的工作台；不移动、不删除、不覆盖历史文件。</td>
             <td><span class="status done">已实现</span></td>
           </tr>
@@ -598,15 +598,15 @@
             <td><strong><code>starworkInit</code></strong></td>
             <td>初始化设计助手。</td>
             <td>用户想从 0 建工作台，但还没确定工作台类型、语言或目录偏好。</td>
-            <td>分支式采访；判断是 Hub 还是普通项目；判断语言；生成初始化建议或 init blueprint；用户确认创建时继续执行 dry-run、写入和 doctor 验证。</td>
+            <td>分支式采访；判断是 项目中心 还是普通项目；判断语言；生成初始化建议或 init blueprint；用户确认创建时继续执行 dry-run、写入和 doctor 验证。</td>
             <td>初始化建议、<code>init-blueprint.json</code>、rules、dry-run / yes / doctor 执行结果。</td>
             <td><code>starwork init</code> / <code>starwork init --blueprint</code></td>
             <td><span class="status done">已实现</span></td>
           </tr>
           <tr>
             <td><strong><code>starworkSpawn</code></strong></td>
-            <td>Hub Kit 自带的项目定制单设计助手。</td>
-            <td>用户已有 Hub，要创建一个新项目，并希望项目目录、规则或托管的 AI 使用说明可定制。</td>
+            <td>项目中心 Kit 自带的项目定制单设计助手。</td>
+            <td>用户已有项目中心，要创建一个新项目，并希望项目目录、规则或托管的 AI 使用说明可定制。</td>
             <td>采访项目类型和工作方式；生成项目创建方案；整理项目规则和初始文件。</td>
             <td><code>blueprint.json</code>、rules、初始文件、spawn dry-run 命令。</td>
             <td><code>starwork spawn --blueprint</code></td>
@@ -625,7 +625,7 @@
             <td><strong><code>starworkDoctor</code></strong></td>
             <td>工作区诊断助手。</td>
             <td>用户要理解 doctor 输出、判断旧目录如何整理成 StarWork 工作台；或想无损生成升级方案。</td>
-            <td>读取 doctor JSON；解释目录清单和线索；建立目录角色映射；识别历史模板或 Hub-like 旧主库；判断目录分工是否清楚；提出整理建议；用户确认后生成升级方案和规则文件。</td>
+            <td>读取 doctor JSON；解释目录清单和线索；建立目录角色映射；识别历史模板或 项目中心-like 旧主库；判断目录分工是否清楚；提出整理建议；用户确认后生成升级方案和规则文件。</td>
             <td>诊断报告、目录角色映射、缺失和风险、确认问题、<code>upgrade-blueprint.json</code>、rules、dry-run 命令。</td>
             <td><code>starwork doctor</code> / <code>starwork upgrade --blueprint</code></td>
             <td><span class="status done">已实现</span></td>
@@ -687,7 +687,7 @@
 starwork init --type hub --target ./my-hub --yes</pre>
         </div>
         <div>
-          <h3>从 Hub 创建项目</h3>
+          <h3>从项目中心创建项目</h3>
           <pre>starwork spawn --hub ./my-hub --name "新项目" --target ./new-project --mode project --language zh --dry-run
 starwork spawn --hub ./my-hub --target ./new-project --blueprint ./blueprint.json --dry-run</pre>
         </div>

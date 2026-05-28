@@ -16,10 +16,10 @@
 它不替代 `doctor`。`doctor` 检查一个工作台；`audit` 从 Hub 读取项目注册表，再对多个 Satellite 做聚合检查。
 
 ```text
-Hub
-  ↓ 读取 projects/registry.json
+项目中心
+  ↓ 读取项目注册表（中文默认 项目/registry.json，英文默认 projects/registry.json）
 starwork audit
-  ↓ 对每个 Satellite 复用 doctor
+  ↓ 对每个已登记项目工作台复用 doctor
 audit-result.json
   ↓
 starworkAudit skill 判断和生成 repair blueprint
@@ -104,24 +104,25 @@ v0.1 不支持：
 | 路径 | 说明 |
 |---|---|
 | `.starwork/workspace.json` | Hub 工作台身份证。 |
-| `projects/registry.json` | 项目注册表。 |
-| `projects/coordination/` | 中央跨项目路由。 |
+| 项目注册表 | 中文默认 `项目/registry.json`，英文默认 `projects/registry.json`。 |
+| 项目协作路由 | 中文默认 `项目/协作/`，英文默认 `projects/coordination/`。 |
 | `.starwork/handoff/` | Hub 本地收发队列。 |
 | `.incoming/` | 回写候选区。 |
-| `identity/` | 共享身份。 |
-| `lessons/` | 共享教训。 |
-| `knowledge/` | 共享知识。 |
-| `skills/registry.json` | Hub 托管 Skill 注册表。 |
-| `workspace/` | Hub 草稿和实验区。 |
+| 共享身份 | 中文默认 `身份/`，英文默认 `identity/`。 |
+| 共享教训 | 中文默认 `教训/`，英文默认 `lessons/`。 |
+| 共享知识 | 中文默认 `知识/`，英文默认 `knowledge/`。 |
+| 托管 Skill 注册表 | 中文默认 `技能/registry.json`，英文默认 `skills/registry.json`。 |
+| 草稿和实验区 | 中文默认 `工作区/`，英文默认 `workspace/`。 |
 
 Hub 自检可以复用 `doctorCollect(hubPath)`，但 `audit` 还需要读取 registry 和聚合项目结果。
 
 ### Step 3：读取项目注册表
 
-读取：
+读取语言映射后的项目注册表：
 
 ```text
-projects/registry.json
+zh: 项目/registry.json
+en: projects/registry.json
 ```
 
 检查：
@@ -202,10 +203,10 @@ v0.1 对 `archived` 项目默认仍做轻量存在性检查，但不把 doctor w
 
 | 资源 | 中文 Satellite | 英文 Satellite | Hub 来源 |
 |---|---|---|---|
-| knowledge | `知识/` | `knowledge/` | `knowledge/` |
-| identity | `_系统/身份/` | `_system/identity/` | `identity/` |
-| lessons | `_系统/教训/` | `_system/lessons/` | `lessons/` |
-| skills | `.agents/skills/`、`.claude/skills/` | 同左 | Hub `skills/` 或 Kit 自带 Skill |
+| knowledge | `知识/` | `knowledge/` | 中文项目中心 `知识/`，英文 Project Center `knowledge/` |
+| identity | `_系统/身份/` | `_system/identity/` | 中文项目中心 `身份/`，英文 Project Center `identity/` |
+| lessons | `_系统/教训/` | `_system/lessons/` | 中文项目中心 `教训/`，英文 Project Center `lessons/` |
+| skills | `.agents/skills/`、`.claude/skills/` | 同左 | 中文项目中心 `技能/`，英文 Project Center `skills/`，或 Kit 自带 Skill |
 
 检查：
 
@@ -247,7 +248,7 @@ _system/cross-project/
 - 是否仍把 `_系统/跨项目/` 作为标准路径。
 - 是否能找到当前项目状态和当前工作入口。
 - 是否明确 Satellite 不把项目进度正文写回 Hub。
-- 是否明确 Hub 中央路由在 `projects/coordination/`。
+- 是否明确项目中心中央路由在语言映射后的协作目录中。
 
 v0.1 只输出信号，不做复杂自然语言判定。
 
@@ -280,7 +281,7 @@ v0.1 只输出信号，不做复杂自然语言判定。
     }
   },
   "registry": {
-    "path": "projects/registry.json",
+    "path": "项目/registry.json",
     "ok": true,
     "projects_total": 2,
     "duplicate_ids": [],

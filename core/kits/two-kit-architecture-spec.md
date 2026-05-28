@@ -5,7 +5,7 @@
 - 版本：v0.1 draft
 - 所属模块：StarWork Core / CLI / Skills
 - 主题：封存 事项 Kit，收敛为两类 Kit
-- 实现状态：已落地主要结构；`satellite-starter` 是否作为独立结构继续维护待讨论
+- 实现状态：已被 M2.8 命名优化更新；`satellite-starter` 已降级到 `core/legacy/`，不再作为正式 Kit
 - 相关对象：`init`、`spawn`、`doctor`、`upgrade`、`audit`、`starworkInit`、`starworkSpawn`、`starworkDoctor`
 
 ## 背景
@@ -18,12 +18,12 @@
 - `hub`
 - matter / 事项型工作台
 
-这个模型的初衷是把“是否接入 Hub”和“是否使用 Project 标准结构”都提前固化为 Kit 类型。但实际推进后出现了两个问题：
+这个模型的初衷是把“是否接入项目中心”和“是否使用项目工作台标准结构”都提前固化为 Kit 类型。但实际推进后出现了两个问题：
 
 1. 事项型工作台的真实使用场景还没有被验证清楚。
 2. 事项机制作为 Kit 类型，会让 CLI、Doctor、Spawn、Upgrade、Skill、Pack 支持矩阵成倍复杂。
 
-因此本 SPEC 建议：**暂时封存 事项 Kit，把 StarWork Kit 收敛为两类：Project Kit 和 Hub Kit。**
+因此本 SPEC 建议：**暂时封存 事项 Kit，把 StarWork Kit 收敛为两类：Project Kit 和 项目中心 Kit。**
 
 ## 一句话决策
 
@@ -31,7 +31,7 @@ StarWork v0.1 只保留两种正式 Kit：
 
 ```text
 project kit = 具体项目工作台
-hub kit     = 多项目中枢工作台
+hub kit     = 项目中心工作台
 ```
 
 事项机制不再是 Kit 类型，而是未来的可选能力，形态更接近 Agent Lanes：在一个已存在的 Project Kit 上增加“多事项 / 多推进线 / 多阶段交接”的协作层。
@@ -88,8 +88,8 @@ starwork 事项 archive
 
 | Kit | 定位 | 使用场景 |
 |---|---|---|
-| `project` | 具体项目工作台 | 单项目用户；Hub 生成的 Satellite；普通项目执行层。 |
-| `hub` | 多项目中枢工作台 | 管理多个项目、共享身份、教训、知识、skills、registry 和联络路由。 |
+| `project` | 具体项目工作台 | 单项目用户；项目中心创建的中心管理项目工作台；普通项目执行层。 |
+| `hub` | 项目中心工作台 | 管理多个项目、共享身份、教训、知识、skills、registry 和联络路由。 |
 
 ### Workspace Type
 
@@ -97,15 +97,19 @@ starwork 事项 archive
 
 | workspace_type | 说明 |
 |---|---|
-| `project` | 具体项目工作台。可以独立使用，也可以由 Hub 管理。 |
-| `hub` | 多项目中枢。 |
+| `project` | 具体项目工作台。可以独立使用，也可以由项目中心管理。 |
+| `hub` | 项目中心。 |
 
-是否是 Satellite 不再由 Kit 名称表达，而由 workspace state 表达：
+是否是中心管理项目工作台不再由 Kit 名称表达，而由 workspace state 表达：
 
 ```json
 {
   "workspace_type": "project",
   "kit": "project",
+  "project_center": {
+    "path": "/Users/example/my-hub",
+    "project_id": "content-site"
+  },
   "hub": {
     "path": "/Users/example/my-hub",
     "project_id": "content-site"
@@ -113,7 +117,7 @@ starwork 事项 archive
 }
 ```
 
-如果没有 `hub` 字段，就是独立 Project。
+如果没有 `project_center` 或兼容字段 `hub`，就是独立项目工作台。
 
 ### Capability 状态
 
@@ -143,6 +147,8 @@ Doctor 可识别旧项目中的这些路径，但不把它们作为新版标准�
 
 ## 目标 Project Kit 结构
 
+> M2.10 更新：Project Kit 只定义基础工作台骨架，不直接拥有 `参考资料/`、`输出/`、`references/` 或 `outputs/`。普通初始化仍默认安装 General Pack，因此最终工作台会出现这些业务目录，但目录来源是 Pack，不是 Kit。
+
 ### 中文 Project Kit
 
 ```text
@@ -169,11 +175,7 @@ Doctor 可识别旧项目中的这些路径，但不把它们作为新版标准�
 │   │   └── 当前工作.md
 │   ├── 身份/
 │   └── 教训/
-├── 知识/
-├── 参考资料/
-└── 输出/
-    ├── 草稿/
-    └── 确认成果/
+└── 知识/
 ```
 
 ### 英文 Project Kit
@@ -197,43 +199,67 @@ Doctor 可识别旧项目中的这些路径，但不把它们作为新版标准�
 │   │   └── current-work.md
 │   ├── identity/
 │   └── lessons/
-├── knowledge/
-├── references/
-└── outputs/
-    ├── drafts/
-    └── final/
+└── knowledge/
 ```
 
-### 独立 Project 与 Satellite 的区别
+### 独立 Project 与 中心管理项目工作台 的区别
 
-两者以同一个 Project Kit 为基础，但 Satellite 由 `spawn` 额外叠加 Hub 同步层。
+两者以同一个 Project Kit 为基础，但 中心管理项目工作台 由 `spawn` 额外叠加 项目中心同步层。
 
 区别只在状态和同步说明：
 
 | 项目形态 | `.starwork/workspace.json` | `.core-sync.json` | identity / lessons / knowledge |
 |---|---|---|---|
-| 独立 Project | 没有 `hub` 字段 | 不默认存在 | 本地维护 |
-| Satellite Project | 有 `hub.path` 和 `hub.project_id` | 作为 legacy mirror 存在 | 来自 Hub 的快照或链接 |
+| 独立项目工作台 | 没有 `project_center` / `hub` 字段 | 不默认存在 | 本地维护 |
+| 中心管理的项目工作台 | 有 `project_center.path` 和 `project_center.project_id`，兼容保留 `hub` 镜像 | 作为 legacy mirror 存在 | 来自项目中心的快照或链接 |
 
 也就是说：
 
 ```text
-Project Kit + spawn satellite overlay + hub binding = Satellite
-Project Kit without hub binding = standalone project
+Project Kit + project_center 连接 = 中心管理项目工作台
+Project Kit without project_center = standalone project
 ```
 
-Satellite overlay 至少包含：
+中心管理项目叠加层 至少包含：
 
 ```text
 _系统/主库同步/README.md 或 _system/main-repo-sync/README.md
 .starwork/sync.json
 .core-sync.json
-.starwork/internal/    # 如 Hub 提供内部协议快照
+.starwork/internal/    # 如项目中心提供内部协议快照
 ```
 
-## 目标 Hub Kit 结构
+## 目标 项目中心 Kit 结构
 
-Hub Kit 沿用已确定的新标准结构：
+项目中心 Kit 的机制目录保持英文；用户可见目录按语言生成。中文项目中心使用中文可见目录，英文 Project Center 使用英文可见目录。
+
+中文项目中心：
+
+```text
+.
+├── AGENTS.md
+├── README.md
+├── .starwork/
+│   ├── workspace.json
+│   ├── skills.json
+│   └── handoff/
+├── .incoming/
+├── .internal/
+├── 身份/
+├── 教训/
+├── 知识/
+├── 项目/
+│   ├── README.md
+│   ├── registry.json
+│   └── 协作/
+├── 技能/
+│   ├── README.md
+│   └── registry.json
+└── 工作区/
+    └── README.md
+```
+
+英文 Project Center：
 
 ```text
 .
@@ -259,7 +285,7 @@ Hub Kit 沿用已确定的新标准结构：
     └── README.md
 ```
 
-Hub 不是项目执行层，不生成项目状态和当前工作入口。
+项目中心不是项目执行层，不生成项目状态和当前工作入口。
 
 ## 事项机制下线口径
 
@@ -343,7 +369,7 @@ starwork init --type hub
 
 推荐流程：
 
-1. 选择工作台类型：项目工作台 / 多项目中枢。
+1. 选择工作台类型：项目工作台 / 项目中心。
 2. 选择语言：中文 / 英文。
 3. 选择 Pack：默认通用 Pack。
 4. 是否需要定制工作台结构。
@@ -376,10 +402,10 @@ starwork spawn --hub ~/my-hub --name "New Project" --target ~/projects/new-proje
 | `starter` | 兼容别名，映射为 `project`。 |
 | 旧事项模式 | 不兼容，直接报不支持。 |
 
-Spawn 生成的 Satellite 本质是：
+Spawn 生成的 中心管理项目工作台 本质是：
 
 ```text
-Project Kit + Hub binding
+Project Kit + project_center 连接
 ```
 
 workspace state：
@@ -388,6 +414,10 @@ workspace state：
 {
   "workspace_type": "project",
   "kit": "project",
+  "project_center": {
+    "path": "/Users/example/my-hub",
+    "project_id": "new-project"
+  },
   "hub": {
     "path": "/Users/example/my-hub",
     "project_id": "new-project"
@@ -434,14 +464,14 @@ Upgrade blueprint 目标类型收敛：
 | 旧值 | 新处理 |
 |---|---|
 | `single-light` + `local-starter` | 映射为 `project` + `project`。 |
-| `satellite-starter` | 映射为 `project` + Hub binding。 |
+| `satellite-starter` | 映射为 `project` + project_center 连接。 |
 
 ### `audit`
 
 `audit` SPEC 需要同步改名：
 
 - 不再以 `satellite-starter` / `project` 为正式类型。
-- Satellite 是 `workspace_type: project` 且存在 `hub` 绑定。
+- 中心管理项目工作台是 `workspace_type: project` 且存在 `project_center` 连接；`hub` 字段只作为兼容镜像。
 - 旧 `satellite-*` 作为 legacy 兼容。
 
 ### `repair`
@@ -469,7 +499,7 @@ project
 新主线：
 
 ```text
-你要建的是一个具体项目，还是多项目中枢？
+你要建的是一个具体项目，还是项目中心？
 ```
 
 不再问：
@@ -491,7 +521,7 @@ v0.1 先用 Project Kit。事项机制暂时作为未来能力封存，不作为
 新主线：
 
 ```text
-从 Hub 创建一个 Project Satellite。
+从 项目中心创建一个 中心管理的项目工作台。
 ```
 
 如果用户要定制推进结构，用 spawn blueprint 的目录定制能力解决，而不是切换到 事项 Kit。
@@ -508,10 +538,10 @@ v0.1 先用 Project Kit。事项机制暂时作为未来能力封存，不作为
 
 ### `starworkAudit`
 
-把 Satellite 判断改为：
+把 中心管理项目工作台 判断改为：
 
 ```text
-workspace_type = project + hub binding
+workspace_type = project + project_center
 ```
 
 旧 `project` 只作为 legacy 类型输出。
@@ -528,7 +558,7 @@ Pack 不应再声明支持 `project`。
 }
 ```
 
-Hub Pack：
+项目中心 Pack：
 
 ```json
 {
@@ -571,7 +601,7 @@ product/core/kits/project/
 product/core/presets/project.yaml
 ```
 
-`local-starter` 已移出 Core 正式材料。`satellite-starter` 是否作为独立结构继续维护，需要单独讨论；在现有 CLI 主路径中，Satellite 由 `project` 加 Hub 绑定生成。
+`local-starter` 已移出 Core 正式材料。`satellite-starter` 已降级到 `core/legacy/`，不再作为正式 Kit；在现有 CLI 主路径中，中心管理项目工作台由 `project` 加 `project_center` 连接生成。
 
 ```text
 product/core/kits/project/
@@ -593,14 +623,14 @@ product/core/presets/project.yaml
 - 从 `local-starter` 和 `satellite-starter` 合并生成 `project` Kit。
 - `project` Kit 默认不包含 `事项/` 和决策文件。
 - `project` Kit 默认服务独立项目。
-- Satellite 在 Project Kit 基础上由 `spawn` 叠加 Hub 同步说明、`.starwork/sync.json`、legacy `.core-sync.json` 和 `hub` state。
+- 中心管理项目工作台 在 Project Kit 基础上由 `spawn` 叠加 项目中心同步说明、`.starwork/sync.json`、legacy `.core-sync.json` 和 `hub` state。
 
 ### Phase 3：CLI 兼容改造
 
 - `init --type project` 成为正式入口。
 - `init --type single-light` 映射为 `project`。
 - 旧事项类型不再接受。
-- `spawn` 默认生成 Project Satellite。
+- `spawn` 默认生成 中心管理的项目工作台。
 - `spawn --mode starter` 保留兼容并映射为 project。
 - 旧事项模式不再接受。
 - `doctor` 认可新 state，同时兼容旧 state。
@@ -613,12 +643,12 @@ product/core/presets/project.yaml
 1. `init --type project` 生成 Project Kit。
 2. `init --type single-light` 兼容并生成 Project Kit。
 3. 旧事项类型报不支持。
-4. `spawn` 默认生成 `workspace_type: project` 且含 Hub binding。
+4. `spawn` 默认生成 `workspace_type: project` 且含 project_center 连接。
 5. 旧事项模式报不支持。
 6. `doctor` 对新 Project 通过。
 7. `doctor` 对历史事项目录只输出内容信号，不输出兼容类型。
 8. `upgrade` 生成 / 接受 project blueprint。
-9. `audit` 把 `workspace_type: project + hub` 识别为 Satellite。
+9. `audit` 把 `workspace_type: project + hub` 识别为 中心管理项目工作台。
 
 ### Phase 5：发布说明
 
@@ -627,8 +657,8 @@ product/core/presets/project.yaml
 ```text
 StarWork 不再要求你在初始化时判断“是不是项目工作台”。
 现在只有两类工作台：
-1. Project：具体项目。
-2. Hub：多项目中枢。
+1. 项目工作台：具体项目。
+2. 项目中心：管理多个项目和共享资源。
 
 事项机制暂时封存为未来能力。已有事项目录不会被删除，也不会被自动迁移。
 ```
@@ -659,9 +689,9 @@ StarWork 不再要求你在初始化时判断“是不是项目工作台”。
 完成后应满足：
 
 1. 正式 Kit 列表只有 `project` 和 `hub`。
-2. `init` 正式只推荐 Project / Hub。
-3. `spawn` 正式只生成 Project Satellite。
+2. `init` 正式只推荐项目工作台 / 项目中心。
+3. `spawn` 正式只生成 中心管理的项目工作台。
 4. 事项机制 不再作为用户初始化和 spawn 的主分叉。
 5. `doctor` 仍能识别旧 事项 项目，但将其标为 legacy / frozen capability。
 6. 旧 `project` 和 `project` 不会在 A 测用户侧造成硬失败。
-7. 文档能用一句话解释：Project 是项目，Hub 是中枢，事项机制 暂时封存为未来能力。
+7. 文档能用一句话解释：Project 是项目，项目中心是项目中心，事项机制 暂时封存为未来能力。

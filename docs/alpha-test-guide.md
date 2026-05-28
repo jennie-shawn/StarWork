@@ -34,7 +34,7 @@ npx @jennie-shawn/starwork --help
 npx skills add jennie-shawn/StarWork -g -a codex -y
 ```
 
-说明：这是一条短命令，只安装 StarWork 系统级 Skills。`starworkSpawn`、`starworkAudit` 和 `neat-freak` 不应被全局安装；前两个会在 `starwork init --type hub` 时进入 Hub 工作台，`neat-freak` 会在单项目初始化时进入项目。
+说明：这是一条短命令，只安装 StarWork 系统级 Skills。`starworkSpawn`、`starworkAudit` 和 `neat-freak` 不应被全局安装；前两个会在 `starwork init --type hub` 时进入项目中心，`neat-freak` 会在单项目初始化时进入项目。
 
 安装前可先查看仓库会安装哪些 Skills：
 
@@ -56,11 +56,11 @@ npx skills ls -g -a codex --json
 
 说明：历史模板诊断和升级方案生成统一由 `starworkDoctor` 负责；`starwork upgrade` CLI 只执行已经确认过的升级方案。
 
-说明：Hub-like 旧主库接入也走 `starworkDoctor -> starwork upgrade` 链路；默认保留 `projects/`、`knowledge/`、`skills/` 等原目录名，不创建重复标准目录。
+说明：类似项目中心的旧工作区接入也走 `starworkDoctor -> starwork upgrade` 链路；默认保留 `projects/`、`knowledge/`、`skills/` 等原目录名，不创建重复标准目录。
 
 ## 最小测试流程
 
-交互式测试时，`starwork init` 会先询问工作台类型和语言；默认推荐普通项目工作台。Hub 会自动使用中枢管理结构，单项目会默认使用通用工作能力。
+交互式测试时，`starwork init` 会先询问工作台类型和语言；默认推荐项目工作台。项目中心会自动使用项目中心管理结构，项目工作台会默认使用通用工作能力。
 
 ### 1. 创建普通项目工作台
 
@@ -80,13 +80,13 @@ starwork init \
 starwork doctor --target ~/Desktop/starwork-a-test
 ```
 
-### 2. 创建多项目中枢
+### 2. 创建项目中心
 
 ```bash
 starwork init \
   --type hub \
   --language zh \
-  --name "StarWork Hub A Test" \
+  --name "StarWork Project Center A Test" \
   --target ~/Desktop/starwork-hub-a-test \
   --yes
 ```
@@ -97,7 +97,7 @@ starwork init \
 starwork doctor --target ~/Desktop/starwork-hub-a-test
 ```
 
-### 3. 从 Hub 生成项目
+### 3. 从项目中心创建项目工作台
 
 ```bash
 starwork spawn \
@@ -122,13 +122,13 @@ starwork doctor --target ~/Desktop/starwork-alpha-project
 - CLI 是否能顺利安装和运行。
 - `init` 创建的工作台结构是否容易理解。
 - `doctor` 的检查结果是否能指导修复问题。
-- `spawn` 从 Hub 创建项目的过程是否清楚。
-- `doctor` / `starworkDoctor` 对历史模板或 Hub-like 旧主库的说明是否能看懂。
+- `spawn` 从项目中心创建项目工作台的过程是否清楚。
+- `doctor` / `starworkDoctor` 对历史模板或类似项目中心的旧工作区的说明是否能看懂。
 - 历史模板升级后生成的 `AGENTS.md` 是否简洁、清楚，是否保留了用户原有规则里的有效内容。
 - 系统 skills 是否能被 Codex 识别和调用：`starworkInit`、`starworkDoctor`、`starworkMultiagent`。
 - `starworkMultiagent` 是否能把“登记当前会话为常用智能体”正确转换成 `starwork multiagent init/add/bind` 建议。
 - `starwork multiagent bind --session-name` 是否能正确同步 Codex 宿主会话名；失败时是否能看懂 warning。
-- Hub Kit 自带的 `starworkSpawn`、`starworkAudit` 与单项目 Kit 自带的 `neat-freak` 是否能在对应工作台内被发现。
+- 项目中心自带的 `starworkSpawn`、`starworkAudit` 与项目工作台自带的 `neat-freak` 是否能在对应工作台内被发现。
 
 ## 发布前检查
 

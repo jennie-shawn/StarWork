@@ -6,6 +6,23 @@
     "drafts": "outputs/drafts/",
     "final": "outputs/final/"
   },
+  "directories": [
+    {
+      "id": "references",
+      "path": "references/",
+      "readme": "# References\n\nStore source materials, reference links, and user-provided materials here.\n\nTreat this directory as read-only by default unless the user explicitly asks you to edit source material.\n"
+    },
+    {
+      "id": "drafts",
+      "path": "outputs/drafts/",
+      "readme": "# Drafts\n\nStore AI-generated drafts, working notes, and intermediate versions here.\n\nDrafts are not the formal source of truth.\n"
+    },
+    {
+      "id": "final",
+      "path": "outputs/final/",
+      "readme": "# Final Outputs\n\nStore user-approved outputs and confirmed deliverables here.\n\nA project may declare another formal source of truth; by default, this directory holds confirmed outputs.\n"
+    }
+  ],
   "overrides": {
     "formal_source": "outputs/final/",
     "business_work_area": "outputs/drafts/"

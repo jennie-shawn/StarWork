@@ -11,6 +11,11 @@
     "final": { "kind": "formal_source" }
   },
   "flow": ["references", "drafts", "final"],
+  "directories": [
+    { "id": "references", "role": "references" },
+    { "id": "drafts", "role": "drafts" },
+    { "id": "final", "role": "final" }
+  ],
   "rules": [
     { "id": "overview", "slot": "pack.general.overview" },
     { "id": "workflow", "slot": "pack.general.workflow" }

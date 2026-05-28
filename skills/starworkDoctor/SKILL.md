@@ -1,6 +1,6 @@
 ---
 name: starworkDoctor
-description: 'Diagnose StarWork workspaces, legacy templates, or Hub-like repos from `starwork doctor --json`; explain structure issues and draft safe `starwork upgrade --blueprint` plans.'
+description: 'Diagnose StarWork workspaces, legacy templates, or Project Center-like repos from `starwork doctor --json`; explain structure issues and draft safe `starwork upgrade --blueprint` plans.'
 ---
 
 # starworkDoctor
@@ -12,12 +12,12 @@ description: 'Diagnose StarWork workspaces, legacy templates, or Hub-like repos 
 - 当前目录是否已经具备 StarWork Core 的基本工作逻辑
 - 当前目录是否有清楚的入口规则、项目状态、当前工作、资料区、草稿区、正式成果区
 - 哪些非标准目录可能承担“参考资料”“正式成果”“草稿”“当前推进”等 Core 角色
-- 当前目录是否更像 Hub-like 主库 / 多项目中枢，而不是普通单项目旧模板
+- 当前目录是否更像项目中心候选，而不是普通单项目旧模板
 - 当前目录缺少哪些 Core 必需结构
 - 应该如何整理、补齐或升级，且不破坏用户历史文件
 - 用户确认升级语义后，生成可 dry-run 的 `upgrade-blueprint.json` 和配套规则文件
 
-Kit / Pack 不是本 skill 的主线任务。只有在生成升级蓝图时，才选择 CLI 可执行的落地参数：单项目默认 `general` Pack；Hub-like 主库使用 `hub + preserve-names + pack:null`，避免创建重复标准目录。
+Kit / Pack 不是本 skill 的主线任务。只有在生成升级蓝图时，才选择 CLI 可执行的落地参数：单项目默认 `general` Pack；类似项目中心的旧工作区使用 `hub + preserve-names + pack:null`，避免创建重复标准目录。
 
 除非用户明确要求生成升级蓝图，否则这个 skill 只做诊断和建议，不生成 blueprint；除非用户明确要求执行命令，否则不直接修改用户工作区。
 
@@ -29,7 +29,7 @@ Kit / Pack 不是本 skill 的主线任务。只有在生成升级蓝图时，�
 ../starworkDoctor-spec.md
 ```
 
-需要更产品化的回复模板、术语翻译或 Hub-like 主库示例时，读取：
+需要更产品化的回复模板、术语翻译或项目中心候选示例时，读取：
 
 ```text
 references/response-guide.md
@@ -106,7 +106,7 @@ starwork doctor --target <path> --json --inventory-depth all
 - 是否存在 `signals`
 - 是否缺少 workspace state
 - fail 是标准工作台损坏，还是历史模板缺少 state
-- 是否存在 `hub-like-main-repository`、`hub_candidate_paths`、`project_registry_files` 等主库 / Hub 信号
+- 是否存在 `hub-like-main-repository`、`hub_candidate_paths`、`project_registry_files` 等项目中心候选信号
 
 `doctor` 输出只当作事实和信号，不把其中的 legacy 判断当作最终诊断。
 
@@ -148,7 +148,7 @@ starwork doctor --target <path> --json --inventory-depth all
 - 决策记录
 - 身份偏好
 - 经验教训
-- Hub-like 主库角色：项目登记、跨项目联络、回写待审、共享身份、共享教训、共享知识、共享 skills
+- 项目中心候选角色：项目登记、跨项目联络、回写待审、共享身份、共享教训、共享知识、共享 skills
 
 ### Step 4：判断 Core 逻辑贴近程度
 
@@ -183,7 +183,7 @@ starwork doctor --target <path> --json --inventory-depth all
 同时给出升级准备度：
 
 - `ready`：关键目录语义已确认，可以生成 blueprint。
-- `needs-confirmation`：目录逻辑贴近，但正式事实源 / 当前工作 / Hub 映射还需要用户确认。
+- `needs-confirmation`：目录逻辑贴近，但正式事实源、当前工作或项目中心映射还需要用户确认。
 - `not-recommended`：已经是健康 StarWork 工作台，或目标不是工作区。
 
 ### Step 5：形成整理和升级建议
@@ -196,7 +196,7 @@ starwork doctor --target <path> --json --inventory-depth all
 - 哪些目录应映射为 StarWork Core 角色
 - 哪些 Core 必需文件需要补齐
 - 是否需要事项机制
-- 是否是 Hub-like 主库，应使用 `hub + preserve-names + pack:null`
+- 是否是类似项目中心的旧工作区，应使用 `hub + preserve-names + pack:null`
 - 是否需要先保持旧模板，只补 state 和入口规则
 - 是否适合进入 `starwork upgrade --blueprint --dry-run`
 
@@ -212,7 +212,7 @@ starwork doctor --target <path> --json --inventory-depth all
 - 哪个目录是当前工作 / 日常推进区？
 - 哪些目录是只读参考资料？
 - 是否需要事项机制？
-- 对 Hub-like 主库：哪个目录是项目登记、跨项目协调和回写待审？
+- 对项目中心候选：哪个目录是项目登记、跨项目协调和回写待审？
 - 希望保留旧目录名，还是逐步标准化？
 
 推荐问法：
@@ -237,9 +237,9 @@ preserve-names
 
 默认 base：
 
-- 单事务旧模板：`single-light + local-starter + general`
+- 单项目旧模板：按 `project + project + general` 接入；如果 doctor 识别到 `single-light` 或 `local-starter`，只把它们当作历史信号
 - 多线推进旧模板：`project + project + general`
-- Hub-like 主库：`hub + hub + pack:null`
+- 项目中心候选：`hub + hub + pack:null`
 
 推荐输出目录：
 
@@ -367,6 +367,6 @@ starwork doctor --target <workspace>
 - 不把 `doctor` 的 legacy 判断当作最终结论；它只是信号。
 - 不直接执行 `starwork upgrade --yes`，除非用户明确要求。
 - 不生成包含绝对路径、`..`、`.git/`、`node_modules/` 写入动作的 blueprint。
-- 不主动推荐未定稿业务 Pack；v0.1 单项目升级默认 `general`，Hub-like 主库默认 `pack:null`。
+- 不主动推荐未定稿业务 Pack；v0.1 单项目升级默认 `general`，项目中心候选默认 `pack:null`。
 - 不生成完整 `AGENTS.md`；只生成可注入的短规则片段。
 - 不把旧规则原文无筛选地塞进新规则槽；必须先提炼、分类和标注来源。

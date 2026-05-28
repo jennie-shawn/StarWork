@@ -2,11 +2,10 @@ id: project
 name: 项目工作台
 profile: zh
 capabilities:
-  - starter-outputs
 default_pack: general
 paths:
-  formal_source: 输出/确认成果/
-  business_work_area: 输出/草稿/
+  formal_source: "{{pack.general.formal_source}}"
+  business_work_area: "{{pack.general.business_work_area}}"
 description: >
-  面向具体项目执行层。既可独立使用，也可由 Hub 生成并绑定为 Satellite。
-  v0.1 使用 Project 标准结构，不再提供事项分叉。
+  面向具体项目执行层。既可独立使用，也可由项目中心创建并登记为中心管理的项目工作台。
+  v0.1 使用 Project 基础结构，不再提供事项分叉；参考资料和输出目录由 General Pack 提供。

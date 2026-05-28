@@ -9,9 +9,6 @@
     "identity.local": "_系统/身份/",
     "lessons.local": "_系统/教训/",
     "handoff.local": ".starwork/handoff/",
-    "work.starter.references": "参考资料/",
-    "work.starter.outputs_drafts": "输出/草稿/",
-    "work.starter.outputs_final": "输出/确认成果/",
     "work.matters.registry": "事项/注册表.md"
   },
   "legacyAliases": {

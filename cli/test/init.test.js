@@ -350,18 +350,20 @@ test("creates a hub workspace with hub management pack", () => {
   const state = readJson(path.join(dir, ".starwork", "workspace.json"));
   const skills = readJson(path.join(dir, ".starwork", "skills.json"));
   assert.match(output, /需要创建项目时，先用 starworkSpawn 设计，或直接运行 starwork spawn/);
-  assert.match(output, /运行 starwork audit 巡检 Hub 里的项目登记/);
+  assert.match(output, /运行 starwork audit 巡检项目中心里的项目登记/);
   assert.equal(state.workspace_type, "hub");
   assert.equal(state.kit, "hub");
   assert.equal(state.packs[0].id, "hub-management");
   assert.equal(skills.skills[0].id, "starworkSpawn");
   assert.equal(skills.skills[0].source.kind, "kit");
-  assert.equal(fs.existsSync(path.join(dir, "skills", "starworkSpawn", "SKILL.md")), true);
-  assert.equal(fs.existsSync(path.join(dir, "skills", "registry.json")), true);
-  assert.equal(fs.existsSync(path.join(dir, "projects", "registry.json")), true);
-  assert.equal(fs.existsSync(path.join(dir, "knowledge", "README.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, "技能", "starworkSpawn", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, "技能", "registry.json")), true);
+  assert.equal(fs.existsSync(path.join(dir, "项目", "registry.json")), true);
+  assert.equal(fs.existsSync(path.join(dir, "知识", "README.md")), true);
   assert.equal(fs.existsSync(path.join(dir, ".starwork", "handoff", "state.json")), true);
   assert.equal(fs.existsSync(path.join(dir, "_系统")), false);
+  assert.equal(fs.existsSync(path.join(dir, "projects")), false);
+  assert.equal(fs.existsSync(path.join(dir, "skills")), false);
   assert.equal(fs.existsSync(path.join(dir, ".incoming", "README.md")), true);
 });
 
@@ -421,6 +423,18 @@ test("doctor warns when hub rules mention old hub paths", () => {
 
   assert.equal(result.status, 0);
   assert(report.checks.some((check) => check.id === "hub.rules.agents_md.paths" && check.level === "warn"));
+});
+
+test("doctor warns when a project center has duplicate semantic directories", () => {
+  const dir = tempDir();
+  runInit(["--type", "hub", "--target", dir, "--yes"]);
+  fs.mkdirSync(path.join(dir, "knowledge"), { recursive: true });
+
+  const result = runDoctor(["--target", dir, "--json"]);
+  const report = JSON.parse(result.stdout);
+
+  assert.equal(result.status, 0);
+  assert(report.checks.some((check) => check.id === "hub.semantic_duplicate_dirs" && check.level === "warn"));
 });
 
 test("multiagent init creates custom agent lanes without built-in defaults", () => {
@@ -587,13 +601,15 @@ test("spawn creates a project from a hub", () => {
   const state = readJson(path.join(target, ".starwork", "workspace.json"));
   const sync = readJson(path.join(target, ".core-sync.json"));
   const skills = readJson(path.join(target, ".starwork", "skills.json"));
-  const registry = readJson(path.join(hub, "projects", "registry.json"));
+  const registry = readJson(path.join(hub, "项目", "registry.json"));
   const doctor = runDoctor(["--target", target, "--json"]);
   const report = JSON.parse(doctor.stdout);
 
   assert.equal(spawn.status, 0);
   assert.equal(state.workspace_type, "project");
   assert.equal(state.kit, "project");
+  assert.equal(state.project_center.project_id, "content-site");
+  assert.equal(state.project_center.path, hub);
   assert.equal(state.hub.project_id, "content-site");
   assert.equal(sync.project_id, "content-site");
   assert.equal(registry.projects[0].id, "content-site");
@@ -602,8 +618,8 @@ test("spawn creates a project from a hub", () => {
   assert.equal(fs.existsSync(path.join(target, ".starwork", "handoff", "state.json")), true);
   assert.equal(fs.existsSync(path.join(target, "_系统", "主库同步", "README.md")), true);
   assert.match(fs.readFileSync(path.join(target, "AGENTS.md"), "utf8"), /_系统\/主库同步\/README\.md/);
-  assert.match(fs.readFileSync(path.join(target, "_系统", "身份", "README.md"), "utf8"), /来自 Hub/);
-  assert.match(fs.readFileSync(path.join(target, "_系统", "教训", "README.md"), "utf8"), /来自 Hub/);
+  assert.match(fs.readFileSync(path.join(target, "_系统", "身份", "README.md"), "utf8"), /来自项目中心/);
+  assert.match(fs.readFileSync(path.join(target, "_系统", "教训", "README.md"), "utf8"), /来自项目中心/);
   assert.equal(fs.lstatSync(path.join(target, ".agents", "skills")).isDirectory(), true);
   assert(skills.skills.some((skill) => skill.id === "neat-freak"));
   assert.equal(sync.resources.skills.mode, "selected");
@@ -653,14 +669,14 @@ test("spawn creates an English starter satellite from a hub", () => {
   assert.equal(state.language, "en");
   assert.equal(state.workspace_type, "project");
   assert.equal(state.paths.formal_source, "outputs/final/");
-  assert.equal(state.paths.business_work_area, "references/");
+  assert.equal(state.paths.business_work_area, "outputs/drafts/");
   assert.equal(sync.resources.identity.target, "_system/identity");
   assert.equal(sync.resources.knowledge.target, "knowledge");
   assert.equal(fs.existsSync(path.join(target, "_system", "context", "current-project.md")), true);
   assert.equal(fs.existsSync(path.join(target, "_system", "tasks", "current-work.md")), true);
   assert.equal(fs.existsSync(path.join(target, "_system", "main-repo-sync", "README.md")), true);
   assert.match(fs.readFileSync(path.join(target, "AGENTS.md"), "utf8"), /_system\/main-repo-sync\/README\.md/);
-  assert.match(fs.readFileSync(path.join(target, "_system", "identity", "README.md"), "utf8"), /Hub identity snapshots/);
+  assert.match(fs.readFileSync(path.join(target, "_system", "identity", "README.md"), "utf8"), /Project Center identity snapshots/);
   assert.equal(fs.existsSync(path.join(target, "references", "README.md")), true);
   assert.equal(fs.existsSync(path.join(target, "outputs", "final", "README.md")), true);
   assert.equal(fs.lstatSync(path.join(target, "knowledge")).isSymbolicLink(), true);
@@ -716,7 +732,7 @@ test("spawn creates a customized project from a blueprint", () => {
   const blueprintRule = fs.readFileSync(path.join(target, ".starwork", "rules", "project.file_boundaries.md"), "utf8");
   const projectStatus = fs.readFileSync(path.join(target, "_系统", "上下文", "当前项目.md"), "utf8");
   const seed = fs.readFileSync(path.join(target, "会议纪要", "README.md"), "utf8");
-  const registry = readJson(path.join(hub, "projects", "registry.json"));
+  const registry = readJson(path.join(hub, "项目", "registry.json"));
   const doctor = runDoctor(["--target", target, "--json"]);
   const report = JSON.parse(doctor.stdout);
 
@@ -745,9 +761,9 @@ test("spawn distributes selected hub-managed skills from registry", () => {
   const target = tempDir();
   const blueprintDir = tempDir();
   runInit(["--type", "hub", "--target", hub, "--yes"]);
-  fs.mkdirSync(path.join(hub, "skills", "meeting-summary"), { recursive: true });
-  fs.writeFileSync(path.join(hub, "skills", "meeting-summary", "SKILL.md"), "# Meeting Summary\n", "utf8");
-  fs.writeFileSync(path.join(hub, "skills", "registry.json"), `${JSON.stringify({
+  fs.mkdirSync(path.join(hub, "技能", "meeting-summary"), { recursive: true });
+  fs.writeFileSync(path.join(hub, "技能", "meeting-summary", "SKILL.md"), "# Meeting Summary\n", "utf8");
+  fs.writeFileSync(path.join(hub, "技能", "registry.json"), `${JSON.stringify({
     schema: "starwork.skill_registry.v0.1",
     owner: "hub",
     updated_at: "2026-05-20T00:00:00.000Z",
@@ -756,7 +772,7 @@ test("spawn distributes selected hub-managed skills from registry", () => {
         id: "meeting-summary",
         name: "Meeting Summary",
         type: "hub-managed",
-        source: { kind: "local", path: "skills/meeting-summary" },
+        source: { kind: "local", path: "技能/meeting-summary" },
         ownership: "hub-owned",
         distribution: { mode: "symlink", default_for_spawn: false },
         description: "会议纪要整理。"
@@ -821,7 +837,7 @@ test("spawn blueprint dry-run does not write target or registry", () => {
   runInit(["--type", "hub", "--target", hub, "--yes"]);
 
   const result = runCommand(["spawn", "--hub", hub, "--target", target, "--blueprint", path.join(blueprintDir, "blueprint.json"), "--dry-run"]);
-  const registry = readJson(path.join(hub, "projects", "registry.json"));
+  const registry = readJson(path.join(hub, "项目", "registry.json"));
 
   assert.equal(result.status, 0);
   assert.match(result.stdout, /Blueprint/);
@@ -875,7 +891,7 @@ test("spawn refuses non-hub workspaces", () => {
   const result = runCommand(["spawn", "--hub", workspace, "--name", "Nope", "--id", "nope", "--target", target, "--yes"]);
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /多项目管理中枢/);
+  assert.match(result.stderr, /项目中心/);
 });
 
 test("spawn refuses non-empty target directories", () => {
@@ -1419,16 +1435,16 @@ test("audit checks a healthy hub and project satellite", () => {
 
   const human = runCommand(["audit", "--hub", hub]);
   assert.equal(human.status, 0);
-  assert.match(human.stdout, /StarWork Hub 巡检结果/);
+  assert.match(human.stdout, /StarWork 项目中心巡检结果/);
   assert.match(human.stdout, /项目检查结果/);
-  assert.match(human.stdout, /这个 Hub 和已登记项目目前结构完整，可以继续使用/);
+  assert.match(human.stdout, /这个项目中心和已登记项目目前结构完整，可以继续使用/);
 });
 
 test("audit reports a missing satellite path", () => {
   const hub = tempDir();
   const target = path.join(tempDir(), "missing-project");
   runInit(["--type", "hub", "--target", hub, "--yes"]);
-  const registryPath = path.join(hub, "projects", "registry.json");
+  const registryPath = path.join(hub, "项目", "registry.json");
   const registry = readJson(registryPath);
   registry.projects.push({ id: "missing-project", name: "Missing Project", path: target, status: "active" });
   fs.writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
