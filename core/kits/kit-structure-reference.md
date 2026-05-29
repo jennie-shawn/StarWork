@@ -75,7 +75,6 @@ v0.1 只保留两类正式 Kit：
 │   │   └── 当前工作.md
 │   ├── 身份/
 │   └── 教训/
-└── 知识/
 ```
 
 英文镜像结构：
@@ -96,12 +95,13 @@ v0.1 只保留两类正式 Kit：
 │   │   └── current-work.md
 │   ├── identity/
 │   └── lessons/
-└── knowledge/
 ```
 
 Project 不默认创建事项目录。需要多推进线时，先通过 Pack、Skill 或用户自定义目录表达，不再切 Kit。
 
 Project Kit 也不直接拥有 `参考资料/` / `references/` 或 `输出/` / `outputs/`。普通初始化仍会看到这些目录，是因为默认安装的 General Pack 负责创建它们。
+
+Project Kit 也不默认拥有 `知识/` / `knowledge/` / `知识库/` / `knowledge-base/`。需要长期沉淀项目知识时，由 Knowledge Capability 通过 `starwork knowledge init` 另行开启。
 
 独立 Project 也不默认创建 `_系统/主库同步/`、`_system/main-repo-sync/`、`.core-sync.json` 或 `.internal/`。这些只在项目中心创建项目工作台或升级接入项目中心时由 CLI 叠加。
 

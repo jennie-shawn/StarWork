@@ -5,7 +5,7 @@ StarWork 是一套面向 AI 的工作台协议和工具集，用来帮助用户�
 它包含四个核心部分：
 
 - **Core**：定义工作台应该长什么样，包括目录结构、角色边界、状态文件和健康检查规则。
-- **CLI**：提供 `init`、`doctor`、`spawn`、`upgrade`、`adapt`、`pack install`、`multiagent` 等命令，用来创建、检查、升级、协作和扩展工作台。
+- **CLI**：提供 `init`、`doctor`、`knowledge`、`spawn`、`upgrade`、`adapt`、`pack install`、`multiagent` 等命令，用来创建、检查、升级、协作和扩展工作台。
 - **Packs**：场景模板包。当前 A 测阶段默认使用通用工作能力。
 - **Skills**：给 Codex 等 AI 工具使用的工作流说明，让 AI 能更可靠地帮用户设计和生成 StarWork 工作台。
 
@@ -48,6 +48,7 @@ npx skills add jennie-shawn/StarWork -g -a codex -y
 - `starworkInit`：帮助 AI 判断是创建项目工作台还是项目中心，选择语言；用户确认创建时，会带着 `starwork init` dry-run、执行并用 `doctor` 验证。
 - `starworkDoctor`：帮助 AI 基于 `starwork doctor --json` 解释目录问题、识别旧模板或类似项目中心的旧工作区；用户明确要求升级时，生成可预览、可确认的升级方案。
 - `starworkMultiagent`：帮助 AI 把“登记当前会话为常用智能体”“管理多 AI 分工”“登记共享输出”等请求转换成 `starwork multiagent` 命令组合。
+- `starworkKnowledge`：帮助 AI 开启和维护项目本地知识库；创建结构时先调用 `starwork knowledge`，整理内容时区分主题页和综合判断。
 
 Kit 随附 Skills 不走全局安装命令，它们跟着具体工作台走：
 
@@ -90,6 +91,14 @@ starwork init \
 starwork doctor --target ~/Desktop/starwork-a-test
 ```
 
+可选：给项目开启知识库：
+
+```bash
+starwork knowledge init --target ~/Desktop/starwork-a-test --dry-run
+starwork knowledge init --target ~/Desktop/starwork-a-test --yes
+starwork knowledge status --target ~/Desktop/starwork-a-test --json
+```
+
 创建一个项目中心：
 
 ```bash
@@ -129,6 +138,7 @@ starwork audit --hub ~/Desktop/starwork-hub-a-test
 ```text
 starwork init
 starwork doctor
+starwork knowledge
 starwork spawn
 starwork upgrade
 starwork adapt
@@ -140,6 +150,7 @@ starwork multiagent
 
 - `init`：创建项目工作台或项目中心；交互默认推荐项目工作台。
 - `doctor`：检查工作台是否完整、关键文件是否还在；也会为旧模板和类似项目中心的旧工作区列出目录线索，交给 `starworkDoctor` 判断。
+- `knowledge`：开启、检查和按确认方案整理项目本地知识库；默认不会移动旧 `知识/` 或 `knowledge/`。
 - `spawn`：从已有项目中心创建并登记项目工作台，支持中文或英文目录镜像。
 - `upgrade`：按 `starworkDoctor` skill 生成的升级蓝图，把历史模板或类似项目中心的旧工作区安全接入 StarWork 工作台。
 - `adapt`：生成 Claude Code、Cursor 等 AI 工具的适配文件。

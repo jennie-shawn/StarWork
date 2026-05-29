@@ -461,7 +461,7 @@
     <section class="section">
       <div class="section-header">
         <h2>当前总览</h2>
-        <p class="section-note">截至 alpha.13，StarWork 已有 9 个可用 CLI 命令和 6 个自研 Skill。`update` 和 `starwork skill` 仍是未来命令，不在当前可用列表里。新增或调整命令、skill、Kit 分发范围、npm 版本时必须同步维护本页。</p>
+        <p class="section-note">截至 alpha.16，StarWork 已有 10 个可用 CLI 命令和 7 个自研 Skill。`update` 和 `starwork skill` 仍是未来命令，不在当前可用列表里。新增或调整命令、skill、Kit 分发范围、npm 版本时必须同步维护本页。</p>
       </div>
       <div class="grid-3">
         <article class="panel">
@@ -477,7 +477,7 @@
         <article class="panel">
           <span class="badge">状态</span>
           <h3>alpha.13</h3>
-          <p>当前 npm latest 为 <code>@jennie-shawn/starwork@0.1.0-alpha.13</code>。已收敛为 Project Kit 与 项目中心 Kit 两类结构，补齐 项目中心 侧 <code>audit</code> / <code>repair</code> 链路，修正系统级 Skill 与 Kit 自带 Skill 的分发边界，并为 <code>multiagent bind</code> 增加 Codex 宿主会话命名增强。</p>
+          <p>当前 npm latest 为 <code>@jennie-shawn/starwork@0.1.0-alpha.16</code>。已收敛为 Project Kit 与 项目中心 Kit 两类结构，补齐 项目中心 侧 <code>audit</code> / <code>repair</code> 链路，修正系统级 Skill 与 Kit 自带 Skill 的分发边界，并新增可选项目知识库命令组 <code>starwork knowledge</code>。</p>
         </article>
       </div>
     </section>
@@ -525,6 +525,15 @@
             <td><code>--target</code>、<code>--json</code>、<code>--strict</code>、<code>--verbose</code>、<code>--inventory-depth</code></td>
             <td>用户可读体检结果或 <code>starwork.doctor.result.v0.1</code> JSON。</td>
             <td>不输出升级 next steps；不判断目录真实业务语义；不修复文件。</td>
+            <td><span class="status done">已实现</span></td>
+          </tr>
+          <tr>
+            <td><strong><code>starwork knowledge</code></strong></td>
+            <td>项目本地知识库能力。</td>
+            <td>创建标准知识库结构；查看知识库状态；检查基础结构；按确认过的 knowledge blueprint 执行安全结构变更。</td>
+            <td><code>init</code>、<code>status</code>、<code>check</code>、<code>apply</code>、<code>--target</code>、<code>--path</code>、<code>--blueprint</code>、<code>--dry-run</code></td>
+            <td><code>知识库/</code> 或 <code>knowledge-base/</code>、能力声明、知识库规则文件；<code>status --json</code> 只输出事实。</td>
+            <td>不总结资料；不判断内容价值；不自动移动、删除或改名旧 <code>知识/</code> / <code>knowledge/</code>。</td>
             <td><span class="status done">已实现</span></td>
           </tr>
           <tr>
@@ -637,6 +646,15 @@
             <td>判断用户语义；确认 lane ID、职责、写入范围、session 和可选宿主会话显示名称；把请求翻译成 <code>multiagent init/add/bind/release/status/share</code> 命令组合。</td>
             <td>multiagent dry-run 命令、确认后的执行命令、当前分工解释、过程材料放置建议。</td>
             <td><code>starwork multiagent</code></td>
+            <td><span class="status done">已实现</span></td>
+          </tr>
+          <tr>
+            <td><strong><code>starworkKnowledge</code></strong></td>
+            <td>项目知识库整理助手。</td>
+            <td>用户想开启知识库、整理资料、回答并沉淀长期知识、检查知识库是否混乱，或从旧知识目录整理到新结构。</td>
+            <td>先调用 <code>starwork knowledge</code> 创建或检查结构；判断哪些内容值得长期沉淀；维护 <code>pages/</code>、<code>synthesis/</code>、<code>index.md</code> 和 <code>log.md</code>；需要旧目录整理时生成 blueprint。</td>
+            <td>知识库维护建议、主题页、综合判断、来源索引、维护记录、<code>starwork.knowledge</code> blueprint。</td>
+            <td><code>starwork knowledge</code></td>
             <td><span class="status done">已实现</span></td>
           </tr>
         </tbody>

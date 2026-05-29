@@ -147,7 +147,7 @@ Doctor 可识别旧项目中的这些路径，但不把它们作为新版标准�
 
 ## 目标 Project Kit 结构
 
-> M2.10 更新：Project Kit 只定义基础工作台骨架，不直接拥有 `参考资料/`、`输出/`、`references/` 或 `outputs/`。普通初始化仍默认安装 General Pack，因此最终工作台会出现这些业务目录，但目录来源是 Pack，不是 Kit。
+> M2.11 更新：Project Kit 只定义基础工作台骨架，不直接拥有 `参考资料/`、`输出/`、`references/`、`outputs/`、`知识/`、`knowledge/`、`知识库/` 或 `knowledge-base/`。普通初始化仍默认安装 General Pack，因此最终工作台会出现参考资料和输出目录；知识库需要通过 Knowledge Capability 另行开启。
 
 ### 中文 Project Kit
 
@@ -175,7 +175,6 @@ Doctor 可识别旧项目中的这些路径，但不把它们作为新版标准�
 │   │   └── 当前工作.md
 │   ├── 身份/
 │   └── 教训/
-└── 知识/
 ```
 
 ### 英文 Project Kit
@@ -199,7 +198,6 @@ Doctor 可识别旧项目中的这些路径，但不把它们作为新版标准�
 │   │   └── current-work.md
 │   ├── identity/
 │   └── lessons/
-└── knowledge/
 ```
 
 ### 独立 Project 与 中心管理项目工作台 的区别

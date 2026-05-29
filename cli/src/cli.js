@@ -185,6 +185,11 @@ async function run(argv) {
     return;
   }
 
+  if (command === "knowledge") {
+    await knowledgeCommand(argv.slice(1));
+    return;
+  }
+
   if (command === "spawn") {
     await spawnWorkspace(argv.slice(1));
     return;
@@ -268,7 +273,8 @@ async function init(argv) {
     formalSource,
     businessWorkArea,
     blueprint,
-    includeSkills: !options.noSkills
+    includeSkills: !options.noSkills,
+    enableKnowledge: Boolean(options.knowledge)
   });
 
   printPlan(plan, options.dryRun);
@@ -575,8 +581,6 @@ function collectAuditProjectResult({ hubRoot, registryProject, options }) {
     summary: doctor.summary
   };
 
-  const satellitePaths = getSatellitePaths(result.language);
-  checkAuditProjectPath(result, projectPath, satellitePaths.knowledge, "satellite.knowledge.exists", "Knowledge entry exists");
   checkAuditProjectPath(result, projectPath, ".starwork/handoff/state.json", "satellite.handoff.exists", "Local handoff state exists");
   if (fs.existsSync(path.join(projectPath, "_系统", "跨项目")) || fs.existsSync(path.join(projectPath, "_system", "cross-project"))) {
     result.legacy_signals.push("legacy-local-handoff");
@@ -625,6 +629,8 @@ function parseArgs(argv) {
       options.verbose = true;
     } else if (arg === "--no-skills") {
       options.noSkills = true;
+    } else if (arg === "--knowledge") {
+      options.knowledge = true;
     } else if (arg === "--inventory-depth") {
       options.inventoryDepth = readValue(argv, ++i, arg);
     } else if (arg === "--inventory-limit") {
@@ -1143,6 +1149,7 @@ function collectDoctorResult(targetDir, options = {}) {
   checkWorkspaceState(result, state);
   checkKit(result, workspaceRoot, state);
   checkCoreRoles(result, workspaceRoot, state);
+  checkKnowledgeCapability(result, workspaceRoot, state);
   checkPackInstallations(result, workspaceRoot, state);
   checkBlueprintCustomization(result, workspaceRoot, state);
   checkUpgradeRoleMappings(result, workspaceRoot, state);
@@ -1168,6 +1175,7 @@ function createDoctorResult(targetDir) {
     workspace: null,
     skills: null,
     upgrade: null,
+    knowledge: null,
     inventory: null,
     signals: null,
     summary: {
@@ -1211,6 +1219,377 @@ async function confirmOrThrow(options, question) {
   } else if (!options.yes && !process.stdin.isTTY) {
     throw new Error("非交互环境需要传入 --yes 或 --dry-run。");
   }
+}
+
+async function knowledgeCommand(argv) {
+  const subcommand = argv[0] && !argv[0].startsWith("-") ? argv[0] : "status";
+  const options = parseArgs(argv.slice(subcommand === "status" && (!argv[0] || argv[0].startsWith("-")) ? 0 : 1));
+
+  if (options.help) {
+    printKnowledgeHelp();
+    return;
+  }
+
+  if (subcommand === "init") {
+    await knowledgeInit(options);
+    return;
+  }
+
+  if (subcommand === "status") {
+    knowledgeStatus(options);
+    return;
+  }
+
+  if (subcommand === "check") {
+    const result = knowledgeCheck(options);
+    process.exitCode = result.ok ? 0 : 1;
+    return;
+  }
+
+  if (subcommand === "apply") {
+    await knowledgeApply(options);
+    return;
+  }
+
+  throw new Error(`未知 knowledge 子命令：${subcommand}`);
+}
+
+async function knowledgeInit(options) {
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  const state = readWorkspaceState(workspaceRoot);
+  assertProjectKnowledgeWorkspace(state);
+  const language = options.language || state.language || "zh";
+  validateLanguage(language);
+  const root = options.path || getKnowledgeDefaultRoot(language);
+  const plan = buildKnowledgeInitPlan({ workspaceRoot, state, language, root });
+
+  printGenericPlan(options.dryRun ? "项目知识库创建预览（dry run）：" : "项目知识库创建计划：", plan.actions);
+  if (options.dryRun) return;
+  await confirmOrThrow(options, "是否开启项目知识库？");
+  applyPlan(plan);
+  console.log(`已开启项目知识库：${plan.root}`);
+}
+
+function knowledgeStatus(options) {
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  const state = readWorkspaceState(workspaceRoot);
+  const status = collectKnowledgeStatus(workspaceRoot, state, options);
+  if (options.json) {
+    console.log(JSON.stringify(status, null, 2));
+    return;
+  }
+  printKnowledgeStatus(status);
+}
+
+function knowledgeCheck(options) {
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  const state = readWorkspaceState(workspaceRoot);
+  const status = collectKnowledgeStatus(workspaceRoot, state, options);
+  const required = getKnowledgeRequiredEntries(status.root);
+  const missing = required.filter((entry) => !status.structure[entry.key]);
+  const emptyImportant = [];
+  if (status.enabled || status.exists) {
+    for (const entry of required.filter((item) => item.kind === "file" && ["index", "schema"].includes(item.key))) {
+      const absolute = path.join(workspaceRoot, entry.path);
+      if (fs.existsSync(absolute) && !fs.readFileSync(absolute, "utf8").trim()) {
+        emptyImportant.push(entry.path);
+      }
+    }
+  }
+  const ok = (!status.enabled && !status.exists) || (missing.length === 0 && emptyImportant.length === 0);
+  const result = {
+    ok,
+    enabled: status.enabled,
+    exists: status.exists,
+    root: status.root,
+    missing: missing.map((entry) => entry.path),
+    empty: emptyImportant,
+    legacy_candidates: status.legacy_candidates
+  };
+  if (options.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return result;
+  }
+  if (!status.enabled && !status.exists) {
+    console.log("这个项目还没有开启知识库。这不是问题；需要长期沉淀项目知识时再开启即可。");
+    return result;
+  }
+  if (ok) {
+    console.log(`项目知识库结构完整：${status.root}`);
+  } else {
+    console.log(`项目知识库需要补齐：${status.root}`);
+    for (const item of result.missing) console.log(`- 缺少：${item}`);
+    for (const item of result.empty) console.log(`- 内容为空：${item}`);
+  }
+  return result;
+}
+
+async function knowledgeApply(options) {
+  if (!options.blueprint) {
+    throw new Error("knowledge apply 需要 --blueprint <file>。");
+  }
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  const state = readWorkspaceState(workspaceRoot);
+  assertProjectKnowledgeWorkspace(state);
+  const blueprint = loadKnowledgeBlueprint(options.blueprint);
+  const plan = buildKnowledgeApplyPlan({ workspaceRoot, state, blueprint });
+
+  printGenericPlan(options.dryRun ? "知识库整理预览（dry run）：" : "知识库整理计划：", plan.actions);
+  if (options.dryRun) return;
+  await confirmOrThrow(options, "是否按知识库整理方案执行？");
+  applyPlan(plan);
+  console.log(`已应用知识库整理方案：${path.basename(blueprint.__path)}`);
+}
+
+function assertProjectKnowledgeWorkspace(state) {
+  if (state.workspace_type === "hub") {
+    throw new Error("项目知识库只用于具体项目工作台；项目中心共享知识库会在后续能力中单独设计。");
+  }
+}
+
+function buildKnowledgeInitPlan({ workspaceRoot, state, language, root }) {
+  const normalizedRoot = normalizeSafeRelativePath(root, "knowledge root").replace(/\/$/, "");
+  const actions = [
+    ...buildKnowledgeStructureActions(workspaceRoot, language, normalizedRoot),
+    ...buildKnowledgeRuleActions(workspaceRoot, language, normalizedRoot),
+    overwriteFileAction(workspaceRoot, path.join(".starwork", "workspace.json"), renderKnowledgeWorkspaceState(state, language, normalizedRoot))
+  ];
+  return {
+    targetDir: workspaceRoot,
+    language,
+    root: normalizedRoot,
+    actions: dedupeActions(actions)
+  };
+}
+
+function buildKnowledgeStructureActions(workspaceRoot, language, root) {
+  const actions = [directoryAction(workspaceRoot, root)];
+  for (const directory of ["inbox", "sources", "pages", "synthesis"]) {
+    actions.push(directoryAction(workspaceRoot, path.join(root, directory)));
+  }
+  for (const file of ["README.md", "index.md", "schema.md", "log.md"]) {
+    actions.push(fileAction(workspaceRoot, path.join(root, file), loadKnowledgeTemplate(language, file)));
+  }
+  return actions;
+}
+
+function buildKnowledgeRuleActions(workspaceRoot, language, root) {
+  const actions = [];
+  const agentsPath = path.join(workspaceRoot, "AGENTS.md");
+  if (fs.existsSync(agentsPath)) {
+    const existing = fs.readFileSync(agentsPath, "utf8");
+    const next = ensureRulesIndexReference(existing);
+    if (next !== existing) {
+      actions.push(overwriteFileAction(workspaceRoot, "AGENTS.md", next));
+    }
+  }
+  actions.push(...buildRuleSlotActions(workspaceRoot, [{
+    slot: "knowledge",
+    title: language === "en" ? "Knowledge Base" : "知识库",
+    group: language === "en" ? "StarWork Capability Rules" : "StarWork 能力规则",
+    content: renderKnowledgeRule(language, root)
+  }]));
+  return actions;
+}
+
+function renderKnowledgeWorkspaceState(state, language, root) {
+  const nextState = {
+    ...state,
+    language: state.language || language,
+    capabilities: {
+      ...(state.capabilities || {}),
+      knowledge: {
+        enabled: true,
+        root,
+        mode: "local"
+      }
+    }
+  };
+  return `${JSON.stringify(nextState, null, 2)}\n`;
+}
+
+function getKnowledgeDefaultRoot(language) {
+  return language === "en" ? "knowledge-base" : "知识库";
+}
+
+function getKnowledgeTemplateDir(language) {
+  return path.join(PRODUCT_ROOT, "core", "capabilities", "knowledge", "templates", language === "en" ? "en" : "zh");
+}
+
+function loadKnowledgeTemplate(language, file) {
+  const templatePath = path.join(getKnowledgeTemplateDir(language), file);
+  if (!fs.existsSync(templatePath)) {
+    throw new Error(`缺少知识库模板：${templatePath}`);
+  }
+  return fs.readFileSync(templatePath, "utf8");
+}
+
+function renderKnowledgeRule(language, root) {
+  if (language === "en") {
+    return `## Knowledge Base
+
+When a task depends on long-term project knowledge, read \`${root}/index.md\` first.
+
+Do not dump raw sources, temporary drafts, or one-off task notes into the knowledge base. Stable topics belong in \`${root}/pages/\`; cross-topic strategy, reviews, and synthesized judgment belong in \`${root}/synthesis/\`.
+`;
+  }
+  return `## 知识库
+
+如果任务需要复用本项目的长期知识，先读 \`${root}/index.md\`。
+
+不要把原始资料、临时草稿或单次任务过程直接塞进知识库。新资料需要整理成稳定主题页，放入 \`${root}/pages/\`；跨主题的策略、复盘和综合判断放入 \`${root}/synthesis/\`。
+`;
+}
+
+function collectKnowledgeStatus(workspaceRoot, state, options = {}) {
+  const language = options.language || state.language || "zh";
+  const declared = state.capabilities?.knowledge || {};
+  const root = normalizeSafeRelativePath(options.path || declared.root || getKnowledgeDefaultRoot(language), "knowledge root").replace(/\/$/, "");
+  const required = getKnowledgeRequiredEntries(root);
+  const structure = {};
+  for (const entry of required) {
+    const absolute = path.join(workspaceRoot, entry.path);
+    structure[entry.key] = entry.kind === "directory"
+      ? fs.existsSync(absolute) && fs.statSync(absolute).isDirectory()
+      : fs.existsSync(absolute) && fs.statSync(absolute).isFile();
+  }
+  const exists = fs.existsSync(path.join(workspaceRoot, root));
+  const legacyCandidates = ["知识", "knowledge"]
+    .filter((candidate) => candidate !== root && fs.existsSync(path.join(workspaceRoot, candidate)));
+  const warnings = [];
+  if (declared.enabled && !exists) {
+    warnings.push(`workspace state 声明了知识库，但目录不存在：${root}`);
+  }
+  for (const entry of required) {
+    if ((declared.enabled || exists) && !structure[entry.key]) {
+      warnings.push(`缺少知识库结构：${entry.path}`);
+    }
+  }
+  return {
+    ok: warnings.length === 0,
+    enabled: Boolean(declared.enabled),
+    exists,
+    language,
+    root,
+    structure,
+    counts: {
+      pages: countDirectoryEntries(path.join(workspaceRoot, root, "pages")),
+      synthesis: countDirectoryEntries(path.join(workspaceRoot, root, "synthesis")),
+      inbox: countDirectoryEntries(path.join(workspaceRoot, root, "inbox")),
+      sources: countDirectoryEntries(path.join(workspaceRoot, root, "sources"))
+    },
+    legacy_candidates: legacyCandidates,
+    warnings
+  };
+}
+
+function getKnowledgeRequiredEntries(root) {
+  return [
+    { key: "readme", kind: "file", path: path.join(root, "README.md") },
+    { key: "index", kind: "file", path: path.join(root, "index.md") },
+    { key: "schema", kind: "file", path: path.join(root, "schema.md") },
+    { key: "log", kind: "file", path: path.join(root, "log.md") },
+    { key: "inbox", kind: "directory", path: path.join(root, "inbox") },
+    { key: "sources", kind: "directory", path: path.join(root, "sources") },
+    { key: "pages", kind: "directory", path: path.join(root, "pages") },
+    { key: "synthesis", kind: "directory", path: path.join(root, "synthesis") }
+  ];
+}
+
+function countDirectoryEntries(directoryPath) {
+  if (!fs.existsSync(directoryPath) || !fs.statSync(directoryPath).isDirectory()) return 0;
+  return fs.readdirSync(directoryPath).filter((name) => name !== ".gitkeep").length;
+}
+
+function printKnowledgeStatus(status) {
+  console.log("项目知识库状态");
+  console.log("");
+  console.log(`语言：${friendlyLanguage(status.language)}`);
+  console.log(`路径：${status.root}`);
+  console.log(`是否开启：${status.enabled ? "已开启" : "未开启"}`);
+  console.log(`目录是否存在：${status.exists ? "存在" : "不存在"}`);
+  if (status.legacy_candidates.length) {
+    console.log(`检测到旧知识相关目录：${status.legacy_candidates.join("、")}`);
+  }
+  if (status.warnings.length) {
+    console.log("");
+    console.log("需要关注：");
+    for (const warning of status.warnings) console.log(`- ${warning}`);
+  }
+}
+
+function loadKnowledgeBlueprint(blueprintPath) {
+  const filePath = path.resolve(blueprintPath);
+  let blueprint;
+  try {
+    blueprint = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (error) {
+    throw new Error(`无法读取 knowledge blueprint：${error.message}`);
+  }
+  if (blueprint.type !== "starwork.knowledge" || blueprint.version !== "0.1") {
+    throw new Error("knowledge blueprint 必须声明 type=starwork.knowledge 且 version=0.1。");
+  }
+  if (!["zh", "en"].includes(blueprint.language)) {
+    throw new Error("knowledge blueprint language 只支持 zh 或 en。");
+  }
+  if (!blueprint.root) {
+    throw new Error("knowledge blueprint 缺少 root。");
+  }
+  if (!Array.isArray(blueprint.actions) || blueprint.actions.length === 0) {
+    throw new Error("knowledge blueprint 必须包含 actions。");
+  }
+  for (const action of blueprint.actions) {
+    if (["delete", "remove", "rm"].includes(action?.type)) {
+      throw new Error("knowledge blueprint 不允许删除动作。");
+    }
+    if (action.path) normalizeSafeRelativePath(action.path, `knowledge action ${action.type}.path`);
+  }
+  return { ...blueprint, __path: filePath, __dir: path.dirname(filePath) };
+}
+
+function buildKnowledgeApplyPlan({ workspaceRoot, state, blueprint }) {
+  const root = normalizeSafeRelativePath(blueprint.root, "knowledge root").replace(/\/$/, "");
+  const actions = [];
+  for (const action of blueprint.actions) {
+    if (action.type === "create_knowledge_base") {
+      actions.push(...buildKnowledgeStructureActions(workspaceRoot, blueprint.language, normalizeSafeRelativePath(action.path || root, "knowledge action path").replace(/\/$/, "")));
+    } else if (action.type === "create_dir") {
+      actions.push(directoryAction(workspaceRoot, normalizeSafeRelativePath(action.path, "knowledge create_dir.path")));
+    } else if (action.type === "write_template") {
+      actions.push(fileAction(workspaceRoot, normalizeSafeRelativePath(action.path, "knowledge write_template.path"), loadKnowledgeNamedTemplate(action.template, blueprint.language)));
+    } else if (action.type === "append_agents_rule") {
+      actions.push(...buildKnowledgeRuleActions(workspaceRoot, blueprint.language, root));
+    } else if (action.type === "copy_file") {
+      if (action.confirmed !== true) throw new Error("knowledge copy_file 需要 confirmed=true。");
+      const from = normalizeSafeSourcePath(action.from, blueprint.__dir, "knowledge copy_file.from");
+      const to = normalizeSafeRelativePath(action.to, "knowledge copy_file.to");
+      actions.push(strictFileAction(workspaceRoot, to, fs.readFileSync(from, "utf8")));
+    } else {
+      throw new Error(`knowledge blueprint 不支持 action.type：${action.type}`);
+    }
+  }
+  actions.push(overwriteFileAction(workspaceRoot, path.join(".starwork", "workspace.json"), renderKnowledgeWorkspaceState(state, blueprint.language, root)));
+  return {
+    targetDir: workspaceRoot,
+    root,
+    language: blueprint.language,
+    actions: dedupeActions(actions)
+  };
+}
+
+function loadKnowledgeNamedTemplate(template, language) {
+  const normalized = template || "";
+  const mapping = {
+    [`knowledge.readme.${language}`]: "README.md",
+    [`knowledge.index.${language}`]: "index.md",
+    [`knowledge.schema.${language}`]: "schema.md",
+    [`knowledge.log.${language}`]: "log.md"
+  };
+  const file = mapping[normalized] || mapping[normalized.replace(/\.(zh|en)$/, `.${language}`)];
+  if (!file) {
+    throw new Error(`未知知识库模板：${template}`);
+  }
+  return loadKnowledgeTemplate(language, file);
 }
 
 function buildAdaptPlan({ workspaceRoot, state, agents }) {
@@ -2038,6 +2417,28 @@ function checkHubCoreRoles(result, workspaceRoot, state) {
   checkPathExists(result, workspaceRoot, hubPaths.draftsAndExperiments, "hub.workspace.exists", "Project Center workspace exists", "缺少项目中心 workspace/。");
   checkHubDuplicateSemanticDirs(result, workspaceRoot);
   checkHubRuleDocumentPaths(result, workspaceRoot);
+}
+
+function checkKnowledgeCapability(result, workspaceRoot, state) {
+  if (state.workspace_type === "hub") return;
+  const status = collectKnowledgeStatus(workspaceRoot, state);
+  result.knowledge = status;
+
+  if (!status.enabled && !status.exists) {
+    addCheck(result, "knowledge.optional.not_enabled", "info", "项目未开启知识库；这不是结构问题。");
+  } else if (status.enabled) {
+    if (status.exists && status.warnings.length === 0) {
+      addCheck(result, "knowledge.structure.complete", "pass", `项目知识库结构完整：${status.root}`, status.root);
+    } else {
+      addCheck(result, "knowledge.structure.complete", "fail", `项目知识库已开启，但结构不完整：${status.root}`, status.root);
+    }
+  } else if (status.exists) {
+    addCheck(result, "knowledge.structure.undeclared", "warn", `检测到项目知识库目录，但 workspace state 尚未声明开启：${status.root}`, status.root);
+  }
+
+  if (status.legacy_candidates.length) {
+    addCheck(result, "knowledge.legacy_candidates.detected", "info", `检测到旧知识相关目录：${status.legacy_candidates.join(", ")}。不会自动移动或删除。`, status.legacy_candidates.join(", "));
+  }
 }
 
 function checkHubDuplicateSemanticDirs(result, workspaceRoot) {
@@ -3255,7 +3656,7 @@ function ask(question) {
   });
 }
 
-function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfig, pack, formalSource, businessWorkArea, blueprint = null, includeSkills = true }) {
+function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfig, pack, formalSource, businessWorkArea, blueprint = null, includeSkills = true, enableKnowledge = false }) {
   const kitDir = path.join(PRODUCT_ROOT, "core", "kits", workspaceConfig.kit);
   if (!fs.existsSync(kitDir)) {
     throw new Error(`找不到 Kit：${workspaceConfig.kit}`);
@@ -3282,6 +3683,7 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
   };
   const packRuleSlots = renderPackRuleSlots(pack, variables, "场景规则");
   const blueprintRuleSlots = renderInitBlueprintRuleSlots(blueprint, variables);
+  const hasKnowledgeRule = enableKnowledge && workspaceType !== "hub";
 
   for (const source of walkFiles(kitDir)) {
     const sourceRelativePath = normalizeRelativePath(path.relative(kitDir, source));
@@ -3300,10 +3702,10 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
         language: pack.language || "zh",
         blueprint,
         variables,
-        hasExtraRules: packRuleSlots.length > 0 || blueprintRuleSlots.length > 0
+        hasExtraRules: packRuleSlots.length > 0 || blueprintRuleSlots.length > 0 || hasKnowledgeRule
       });
     }
-    if (relativePath === "AGENTS.md" && (packRuleSlots.length || blueprintRuleSlots.length)) {
+    if (relativePath === "AGENTS.md" && (packRuleSlots.length || blueprintRuleSlots.length || hasKnowledgeRule)) {
       content = ensureRulesIndexReference(content);
     }
     actions.push(fileAction(targetDir, relativePath, content));
@@ -3369,6 +3771,15 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
         ...getHubStatePathsForLanguage(pack.language || "zh")
       } : {})
     },
+    ...(enableKnowledge && workspaceType !== "hub" ? {
+      capabilities: {
+        knowledge: {
+          enabled: true,
+          root: getKnowledgeDefaultRoot(pack.language || "zh"),
+          mode: "local"
+        }
+      }
+    } : {}),
     ...(blueprint ? {
       customization: {
         type: "init_blueprint",
@@ -3394,6 +3805,11 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
     } : {}),
     created_by: blueprint ? "starwork init --blueprint" : "starwork init"
   };
+  if (enableKnowledge && workspaceType !== "hub") {
+    const knowledgeRoot = getKnowledgeDefaultRoot(pack.language || "zh");
+    actions.push(...buildKnowledgeStructureActions(targetDir, pack.language || "zh", knowledgeRoot));
+    actions.push(...buildKnowledgeRuleActions(targetDir, pack.language || "zh", knowledgeRoot));
+  }
   actions.push(fileAction(targetDir, path.join(".starwork", "workspace.json"), `${JSON.stringify(workspaceState, null, 2)}\n`));
   actions.push(fileAction(targetDir, path.join(".starwork", "skills.json"), renderProjectSkillsManifest(kitSkillPlan.records)));
 
@@ -3412,6 +3828,7 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
     blueprint,
     formalSource,
     businessWorkArea,
+    knowledgeRoot: enableKnowledge && workspaceType !== "hub" ? getKnowledgeDefaultRoot(pack.language || "zh") : null,
     targetExists: fs.existsSync(targetDir),
     skills: kitSkillPlan.records,
     actions: dedupeActions(filteredActions)
@@ -4024,7 +4441,6 @@ function buildSpawnPlan({ hubRoot, hubState, targetDir, projectName, projectId, 
     actions.push(...copyDirectoryFiles(hubRoot, ".obsidian", targetDir, ".obsidian"));
   }
 
-  actions.push(symlinkAction(targetDir, satellitePaths.knowledge, path.join(hubRoot, hubPaths.knowledge)));
   actions.push(directoryAction(targetDir, path.join(".agents", "skills")));
   actions.push(directoryAction(targetDir, path.join(".claude", "skills")));
   const skillPlan = buildSpawnSkillPlan({
@@ -4103,11 +4519,6 @@ function buildSpawnPlan({ hubRoot, hubState, targetDir, projectName, projectId, 
         target: satellitePaths.lessons,
         mode: "snapshot"
       },
-      knowledge: {
-        source: hubPaths.knowledge,
-        target: satellitePaths.knowledge,
-        mode: "readonly-link"
-      },
       skills: {
         source: "skills/registry.json",
         target: [".agents/skills/", ".claude/skills/"],
@@ -4163,7 +4574,6 @@ function buildSpawnPlan({ hubRoot, hubState, targetDir, projectName, projectId, 
         sync: {
           identity: "snapshot",
           lessons: "snapshot",
-          knowledge: "readonly-link",
           skills: "selected"
         }
       }
@@ -4327,9 +4737,6 @@ function renderProjectKitContent(relativePath, content, { language }) {
   if (normalized === "_system/lessons/README.md") {
     return renderEnglishProjectLessonsReadme();
   }
-  if (normalized === "knowledge/README.md") {
-    return renderEnglishProjectKnowledgeReadme();
-  }
   return content;
 }
 
@@ -4492,7 +4899,7 @@ function renderEnglishProjectAgents() {
 
 - Read \`_system/identity/README.md\` when user preferences, communication style, domain background, or long-term context may matter.
 - Read \`_system/lessons/README.md\` before repeated, risky, or pattern-sensitive work.
-- Read \`knowledge/README.md\` when project knowledge or reusable references may matter.
+- If this project has a knowledge base enabled and long-term project knowledge matters, read the knowledge base rules and index.
 - Read Project Center sync docs only if this workspace is connected to a Project Center.
 
 ## File Boundaries
@@ -4501,7 +4908,7 @@ function renderEnglishProjectAgents() {
 - Current execution notes belong in \`_system/tasks/current-work.md\`.
 - User preferences, communication style, and durable background belong in \`_system/identity/README.md\`.
 - Reusable lessons that should change future behavior belong in \`_system/lessons/README.md\`.
-- Project knowledge or knowledge indexes belong in \`knowledge/\`.
+- The project knowledge base is optional. Enable it with \`starwork knowledge init\` when the project needs long-term knowledge.
 - Concrete business directories are defined by installed Packs or user customizations.
 - Source materials, drafts, and approved outputs follow Pack rules or the path mapping in \`.starwork/workspace.json\`.
 - StarWork mechanism state belongs in \`.starwork/\`.
@@ -4532,9 +4939,10 @@ This is a project workspace for concrete work. It can be used independently. If 
 - \`_system/tasks/current-work.md\`: current work
 - \`_system/identity/\`: durable user and project context
 - \`_system/lessons/\`: reusable lessons
-- \`knowledge/\`: local project knowledge entry or index
 
 Concrete business directories are created by Packs or user customizations. The default General Work Pack creates \`references/\`, \`outputs/drafts/\`, and \`outputs/final/\`; they are not part of the base Project Kit.
+
+When the project needs long-term knowledge maintained by AI, run \`starwork knowledge init\` to enable \`knowledge-base/\`.
 
 ## Not Included By Default
 
@@ -4643,17 +5051,6 @@ Ask before promoting a candidate lesson into a stable lesson.
 `;
 }
 
-function renderEnglishProjectKnowledgeReadme() {
-  return `# Knowledge
-
-This is the local knowledge entry or index for this project.
-
-- Record reusable project knowledge, source indexes, and reference entry points here.
-- Do not record ordinary progress summaries here.
-- If this workspace is later connected to a Project Center, this path may become a shared knowledge entry or read-only link.
-`;
-}
-
 function renderEnglishSatelliteAgents(mode) {
   return `# StarWork Workspace Rules
 
@@ -4667,7 +5064,6 @@ function renderEnglishSatelliteAgents(mode) {
 
 - Read \`_system/identity/README.md\` when user preferences, communication style, domain background, or long-term context may matter.
 - Read \`_system/lessons/README.md\` before repeated, risky, or pattern-sensitive work.
-- Read \`knowledge/README.md\` when project knowledge or reusable references may matter.
 - Read \`_system/main-repo-sync/README.md\` only when shared Project Center resources, skills, or cross-project coordination are involved.
 
 ## Write Boundaries
@@ -4676,7 +5072,6 @@ function renderEnglishSatelliteAgents(mode) {
 - Current work belongs in \`_system/tasks/current-work.md\`.
 - Identity belongs in \`_system/identity/\` and is read-only by default.
 - Lessons belong in \`_system/lessons/\`.
-- Shared knowledge is mounted at \`knowledge/\` and is read-only by default.
 - Concrete business directories come from the installed Pack and \`.starwork/workspace.json\`.
 - Source materials, drafts, and approved outputs follow Pack rules.
 - Local cross-project inbox, outbox, sent, and archived records live in \`.starwork/handoff/\`.
@@ -4707,7 +5102,6 @@ function renderChineseSatelliteAgents() {
 
 - 涉及用户偏好、沟通方式、领域背景或长期上下文时，读 \`_系统/身份/README.md\`
 - 做重复性、风险较高或容易踩坑的工作前，读 \`_系统/教训/README.md\`
-- 需要共享知识或可复用参考时，读 \`知识/README.md\`
 - 只有涉及项目中心资源、共享 skill 或跨项目协同时，才读 \`_系统/主库同步/README.md\`
 
 ## 文件边界
@@ -4716,7 +5110,6 @@ function renderChineseSatelliteAgents() {
 - 当前执行记录写入 \`_系统/任务/当前工作.md\`
 - 身份和长期偏好默认来自项目中心快照，放在 \`_系统/身份/\`
 - 可复用教训默认来自项目中心快照，项目候选教训放在 \`_系统/教训/\`
-- 共享知识挂载在 \`知识/\`，默认只读
 - 具体业务目录由已安装 Pack 和 \`.starwork/workspace.json\` 决定
 - 原始资料、AI 草稿和确认成果按 Pack 规则处理
 - 跨项目联络的本地收发记录放入 \`.starwork/handoff/\`
@@ -4746,16 +5139,15 @@ This project workspace was created from and registered in a Project Center.
 - \`_system/tasks/current-work.md\`
 - \`_system/main-repo-sync/\`
 - \`.starwork/handoff/\`
-- \`knowledge/\`
 - General Pack business directories such as \`references/\` and \`outputs/\`
-When connected to a Project Center, shared identity, lessons, knowledge, skills, and project registration come from the Project Center. This project keeps its own work, drafts, and confirmed outputs.
+When connected to a Project Center, shared identity, lessons, skills, and project registration come from the Project Center. This project keeps its own work, drafts, confirmed outputs, and optional local knowledge base.
 `;
 }
 
 function renderChineseSatelliteReadme(modeConfig) {
   return `# StarWork 项目工作台
 
-这是由项目中心创建和登记的具体项目工作台。项目中心提供共享身份、教训、知识和部分 skills；项目自己的状态、资料、草稿和确认成果仍留在本项目。
+这是由项目中心创建和登记的具体项目工作台。项目中心提供共享身份、教训和部分 skills；项目自己的状态、资料、草稿、确认成果和可选本地知识库仍留在本项目。
 
 ## 主要路径
 
@@ -4764,7 +5156,6 @@ function renderChineseSatelliteReadme(modeConfig) {
 - \`_系统/主库同步/\`：本项目与项目中心的关系说明
 - \`_系统/身份/\`：来自项目中心的身份快照和项目候选更新
 - \`_系统/教训/\`：来自项目中心的教训快照和项目候选教训
-- \`知识/\`：指向项目中心共享知识的只读入口
 - General Pack 创建的 \`参考资料/\` 和 \`输出/\` 等业务目录
 
 正式成果默认放在 \`${modeConfig.formalSource}\`，当前工作资料默认放在 \`${modeConfig.businessWorkArea}\`。
@@ -4784,7 +5175,6 @@ function renderSatelliteMainRepoSyncReadme(language) {
 | \`_系统/身份/\` | 项目中心 \`身份/\` | 默认只读；修改稳定身份前需要确认。 |
 | \`_系统/教训/\` | 项目中心 \`教训/\` | 项目候选教训可先留在本项目，确认后再提交项目中心审核。 |
 | \`.starwork/internal/\` | 项目中心内部协议 | 稳定协议快照。 |
-| \`知识/\` | 项目中心 \`知识/\` | 只读链接。 |
 | \`.agents/skills/\` 和 \`.claude/skills/\` | 项目中心或工作台自带技能 | 只挂载本项目需要的部分。 |
 | \`.starwork/handoff/\` | 本项目 | 跨项目联络的本地收发队列。 |
 `;
@@ -4800,7 +5190,6 @@ The Project Center is not a parent work folder and should not receive project pr
 | \`_system/identity/\` | Project Center \`identity/\` | Read-only by default. |
 | \`_system/lessons/\` | Project Center \`lessons/\` | Project candidates may be reviewed before Project Center merge. |
 | \`.internal/\` | Project Center internal protocols | Stable protocol snapshot. |
-| \`knowledge/\` | Project Center \`knowledge/\` | Read-only link. |
 | \`.agents/skills/\` and \`.claude/skills/\` | Project Center or bundled skills | Selected mounts only. |
 | \`.starwork/handoff/\` | This project | Local cross-project inbox and outbox. |
 `;
@@ -5150,7 +5539,6 @@ function resolveRepairTargetRoot({ hubRoot, projectMap, action }) {
 
 function renderCoreSyncForProject({ hubRoot, hubState, project, projectId, language }) {
   const paths = getSatellitePaths(language);
-  const hubPaths = getHubPaths(hubState);
   return {
     schema: "starwork.core_sync.v0.1",
     hub_path: hubRoot,
@@ -5163,7 +5551,6 @@ function renderCoreSyncForProject({ hubRoot, hubState, project, projectId, langu
     resources: {
       identity: { source: "identity/", target: paths.identity, mode: "snapshot" },
       lessons: { source: "lessons/", target: paths.lessons, mode: "snapshot" },
-      knowledge: { source: hubPaths.knowledge, target: paths.knowledge, mode: "readonly-link" },
       skills: { source: "skills/registry.json", target: [".agents/skills/", ".claude/skills/"], mode: "selected", items: [] }
     }
   };
@@ -5899,9 +6286,9 @@ function applyPlan(plan) {
 }
 
 function printGenericPlan(title, actions) {
-  const creates = actions.filter((action) => action.mode === "create");
-  const overwrites = actions.filter((action) => action.mode === "overwrite" || action.mode === "overwrite-empty");
-  const createNew = actions.filter((action) => action.mode === "create-new");
+  const creates = actions.filter((action) => action.type === "file" && action.mode === "create");
+  const overwrites = actions.filter((action) => action.type === "file" && (action.mode === "overwrite" || action.mode === "overwrite-empty"));
+  const createNew = actions.filter((action) => action.type === "file" && action.mode === "create-new");
   const dirs = actions.filter((action) => action.type === "directory" && action.mode === "create");
 
   console.log("");
@@ -5945,6 +6332,7 @@ function printPlan(plan, dryRun) {
   console.log(`是否新建目录：${plan.targetExists ? "否，目标目录已存在" : "是"}`);
   console.log(`确认后的成果会放在：${plan.formalSource}`);
   console.log(`日常工作会放在：${plan.businessWorkArea}`);
+  console.log(`项目知识库：${plan.knowledgeRoot ? `开启（${plan.knowledgeRoot}）` : "暂不开启"}`);
   if (plan.blueprint) {
     console.log(`初始化定制单：${plan.blueprint.__path}`);
   }
@@ -6159,6 +6547,7 @@ Usage:
 Commands:
   init             创建项目工作台或项目中心。
   doctor           检查工作台是否完整，也能识别旧目录的整理线索。
+  knowledge        开启、检查和按方案整理项目知识库。
   spawn            从项目中心创建新的项目工作台。
   audit            从项目中心巡检已登记项目。
   repair           按确认过的修复方案处理项目问题。
@@ -6171,6 +6560,7 @@ Commands:
   starwork init --type project --pack general --language zh --target ./my-workspace --yes
   starwork init --type hub --language zh --target ./my-hub --yes
   starwork doctor --target ./my-workspace
+  starwork knowledge init --target ./my-workspace --dry-run
   starwork multiagent init --lanes research,writing,review --target ./my-workspace --yes
   starwork spawn --hub ./my-hub --name "New Project" --target ./new-project --yes
 
@@ -6181,6 +6571,7 @@ Commands:
 查看命令帮助：
   starwork init --help
   starwork doctor --help
+  starwork knowledge --help
   starwork spawn --help
   starwork audit --help
   starwork repair --help
@@ -6212,6 +6603,8 @@ Options:
   --name <name>
   --blueprint <init-blueprint.json>
   --formal-source <path>
+  --knowledge
+      初始化时同时开启项目知识库。默认不开启。
   --target <path>
   --dry-run
   --no-skills
@@ -6221,7 +6614,38 @@ Options:
   starwork init --type project --pack general --language zh --target ./my-workspace --yes
   starwork init --target ./custom-workspace --blueprint ./init-blueprint.json --dry-run
   starwork init --type hub --language zh --target ./my-hub --yes
+  starwork init --type project --language zh --target ./my-workspace --knowledge --yes
   starwork init --type project --pack general --target ./preview-workspace --dry-run
+`);
+}
+
+function printKnowledgeHelp() {
+  console.log(`StarWork Knowledge
+
+Usage:
+  starwork knowledge init [options]
+  starwork knowledge status [options]
+  starwork knowledge check [options]
+  starwork knowledge apply --blueprint <knowledge-blueprint.json> [options]
+
+项目知识库是可选能力，用于让 AI 长期整理当前项目里的稳定知识。
+它不是原始资料夹，也不会自动移动旧的 知识/ 或 knowledge/。
+
+Options:
+  --target <path>
+  --language <zh|en>
+  --path <path>
+  --blueprint <path>
+  --json
+  --dry-run
+  --yes, -y
+
+示例：
+  starwork knowledge init --target ./my-workspace --dry-run
+  starwork knowledge init --target ./my-workspace --yes
+  starwork knowledge status --target ./my-workspace --json
+  starwork knowledge check --target ./my-workspace
+  starwork knowledge apply --target ./my-workspace --blueprint ./knowledge-blueprint.json --dry-run
 `);
 }
 

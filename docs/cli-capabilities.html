@@ -605,7 +605,7 @@
           <ul>
             <li>当前保留项目工作台模式，旧的事项型结构已封存。</li>
             <li>复制 项目中心的身份和教训快照。</li>
-            <li>软链接 项目中心的知识和 skills 入口。</li>
+            <li>挂载项目需要的 skills；项目知识库默认由项目自己按需开启。</li>
             <li>写入 <code>.core-sync.json</code> 和项目中心的项目注册表。</li>
           </ul>
           <pre>node cli/bin/starwork.js spawn --hub ./hub --name "新项目" --target ./project --mode project --language zh --yes</pre>
@@ -624,6 +624,21 @@
             <li>健康返回退出码 0，有阻塞问题返回 1。</li>
           </ul>
           <pre>node cli/bin/starwork.js doctor --target ./workspace --json</pre>
+        </article>
+
+        <article class="command">
+          <div class="command-top">
+            <h3><code>knowledge</code></h3>
+            <span class="badge">可选能力</span>
+          </div>
+          <p>给项目工作台开启本地知识库。知识库用于长期沉淀项目理解，不是原始资料夹。</p>
+          <ul>
+            <li><code>init</code> 创建 <code>知识库/</code> 或 <code>knowledge-base/</code> 标准结构。</li>
+            <li><code>status --json</code> 只输出事实，不给 AI 下一步建议。</li>
+            <li><code>check</code> 检查基础结构是否完整。</li>
+            <li><code>apply --blueprint</code> 按确认方案执行结构性变更，不自动迁移旧 <code>知识/</code> 或 <code>knowledge/</code>。</li>
+          </ul>
+          <pre>node cli/bin/starwork.js knowledge init --target ./workspace --dry-run</pre>
         </article>
 
         <article class="command">
@@ -751,7 +766,7 @@
                 <li>定位并检查 项目中心 工作台。</li>
                 <li>检查目标目录是否可写。</li>
                 <li>复制项目基础结构。</li>
-                <li>同步身份、教训、知识和 skills 入口。</li>
+                <li>同步身份、教训和 skills 入口；知识库由项目按需开启。</li>
                 <li>写入 <code>.starwork/workspace.json</code> 与 <code>.core-sync.json</code>。</li>
                 <li>更新项目中心的项目注册表。</li>
                 <li>提示运行 <code>doctor</code>。</li>

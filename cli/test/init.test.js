@@ -136,7 +136,6 @@ test("creates a single-light workspace with general pack", () => {
   const agents = fs.readFileSync(path.join(dir, "AGENTS.md"), "utf8");
   const identity = fs.readFileSync(path.join(dir, "_系统", "身份", "README.md"), "utf8");
   const lessons = fs.readFileSync(path.join(dir, "_系统", "教训", "README.md"), "utf8");
-  const knowledge = fs.readFileSync(path.join(dir, "知识", "README.md"), "utf8");
   const projectStatus = fs.readFileSync(path.join(dir, "_系统", "上下文", "当前项目.md"), "utf8");
   const currentWork = fs.readFileSync(path.join(dir, "_系统", "任务", "当前工作.md"), "utf8");
   assert.equal(state.workspace_type, "project");
@@ -149,6 +148,8 @@ test("creates a single-light workspace with general pack", () => {
   assert.equal(fs.existsSync(path.join(dir, "输出", "确认成果", "README.md")), true);
   assert.equal(fs.existsSync(path.join(dir, "_系统", "身份", "README.md")), true);
   assert.equal(fs.existsSync(path.join(dir, "_系统", "教训", "README.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, "知识")), false);
+  assert.equal(fs.existsSync(path.join(dir, "知识库")), false);
   assert.equal(fs.existsSync(path.join(dir, "_系统", "主库同步")), false);
   assert.equal(fs.existsSync(path.join(dir, ".core-sync.json")), false);
   assert.equal(fs.existsSync(path.join(dir, ".internal")), false);
@@ -162,8 +163,6 @@ test("creates a single-light workspace with general pack", () => {
   assert.doesNotMatch(identity, /主库分发|初始化快照|Hub identity|satellite/i);
   assert.match(lessons, /已确认教训/);
   assert.match(lessons, /候选教训/);
-  assert.match(knowledge, /本项目的知识入口/);
-  assert.doesNotMatch(knowledge, /只读软链接|Hub `knowledge`/);
   assert.match(projectStatus, /## 目标/);
   assert.match(projectStatus, /## 当前阶段/);
   assert.match(projectStatus, /## 近期重点/);
@@ -181,13 +180,14 @@ test("creates an English project workspace with standalone system templates", ()
   const agents = fs.readFileSync(path.join(dir, "AGENTS.md"), "utf8");
   const identity = fs.readFileSync(path.join(dir, "_system", "identity", "README.md"), "utf8");
   const lessons = fs.readFileSync(path.join(dir, "_system", "lessons", "README.md"), "utf8");
-  const knowledge = fs.readFileSync(path.join(dir, "knowledge", "README.md"), "utf8");
   const projectStatus = fs.readFileSync(path.join(dir, "_system", "context", "current-project.md"), "utf8");
   const currentWork = fs.readFileSync(path.join(dir, "_system", "tasks", "current-work.md"), "utf8");
   const doctor = runDoctor(["--target", dir, "--json"]);
   const report = JSON.parse(doctor.stdout);
 
   assert.equal(fs.existsSync(path.join(dir, "_system", "main-repo-sync")), false);
+  assert.equal(fs.existsSync(path.join(dir, "knowledge")), false);
+  assert.equal(fs.existsSync(path.join(dir, "knowledge-base")), false);
   assert.equal(fs.existsSync(path.join(dir, ".core-sync.json")), false);
   assert.equal(fs.existsSync(path.join(dir, ".internal")), false);
   assert.match(agents, /Read When Relevant/);
@@ -201,8 +201,6 @@ test("creates an English project workspace with standalone system templates", ()
   assert.match(lessons, /Active Lessons/);
   assert.match(lessons, /Candidate Lessons/);
   assert.match(lessons, /How To Add A Lesson/);
-  assert.match(knowledge, /local knowledge entry/);
-  assert.doesNotMatch(knowledge, /read-only link to the Hub/);
   assert.match(projectStatus, /## Goal/);
   assert.match(projectStatus, /## Current Stage/);
   assert.match(projectStatus, /## Focus/);
@@ -214,6 +212,107 @@ test("creates an English project workspace with standalone system templates", ()
   assert.match(currentWork, /## Notes For Next AI/);
   assert.equal(doctor.status, 0);
   assert.equal(report.ok, true);
+});
+
+test("knowledge init creates an optional local project knowledge base", () => {
+  const dir = tempDir();
+  runInit(["--type", "project", "--pack", "general", "--target", dir, "--yes"]);
+
+  const preview = runCommand(["knowledge", "init", "--target", dir, "--dry-run"]);
+  assert.equal(preview.status, 0);
+  assert.match(preview.stdout, /知识库\/schema\.md/);
+  assert.equal(fs.existsSync(path.join(dir, "知识库")), false);
+
+  const result = runCommand(["knowledge", "init", "--target", dir, "--yes"]);
+  const state = readJson(path.join(dir, ".starwork", "workspace.json"));
+  const status = runCommand(["knowledge", "status", "--target", dir, "--json"]);
+  const report = JSON.parse(status.stdout);
+  const doctor = runDoctor(["--target", dir, "--json"]);
+  const doctorReport = JSON.parse(doctor.stdout);
+
+  assert.equal(result.status, 0);
+  assert.equal(state.capabilities.knowledge.enabled, true);
+  assert.equal(state.capabilities.knowledge.root, "知识库");
+  assert.equal(fs.existsSync(path.join(dir, "知识库", "README.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, "知识库", "index.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, "知识库", "schema.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, "知识库", "log.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, "知识库", "pages")), true);
+  assert.equal(fs.existsSync(path.join(dir, "知识库", "synthesis")), true);
+  assert.match(fs.readFileSync(path.join(dir, "知识库", "schema.md"), "utf8"), /`pages\/` 写作规则/);
+  assert.match(fs.readFileSync(path.join(dir, "知识库", "schema.md"), "utf8"), /`synthesis\/` 写作规则/);
+  assert.equal(status.status, 0);
+  assert.equal(report.enabled, true);
+  assert.equal(report.root, "知识库");
+  assert.equal(Object.hasOwn(report, "next_steps"), false);
+  assert.equal(doctor.status, 0);
+  assert.equal(doctorReport.knowledge.enabled, true);
+});
+
+test("knowledge status reports facts only when the capability is not enabled", () => {
+  const dir = tempDir();
+  runInit(["--type", "project", "--pack", "general", "--target", dir, "--yes"]);
+
+  const status = runCommand(["knowledge", "status", "--target", dir, "--json"]);
+  const report = JSON.parse(status.stdout);
+  const check = runCommand(["knowledge", "check", "--target", dir]);
+  const doctor = runDoctor(["--target", dir, "--json"]);
+
+  assert.equal(status.status, 0);
+  assert.equal(report.enabled, false);
+  assert.equal(report.exists, false);
+  assert.equal(Object.hasOwn(report, "next_steps"), false);
+  assert.equal(check.status, 0);
+  assert.match(check.stdout, /还没有开启知识库/);
+  assert.equal(doctor.status, 0);
+});
+
+test("init --knowledge creates the English knowledge-base structure", () => {
+  const dir = tempDir();
+  runInit(["--type", "project", "--pack", "general", "--language", "en", "--target", dir, "--knowledge", "--yes"]);
+
+  const state = readJson(path.join(dir, ".starwork", "workspace.json"));
+  const status = runCommand(["knowledge", "status", "--target", dir, "--json"]);
+  const report = JSON.parse(status.stdout);
+
+  assert.equal(state.capabilities.knowledge.enabled, true);
+  assert.equal(state.capabilities.knowledge.root, "knowledge-base");
+  assert.equal(fs.existsSync(path.join(dir, "knowledge-base", "schema.md")), true);
+  assert.match(fs.readFileSync(path.join(dir, "knowledge-base", "README.md"), "utf8"), /Project Knowledge Base/);
+  assert.equal(report.enabled, true);
+  assert.equal(report.root, "knowledge-base");
+  assert.equal(Object.hasOwn(report, "next_steps"), false);
+});
+
+test("knowledge apply creates structure from a blueprint without moving legacy knowledge", () => {
+  const dir = tempDir();
+  const blueprintDir = tempDir();
+  const blueprintPath = path.join(blueprintDir, "knowledge-blueprint.json");
+  runInit(["--type", "project", "--pack", "general", "--target", dir, "--yes"]);
+  fs.mkdirSync(path.join(dir, "知识"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "知识", "old.md"), "# old\n", "utf8");
+  fs.writeFileSync(blueprintPath, JSON.stringify({
+    version: "0.1",
+    type: "starwork.knowledge",
+    language: "zh",
+    root: "知识库",
+    actions: [
+      { type: "create_knowledge_base", path: "知识库" },
+      { type: "append_agents_rule", path: "AGENTS.md", section: "知识库" }
+    ],
+    preserve: ["知识/"]
+  }, null, 2), "utf8");
+
+  const result = runCommand(["knowledge", "apply", "--target", dir, "--blueprint", blueprintPath, "--yes"]);
+  const state = readJson(path.join(dir, ".starwork", "workspace.json"));
+  const status = runCommand(["knowledge", "status", "--target", dir, "--json"]);
+  const report = JSON.parse(status.stdout);
+
+  assert.equal(result.status, 0);
+  assert.equal(state.capabilities.knowledge.root, "知识库");
+  assert.equal(fs.existsSync(path.join(dir, "知识库", "schema.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, "知识", "old.md")), true);
+  assert.deepEqual(report.legacy_candidates, ["知识"]);
 });
 
 test("init creates a customized workspace from a blueprint", () => {
@@ -614,7 +713,8 @@ test("spawn creates a project from a hub", () => {
   assert.equal(sync.project_id, "content-site");
   assert.equal(registry.projects[0].id, "content-site");
   assert.equal(registry.projects[0].path, path.resolve(target));
-  assert.equal(fs.lstatSync(path.join(target, "知识")).isSymbolicLink(), true);
+  assert.equal(fs.existsSync(path.join(target, "知识")), false);
+  assert.equal(fs.existsSync(path.join(target, "知识库")), false);
   assert.equal(fs.existsSync(path.join(target, ".starwork", "handoff", "state.json")), true);
   assert.equal(fs.existsSync(path.join(target, "_系统", "主库同步", "README.md")), true);
   assert.match(fs.readFileSync(path.join(target, "AGENTS.md"), "utf8"), /_系统\/主库同步\/README\.md/);
@@ -671,7 +771,7 @@ test("spawn creates an English starter satellite from a hub", () => {
   assert.equal(state.paths.formal_source, "outputs/final/");
   assert.equal(state.paths.business_work_area, "outputs/drafts/");
   assert.equal(sync.resources.identity.target, "_system/identity");
-  assert.equal(sync.resources.knowledge.target, "knowledge");
+  assert.equal(Object.hasOwn(sync.resources, "knowledge"), false);
   assert.equal(fs.existsSync(path.join(target, "_system", "context", "current-project.md")), true);
   assert.equal(fs.existsSync(path.join(target, "_system", "tasks", "current-work.md")), true);
   assert.equal(fs.existsSync(path.join(target, "_system", "main-repo-sync", "README.md")), true);
@@ -679,7 +779,8 @@ test("spawn creates an English starter satellite from a hub", () => {
   assert.match(fs.readFileSync(path.join(target, "_system", "identity", "README.md"), "utf8"), /Project Center identity snapshots/);
   assert.equal(fs.existsSync(path.join(target, "references", "README.md")), true);
   assert.equal(fs.existsSync(path.join(target, "outputs", "final", "README.md")), true);
-  assert.equal(fs.lstatSync(path.join(target, "knowledge")).isSymbolicLink(), true);
+  assert.equal(fs.existsSync(path.join(target, "knowledge")), false);
+  assert.equal(fs.existsSync(path.join(target, "knowledge-base")), false);
   assert.equal(fs.existsSync(path.join(target, ".starwork", "handoff", "state.json")), true);
   assert.equal(fs.existsSync(path.join(target, "_系统")), false);
   assert.equal(fs.existsSync(path.join(target, "知识")), false);

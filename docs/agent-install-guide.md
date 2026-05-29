@@ -85,13 +85,14 @@ npx skills add jennie-shawn/StarWork -l
 npx skills ls -g -a codex --json
 ```
 
-第一条命令用于查看仓库里会被安装的 Skills，应该只显示这 3 个系统级 Skills：
+第一条命令用于查看仓库里会被安装的 Skills，应该只显示这些系统级 Skills：
 
 - `starworkInit`
 - `starworkDoctor`
 - `starworkMultiagent`
+- `starworkKnowledge`
 
-第二条命令用于查看本机已安装的全局 Skills，确认上面 3 个已经出现在 Codex 的全局列表里。
+第二条命令用于查看本机已安装的全局 Skills，确认上面这些已经出现在 Codex 的全局列表里。
 
 确认不应该把 Kit 随附 Skills 安装到全局，例如 `starworkSpawn`、`starworkAudit` 和 `neat-freak`。它们应由 `starwork init` 按工作区类型写入具体工作台。
 

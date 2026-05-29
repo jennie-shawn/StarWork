@@ -1,0 +1,3 @@
+name: starworkKnowledge
+description: Help users create and maintain a local StarWork project knowledge base by using `starwork knowledge` CLI commands first.
+entry: SKILL.md

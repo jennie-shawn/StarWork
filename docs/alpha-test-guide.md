@@ -47,6 +47,7 @@ npx skills add jennie-shawn/StarWork -l
 - `starworkInit`
 - `starworkDoctor`
 - `starworkMultiagent`
+- `starworkKnowledge`
 
 安装后验证：
 
@@ -125,7 +126,7 @@ starwork doctor --target ~/Desktop/starwork-alpha-project
 - `spawn` 从项目中心创建项目工作台的过程是否清楚。
 - `doctor` / `starworkDoctor` 对历史模板或类似项目中心的旧工作区的说明是否能看懂。
 - 历史模板升级后生成的 `AGENTS.md` 是否简洁、清楚，是否保留了用户原有规则里的有效内容。
-- 系统 skills 是否能被 Codex 识别和调用：`starworkInit`、`starworkDoctor`、`starworkMultiagent`。
+- 系统 skills 是否能被 Codex 识别和调用：`starworkInit`、`starworkDoctor`、`starworkMultiagent`、`starworkKnowledge`。
 - `starworkMultiagent` 是否能把“登记当前会话为常用智能体”正确转换成 `starwork multiagent init/add/bind` 建议。
 - `starwork multiagent bind --session-name` 是否能正确同步 Codex 宿主会话名；失败时是否能看懂 warning。
 - 项目中心自带的 `starworkSpawn`、`starworkAudit` 与项目工作台自带的 `neat-freak` 是否能在对应工作台内被发现。
@@ -148,6 +149,7 @@ npm pack --dry-run
 - `skills/starworkInit/`
 - `skills/starworkDoctor/`
 - `skills/starworkMultiagent/`
+- `skills/starworkKnowledge/`
 - `kit-skills/starworkSpawn/`
 - `kit-skills/starworkAudit/`
 - `kit-skills/neat-freak/`

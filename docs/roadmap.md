@@ -26,8 +26,9 @@ StarWork 现在不缺想法，缺的是一条清晰的主线。
 - `starwork multiagent` 第一版已经可以维护 Agent Lanes，并支持绑定 lane 后 best-effort 同步 Codex 宿主会话名。
 - M2.8 已统一工作台命名体系，对外使用“项目工作台 / 项目中心 / 中心管理的项目工作台”。
 - M2.10 已完成 Core Kit / Pack 边界清理：Project Kit 不再固定通用工作目录，General Pack 负责参考资料、草稿和确认成果目录。
+- M2.11 已本地落地知识库能力：Project Kit 不再默认包含 `知识/knowledge`，项目知识库通过 `starwork knowledge` 和 `starworkKnowledge` 按需开启。
 
-所以，下一步不应该立刻进入新场景 Pack。当前应继续保持 A 测链路稳定，同时推进 M2.11 知识库能力，把 `知识/knowledge` 从“默认目录”进一步梳理为可选能力。
+所以，下一步不应该立刻进入新场景 Pack。当前应继续保持 A 测链路稳定，同时发布并验证 M2.11 知识库能力，观察真实项目里“参考资料、输出、知识库”的边界是否足够清楚。
 
 ## 总路线
 
@@ -211,7 +212,7 @@ M8 v1.0 稳定产品
 
 ## M2.11 知识库能力
 
-状态：规划中。
+状态：本地已实现，待提交、发布和 A 测验证。
 
 目标：把 `知识/knowledge` 从“默认目录”进一步定义为可选知识库能力，避免它在项目资料、长期理解和项目中心共享知识之间语义混乱。
 
@@ -222,11 +223,19 @@ M8 v1.0 稳定产品
 - 知识库是 Agent 持续维护的长期理解层。
 - 项目知识库和项目中心共享知识不是同一个东西。
 
+当前成果：
+
+- Project Kit 已移除默认 `知识/knowledge`。
+- 新增 `core/capabilities/knowledge/`，提供中文 `知识库/` 和英文 `knowledge-base/` 模板。
+- 新增 `starwork knowledge init/status/check/apply`，并支持 `init --knowledge`。
+- `doctor` 不把缺少知识库当作结构错误；旧 `知识/knowledge` 只作为线索暴露。
+- 新增系统级 skill `starworkKnowledge`，负责引导创建、吸收资料、回答并沉淀、形成综合判断、健康检查和生成整理 blueprint。
+
 下一步：
 
-- 确认知识库是否从 Project Kit 默认结构中移出。
-- 确认 `starworkKnowledge` skill 的一期能力。
-- 确认 CLI、doctor、upgrade、init 需要配合的最小改动。
+- 提交并发布该能力。
+- 用真实 A 测样本验证 `starworkKnowledge` 是否能避免把原始资料、草稿和知识库混在一起。
+- 继续观察项目中心共享知识库是否需要另开需求。
 
 ## M3 Content Creator Pack v0.1
 
@@ -369,12 +378,13 @@ v1.0 应具备：
 
 ## 当前下一步
 
-当前最应该做的不是重开 Core、继续扩张 CLI，或立刻进入新 Pack，而是推进 M2.6：
+当前最应该做的不是重开 Core、继续无边界扩张 CLI，或立刻进入新 Pack，而是完成 M2.11 发布验证并继续 A 测稳定化：
 
-1. 校准公开文档和项目记忆中的当前版本、当前阶段和下一步。
-2. 继续优化安装、`init`、`doctor -> starworkDoctor -> upgrade`、`hub -> spawn -> audit -> repair` 和 `multiagent` 这些既有链路。
-3. 持续收集 A 测用户对 CLI 安装、Skills 安装、历史模板升级和规则文档质量的反馈。
-4. 等 GFM 新一期课程敲定时，再启动 Content Creator Pack v0.1 事项，把首个场景 Pack 的目录、规则、模板和 Demo 定下来。
+1. 提交、发布并更新本机 CLI / Skills 到包含 `starwork knowledge` 和 `starworkKnowledge` 的版本。
+2. 用真实项目验证知识库能力是否能清楚区分参考资料、输出和长期知识。
+3. 继续优化安装、`init`、`doctor -> starworkDoctor -> upgrade`、`hub -> spawn -> audit -> repair`、`multiagent` 和 `knowledge` 这些既有链路。
+4. 持续收集 A 测用户对 CLI 安装、Skills 安装、历史模板升级、规则文档质量和知识库边界的反馈。
+5. 等 GFM 新一期课程敲定时，再启动 Content Creator Pack v0.1 事项，把首个场景 Pack 的目录、规则、模板和 Demo 定下来。
 
 如果只能选一个，先优化历史模板升级和规则文档质量，因为这直接决定现有用户能不能平滑迁移。
 

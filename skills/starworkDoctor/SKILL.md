@@ -144,6 +144,7 @@ starwork doctor --target <path> --json --inventory-depth all
 - 参考资料 / 原始资料
 - 草稿 / 临时产物
 - 正式成果 / 事实源
+- 项目知识库是否已开启；旧 `知识/` 或 `knowledge/` 只作为线索，不默认当成新知识库
 - 事项推进
 - 决策记录
 - 身份偏好
@@ -163,6 +164,7 @@ starwork doctor --target <path> --json --inventory-depth all
 - 长期记忆：身份、教训、决策是否有稳定位置？
 - 过程记录：项目工作台是否有过程记录和交接结构？
 - 写入风险：哪些目录应只读，哪些目录允许 Agent 写？
+- 知识库：如果未开启，不当作问题；如果存在旧 `知识/` / `knowledge/`，只说明它可能是什么，不能自动迁移或删除
 
 每项状态使用：
 

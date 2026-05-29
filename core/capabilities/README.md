@@ -13,5 +13,6 @@ Capabilities 是 Core 的可选能力，可以通过 presets 组合。
 - `main-repo-sync`：项目中心与项目工作台的同步模型
 - `skill-mount`：通过软链接挂载共享 skills
 - `agent-lanes`：多 Agent 会话按职责位分工协作
+- `knowledge`：项目本地知识库，可选开启，不属于 Project Kit 默认目录
 
 `.starwork/` 机制运行层边界见：[StarWork Runtime Layer SPEC](../starwork-runtime-layer-spec.md)。Capabilities 可以使用 `.starwork/` 存放机制状态，但不能把项目业务内容、过程材料或正式成果迁入 `.starwork/`。
