@@ -24,8 +24,10 @@ StarWork 现在不缺想法，缺的是一条清晰的主线。
 - `starwork --version` 与产品化 help 文案已补齐，方便 A 测用户确认安装版本和入口命令。
 - `starwork audit` / `starwork repair` 第一版已经可以让项目中心巡检并保守修复已登记项目。
 - `starwork multiagent` 第一版已经可以维护 Agent Lanes，并支持绑定 lane 后 best-effort 同步 Codex 宿主会话名。
+- M2.8 已统一工作台命名体系，对外使用“项目工作台 / 项目中心 / 中心管理的项目工作台”。
+- M2.10 已完成 Core Kit / Pack 边界清理：Project Kit 不再固定通用工作目录，General Pack 负责参考资料、草稿和确认成果目录。
 
-所以，下一步不应该继续扩张 Core，也不应该立刻进入新场景 Pack。当前应进入 M2.6：把已经存在的 CLI、Skills、Kit 和文档链路打磨稳定，再进入第一个场景 Pack 与 Demo 验证。
+所以，下一步不应该立刻进入新场景 Pack。当前应继续保持 A 测链路稳定，同时推进 M2.11 知识库能力，把 `知识/knowledge` 从“默认目录”进一步梳理为可选能力。
 
 ## 总路线
 
@@ -39,6 +41,10 @@ M2 CLI v0.1 最小闭环
 M2.5 公开 A 测分发与安装验证
   ↓
 M2.6 既有功能优化与 A 测稳定化
+  ↓
+M2.8/M2.10 命名体系与 Kit/Pack 边界清理
+  ↓
+M2.11 知识库能力
   ↓
 M3 Content Creator Pack v0.1
   ↓
@@ -91,7 +97,7 @@ M8 v1.0 稳定产品
 
 封版结论：
 
-- Core v0.1 的最小协议、五类 Kit 结构和 Kit 事实依据可以作为后续 CLI 检查、适配和 Pack 安装的基础。
+- Core v0.1 的最小协议、Project Kit / 项目中心 Kit 和 Kit 事实依据可以作为后续 CLI 检查、适配和 Pack 安装的基础。
 - 后续不再继续扩张 Core v0.1 的范围；发现问题时优先通过 `doctor` 检查、Pack 规则或 v0.2 候选项处理。
 
 验收标准：
@@ -142,7 +148,7 @@ M8 v1.0 稳定产品
 - `starworkInit`、`starworkDoctor`、`starworkMultiagent` 可通过一条 `npx skills add` 命令安装为系统 Skill；`starworkDoctor` 同时承担历史模板诊断、类似项目中心的旧工作区诊断和升级蓝图生成；`starworkSpawn`、`starworkAudit` 改为项目中心自带 Skill。
 - 公开 README 已改为中文首页。
 - 已新增面向 Agent 的安装指南：`product/docs/agent-install-guide.md`。
-- npm `latest` 已发布到 `@jennie-shawn/starwork@0.1.0-alpha.13`，本机 CLI 与系统 Skills 已完成更新验证。
+- npm `latest` 已发布到 `@jennie-shawn/starwork@0.1.0-alpha.16`，本机 CLI 与系统 Skills 已完成更新验证。
 - `starwork --version` 已可直接输出包版本，`starwork --help` 已改为面向 A 测用户的命令入口说明。
 - `starwork upgrade --blueprint`、`starworkDoctor`、类似项目中心的旧工作区 preserve-names 接入和 Skill 分发第一版已进入公开包。
 - `starwork audit` / `starwork repair` 已进入公开包，项目中心可巡检并按 blueprint 保守修复它管理的项目工作台。
@@ -160,7 +166,7 @@ M8 v1.0 稳定产品
 
 ## M2.6 既有功能优化与 A 测稳定化
 
-状态：当前阶段。
+状态：已推进完成一轮关键边界清理，继续作为 A 测稳定化背景线。
 
 目标：不急着扩张新能力，先把已经有的 CLI、Skills、Kit 和文档链路打磨到外部用户和 Agent 都不容易走偏。
 
@@ -180,6 +186,47 @@ M8 v1.0 稳定产品
 - Agent 读取 `starworkInit`、`starworkDoctor`、`starworkMultiagent` 时不会被旧 Pack、旧事项模式或旧 skill 分发口径误导。
 - 历史模板升级生成的 `AGENTS.md` 简洁、清晰，没有内部占位符泄露。
 - 项目中心 / 项目工作台模板自带 Skill 不会被系统级安装命令误装。
+
+## M2.8/M2.10 命名体系与 Kit/Pack 边界清理
+
+状态：已完成。
+
+目标：清理外部用户和 Agent 最容易走偏的命名和结构边界。
+
+当前成果：
+
+- 对外统一使用“项目工作台 / 项目中心 / 中心管理的项目工作台”，不再要求用户理解 Satellite。
+- Project Kit 只保留基础工作台骨架，不再固定 `参考资料/` 和 `输出/`。
+- General Pack 接管通用工作目录：`参考资料/`、`输出/草稿/`、`输出/确认成果/`，英文镜像为 `references/`、`outputs/drafts/`、`outputs/final/`。
+- 中文项目中心使用中文可见目录；英文 Project Center 使用英文可见目录；隐藏机制目录保持英文。
+- `doctor` 已能识别项目中心同义目录重复，例如 `知识/` 和 `knowledge/` 同时存在。
+- M2.10 验收补丁已清理 Core profile 中的 `work.starter.*` 当前角色残留。
+
+验收标准：
+
+- 只看 Project Kit 时，不会看到通用 Pack 目录。
+- 普通 `init --type project --pack general` 仍能生成用户熟悉的参考资料和输出目录。
+- 中文 / 英文项目中心的可见目录语言一致。
+- Core profile 不再把 General Pack 目录写成基础事实源。
+
+## M2.11 知识库能力
+
+状态：规划中。
+
+目标：把 `知识/knowledge` 从“默认目录”进一步定义为可选知识库能力，避免它在项目资料、长期理解和项目中心共享知识之间语义混乱。
+
+当前判断：
+
+- 参考资料是输入。
+- 输出是成果。
+- 知识库是 Agent 持续维护的长期理解层。
+- 项目知识库和项目中心共享知识不是同一个东西。
+
+下一步：
+
+- 确认知识库是否从 Project Kit 默认结构中移出。
+- 确认 `starworkKnowledge` skill 的一期能力。
+- 确认 CLI、doctor、upgrade、init 需要配合的最小改动。
 
 ## M3 Content Creator Pack v0.1
 

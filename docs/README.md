@@ -11,6 +11,7 @@
 - [m2.8-workspace-naming-optimization-spec.md](m2.8-workspace-naming-optimization-spec.md)：工作台命名体系优化 SPEC，统一“项目工作台 / 项目中心 / 中心管理的项目工作台”等产品语言
 - [m2.9-knowledge-capability-note.md](m2.9-knowledge-capability-note.md)：知识库能力备忘，记录将 knowledge 从默认目录调整为可插拔 Agent 维护能力的初步判断
 - [m2.10-core-kit-pack-boundary-cleanup-spec.md](m2.10-core-kit-pack-boundary-cleanup-spec.md)：Core Kit / Pack / Capability 边界清理 SPEC，处理 Project Kit 固定目录、项目中心语言一致性和 knowledge 重复问题
+- [m2.11-knowledge-capability-spec.md](m2.11-knowledge-capability-spec.md)：知识库能力正式 SPEC，定义项目知识库定位、目录结构、产生机制、skill 一期能力和 CLI 配合边界
 - [index.html](index.html)：StarWork HTML 文档中心，统一挂载所有 HTML 阅读稿
 - [hub-management.html](hub-management.html)：项目中心管理机制 HTML 阅读版，解释项目中心、项目工作台、项目注册表和回写边界
 - [cli-capabilities.html](cli-capabilities.html)：StarWork CLI v0.1 能力说明 HTML 阅读版
