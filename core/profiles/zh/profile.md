@@ -16,7 +16,10 @@
 | `system.tasks.current_work` | `_系统/任务/当前工作.md` |
 | `identity.local` | `_系统/身份/` |
 | `lessons.local` | `_系统/教训/` |
-| `work.starter.references` | `参考资料/` |
-| `work.starter.outputs_drafts` | `输出/草稿/` |
-| `work.starter.outputs_final` | `输出/确认成果/` |
 | `work.matters.registry` | `事项/注册表.md` |
+
+## 历史说明
+
+早期 profile 曾包含 `work.starter` 相关角色，用来描述参考资料、草稿和确认成果目录。
+
+M2.10 后这些目录不再属于 Core profile。它们由 General Pack 或用户定制路径负责，具体以 `.starwork/workspace.json` 和已安装 Pack 规则为准。

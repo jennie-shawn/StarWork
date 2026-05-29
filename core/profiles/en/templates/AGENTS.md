@@ -16,9 +16,9 @@
 - Current work belongs in `_system/tasks/current-work.md`
 - Identity belongs in `_system/identity/README.md`
 - Lessons belong in `_system/lessons/`
-- Source materials belong in `references/` and are read-only by default
-- AI drafts belong in `outputs/drafts/`
-- User-approved outputs belong in the project-declared formal source of truth
+- Source materials, AI drafts, and user-approved outputs follow the installed Pack or workspace path mapping
+- Check `.starwork/workspace.json` path settings and `.starwork/rules/` Pack rules before writing
+- User-approved outputs may only go into the project-declared formal source of truth
 
 ## Confirmation Required
 
