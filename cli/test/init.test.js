@@ -56,7 +56,7 @@ function listFiles(dir) {
   return result;
 }
 
-function fakeCodexBin({ exitCode = 0, stderr = "", inputPath } = {}) {
+function fakeCodexBin({ exitCode = 0, stderr = "", inputPath, failTurnStart = false, omitFinalRead = false } = {}) {
   const dir = tempDir();
   const binDir = path.join(dir, "bin");
   fs.mkdirSync(binDir, { recursive: true });
@@ -75,12 +75,17 @@ rl.on("line", (line) => {
   }
   const request = JSON.parse(line);
   if (request.method === "thread/read") {
+    if (${Boolean(omitFinalRead)} && request.id >= 4) return;
     console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { thread: { id: request.params.threadId, name: "Fake Codex Thread", cwd: "/fake/project", status: "idle", turns: [{ id: "turn-1", status: "completed" }, { id: "turn-2", status: "completed" }] } } }));
   } else if (request.method === "thread/start") {
     console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { threadId: "launched-thread-1" } }));
   } else if (request.method === "thread/list") {
     console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { data: [{ id: "dev-thread-2", name: "Fake Codex Thread" }] } }));
   } else if (request.method === "turn/start") {
+    if (${Boolean(failTurnStart)}) {
+      console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, error: { message: "turn start failed" } }));
+      return;
+    }
     console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { turnId: "turn-started-1" } }));
     console.log(JSON.stringify({ jsonrpc: "2.0", method: "turn/started", params: { turnId: "turn-started-1" } }));
     console.log(JSON.stringify({ jsonrpc: "2.0", method: "turn/completed", params: { turnId: "turn-started-1" } }));
@@ -878,7 +883,7 @@ test("multiagent launch creates and binds Codex threads with launch message", ()
   runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
 
   const fakeCodex = fakeCodexBin({ inputPath });
-  const launch = runCommand(["multiagent", "launch", "development", "--target", dir, "--json", "--yes"], { env: fakeCodex.env });
+  const launch = runCommand(["multiagent", "launch", "development", "--target", dir, "--json", "--yes", "--timeout", "1000"], { env: fakeCodex.env });
   const result = JSON.parse(launch.stdout);
   const registry = fs.readFileSync(path.join(dir, "_系统", "协作", "agent-lanes.md"), "utf8");
   const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
@@ -889,7 +894,47 @@ test("multiagent launch creates and binds Codex threads with launch message", ()
   assert.match(registry, /codex:launched-thread-1/);
   assert.equal(state.lanes.development.thread_id, "launched-thread-1");
   assert.match(input, /"method":"thread\/start"/);
+  assert.match(input, new RegExp(`"cwd":"${dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
   assert.match(input, /StarWork MultiAgent Launch/);
+});
+
+test("multiagent launch does not bind when launch message delivery fails", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+
+  const fakeCodex = fakeCodexBin({ failTurnStart: true });
+  const launch = runCommand(["multiagent", "launch", "development", "--target", dir, "--json", "--yes", "--timeout", "1000"], { env: fakeCodex.env });
+  const result = JSON.parse(launch.stdout);
+  const registry = fs.readFileSync(path.join(dir, "_系统", "协作", "agent-lanes.md"), "utf8");
+  const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
+
+  assert.equal(launch.status, 0);
+  assert.equal(result.launches[0].status, "failed");
+  assert.equal(result.launches[0].created_thread_id, "launched-thread-1");
+  assert.equal(result.launches[0].thread_id, undefined);
+  assert.match(registry, /\| development \| 功能开发 \| unbound \|/);
+  assert.equal(state.lanes.development?.thread_id, undefined);
+});
+
+test("multiagent launch binds when final verification read times out after completion", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+
+  const fakeCodex = fakeCodexBin({ omitFinalRead: true });
+  const launch = runCommand(["multiagent", "launch", "development", "--target", dir, "--json", "--yes", "--timeout", "1000"], { env: fakeCodex.env });
+  const result = JSON.parse(launch.stdout);
+  const registry = fs.readFileSync(path.join(dir, "_系统", "协作", "agent-lanes.md"), "utf8");
+
+  assert.equal(launch.status, 0);
+  assert.equal(result.launches[0].status, "completed");
+  assert.equal(result.launches[0].thread_id, "launched-thread-1");
+  assert.equal(result.launches[0].verified_by_thread_read, false);
+  assert.match(result.launches[0].verification_warning, /response 4/);
+  assert.match(registry, /codex:launched-thread-1/);
 });
 
 test("multiagent status infers workspace for legacy registries", () => {

@@ -1271,9 +1271,9 @@ async function lanesLaunch(argv) {
   let lanesState = readAgentLanesState(workspaceRoot);
   for (const lane of lanes) {
     const launchMessage = renderMultiagentLaunchMessage({ lane, fromLane: options.from || "user", workspaceRoot, collaboration });
-    const launch = await launchCodexLane({ message: launchMessage, timeout: parsePositiveInt(options.timeout, 30000) });
+    const launch = await launchCodexLane({ message: launchMessage, workspaceRoot, timeout: parsePositiveInt(options.timeout, 90000) });
     const session = launch.thread_id ? `codex:${launch.thread_id}` : "unbound";
-    if (launch.thread_id) {
+    if (launch.thread_id && launch.status === "completed") {
       const sessionNameSync = await renameHostSessionBestEffort({ session, sessionName: normalizeMarkdownCell(options.sessionName || "") });
       const pinSync = pinHostThreadBestEffort({ session, requested: Boolean(options.pin) });
       nextRegistryLanes = nextRegistryLanes.map((item) => item.lane === lane.lane ? { ...item, current_session: session } : item);
@@ -6828,13 +6828,14 @@ async function sendCodexInstruction({ threadId, message, timeout }) {
       method: "turn/start",
       params: {
         threadId,
-        input: [{ type: "text", text: message }]
+        input: [codexTextInput(message)]
       }
     },
     {
       jsonrpc: "2.0",
       id: 5,
       method: "thread/read",
+      optional: true,
       params: { threadId, includeTurns: true }
     }
   ];
@@ -6867,37 +6868,108 @@ async function sendCodexInstruction({ threadId, message, timeout }) {
     turn_id: completed?.params?.turnId || completed?.params?.turn?.id || started?.params?.turnId || started?.params?.turn?.id || start.result?.turnId || null,
     completed_at: completed ? new Date().toISOString() : null,
     verified_by_thread_read: Boolean(finalRead && !finalRead.error),
+    verification_warning: finalRead?.error?.message || result.optional_warnings?.[0] || null,
     ui_visibility: "not_guaranteed"
   };
 }
 
-async function launchCodexLane({ message, timeout }) {
+async function launchCodexLane({ message, workspaceRoot, timeout }) {
   const messages = [
     codexInitializeMessage(1),
     {
       jsonrpc: "2.0",
       id: 2,
       method: "thread/start",
-      params: {}
+      params: { cwd: workspaceRoot }
+    },
+    ({ responses }) => {
+      const response = responses.find((item) => item.id === 2);
+      const threadId = extractCodexThreadIdFromStartResponse(response);
+      if (!threadId) throw new Error("Codex thread/start did not return thread id");
+      return {
+        jsonrpc: "2.0",
+        id: 3,
+        method: "turn/start",
+        params: {
+          threadId,
+          cwd: workspaceRoot,
+          input: [codexTextInput(message)]
+        }
+      };
+    },
+    ({ responses }) => {
+      const response = responses.find((item) => item.id === 2);
+      const threadId = extractCodexThreadIdFromStartResponse(response);
+      if (!threadId) return null;
+      return {
+        jsonrpc: "2.0",
+        id: 4,
+        method: "thread/read",
+        optional: true,
+        params: { threadId, includeTurns: true }
+      };
     }
   ];
-  const start = await runCodexAppServer(messages, { timeout });
-  if (!start.ok) return { adapter: "codex", status: "failed", warning: start.warning };
+  const start = await runCodexAppServer(messages, {
+    timeout,
+    waitAfter: {
+      id: 3,
+      method: "turn/completed",
+      timeout: Math.max(1000, parsePositiveInt(timeout, 90000))
+    }
+  });
   const response = start.responses.find((item) => item.id === 2);
+  const threadId = extractCodexThreadIdFromStartResponse(response);
+  if (!start.ok) {
+    return {
+      adapter: "codex",
+      status: "failed",
+      created_thread_id: threadId || null,
+      warning: start.warning
+    };
+  }
   if (!response || response.error) {
     return { adapter: "codex", status: "failed", warning: response?.error?.message || "Codex thread/start failed" };
   }
-  const threadId = response.result?.threadId || response.result?.data?.threadId || response.result?.data?.thread?.id || response.result?.thread?.id || response.result?.id;
   if (!threadId) return { adapter: "codex", status: "failed", warning: "Codex thread/start did not return thread id" };
-  const delivery = await sendCodexInstruction({ threadId, message, timeout });
+  const turn = start.responses.find((item) => item.id === 3);
+  if (!turn || turn.error) {
+    return {
+      adapter: "codex",
+      status: "failed",
+      created_thread_id: threadId,
+      warning: turn?.error?.message || "Codex turn/start failed",
+      ui_visibility: "not_guaranteed"
+    };
+  }
+  const completed = start.events.find((item) => item.method === "turn/completed");
+  const started = start.events.find((item) => item.method === "turn/started");
+  const turnId = completed?.params?.turnId || completed?.params?.turn?.id || started?.params?.turnId || started?.params?.turn?.id || turn.result?.turnId || null;
+  if (!completed) {
+    return {
+      adapter: "codex",
+      status: "failed",
+      created_thread_id: threadId,
+      turn_id: turnId,
+      warning: "Codex turn/completed was not observed for Launch Message",
+      ui_visibility: "not_guaranteed"
+    };
+  }
+  const finalRead = start.responses.find((item) => item.id === 4);
   return {
     adapter: "codex",
-    status: delivery.status,
+    status: "completed",
     thread_id: threadId,
-    turn_id: delivery.turn_id || null,
-    warning: delivery.warning || null,
+    turn_id: turnId,
+    warning: null,
+    verified_by_thread_read: Boolean(finalRead && !finalRead.error),
+    verification_warning: finalRead?.error?.message || start.optional_warnings?.[0] || null,
     ui_visibility: "not_guaranteed"
   };
+}
+
+function extractCodexThreadIdFromStartResponse(response) {
+  return response?.result?.threadId || response?.result?.data?.threadId || response?.result?.data?.thread?.id || response?.result?.thread?.id || response?.result?.id || null;
 }
 
 function inferCodexThreadStatus(thread) {
@@ -6931,12 +7003,17 @@ function codexInitializeMessage(id) {
   };
 }
 
+function codexTextInput(text) {
+  return { type: "text", text, text_elements: [] };
+}
+
 function runCodexAppServer(messages, options = {}) {
   return new Promise((resolve) => {
     const timeout = options.timeout || 10000;
     const deadline = Date.now() + timeout;
     const responses = [];
     const events = [];
+    const optionalWarnings = [];
     let stderr = "";
     let settled = false;
     let pendingResponse = null;
@@ -6962,6 +7039,7 @@ function runCodexAppServer(messages, options = {}) {
       resolve({
         responses,
         events,
+        optional_warnings: optionalWarnings,
         ...result
       });
     };
@@ -7052,16 +7130,27 @@ function runCodexAppServer(messages, options = {}) {
     });
 
     const writeMessage = (message) => {
-      child.stdin.write(`${JSON.stringify(message)}\n`);
+      const { optional, ...jsonRpcMessage } = message;
+      child.stdin.write(`${JSON.stringify(jsonRpcMessage)}\n`);
     };
 
     (async () => {
       try {
         for (const message of messages) {
           if (settled) return;
-          writeMessage(message);
-          await waitForResponse(message.id);
-          if (options.waitAfter?.id === message.id) {
+          const jsonRpcMessage = typeof message === "function" ? message({ responses, events }) : message;
+          if (!jsonRpcMessage) continue;
+          writeMessage(jsonRpcMessage);
+          try {
+            await waitForResponse(jsonRpcMessage.id);
+          } catch (error) {
+            if (jsonRpcMessage.optional) {
+              optionalWarnings.push(error.message);
+              continue;
+            }
+            throw error;
+          }
+          if (options.waitAfter?.id === jsonRpcMessage.id) {
             try {
               await waitForEvent(options.waitAfter.method, options.waitAfter.timeout);
             } catch {
