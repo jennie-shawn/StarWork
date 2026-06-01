@@ -32,7 +32,7 @@ v0.1 只覆盖最小可用安装和适配能力：
 - `starwork init` 第一版：可以初始化项目工作台和项目中心；`single-light` / `project` 作为兼容别名映射为 `project`；项目中心自动使用 `hub-management` Pack，项目工作台 v0.1 默认使用 `general` Pack，不主动推荐未定稿场景 Pack。
 - `starwork spawn` 第一版：可以从健康项目中心创建项目工作台，支持 `--language zh|en`、`--blueprint` 定制目录、路径、规则和 seed，并回写项目中心项目注册表；`starter` / `project` mode 作为兼容别名映射为 `project`。
 - `starwork doctor` 第一版：可以检查 workspace state、Core 必需角色、Kit 文件、正式事实源、业务工作区和 Pack 落地结果，并支持 `--json` 输出；alpha.4 开始可识别历史模板候选；alpha.5 开始输出目录 `inventory` 与语义 `signals`；alpha.9 开始补齐类似项目中心的旧主库识别，供 `starworkDoctor` skill 判断。
-- `starwork knowledge` 第一版：可以为项目工作台开启本地知识库，支持 `init`、`status --json`、`check` 和 `apply --blueprint`；默认不创建知识库，不迁移或删除旧 `知识/knowledge`。
+- `starwork knowledge` 第一版：可以为项目工作台开启本地知识库，支持 `init`、`status --json`、`check` 和 `apply --blueprint`；成功开启后把项目内业务 Skill `starworkKnowledgeProject` 安装到当前项目；默认不创建知识库，不迁移或删除旧 `知识/knowledge`。
 - `starwork upgrade` 第一版：可以读取 `starworkDoctor` skill 生成的升级蓝图，把历史模板、非标准目录或类似项目中心的旧主库安全升级为 StarWork 工作台；alpha.9 支持 `hub + preserve-names + pack:null`，旧主库接入时不会创建重复标准目录；v0.1 只支持 `--blueprint`，不自动判断升级方案。
 - `starwork adapt` 第一版：可以为 Codex、Claude Code、Cursor、Trae 生成或登记轻量适配入口。
 - `starwork pack install` 第一版：可以在健康工作台上补装 Pack，并更新路径、规则、模板和 workspace state。
@@ -52,7 +52,7 @@ CLI 不在 v0.1 阶段处理账号、授权、消息平台 gateway 或复杂商�
 
 - [`starwork init` SPEC](./init-spec.md)
 - [`starwork doctor` SPEC](./doctor-spec.md)
-- [`M2.11 Knowledge Capability SPEC`](../docs/m2.11-knowledge-capability-spec.md)
+- [`Knowledge Base Capability SPEC`](../planning/features/knowledge-base/specs/v0.1.md)
 - [`starwork adapt` SPEC](./adapt-spec.md)
 - [`starwork pack install` SPEC](./pack-install-spec.md)
 - [`starwork spawn` SPEC](./spawn-spec.md)

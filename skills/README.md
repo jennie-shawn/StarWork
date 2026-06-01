@@ -4,6 +4,8 @@
 
 Kit 自带 skill 不放在这里，避免被全局安装命令误识别；它们存放在 `product/kit-skills/`，由 `starwork init` 按工作区类型写入具体工作台。
 
+能力开启后才需要的项目内业务 skill 也不放在这里。例如知识库能力的 `starworkKnowledgeProject` 存放在 `product/core/capabilities/knowledge/skills/`，由 `starwork knowledge init` 写入当前项目。
+
 Skill 的职责不是替代 CLI，而是帮助 Agent 更可靠地理解用户意图、生成配置、组织规则和调用 StarWork 工具。
 
 Skill 的安装、项目中心管理、Pack 推荐和项目分发规则见 `product/core/skill-management-spec.md`。一句话边界：Skill 负责判断和生成方案，CLI 负责执行和校验。
@@ -15,6 +17,7 @@ Skill 的安装、项目中心管理、Pack 推荐和项目分发规则见 `prod
 - 与 Pack 场景相关的正式包放在 `product/packs/`。
 - 系统级 Agent 工作流 skill 放在 `product/skills/`。
 - Kit 自带 skill 放在 `product/kit-skills/`。
+- Capability 自带的项目内业务 skill 放在 `product/core/capabilities/<capability>/skills/`。
 
 ## 当前 Skills
 
@@ -24,3 +27,4 @@ Skill 的安装、项目中心管理、Pack 推荐和项目分发规则见 `prod
 - `starworkKnowledge/`：帮助 Agent 通过 `starwork knowledge` 开启、检查和维护项目本地知识库；负责判断哪些内容值得长期沉淀，区分 `pages/` 和 `synthesis/`，不默认提交项目中心。
 
 `starworkAudit` 是项目中心工作台模板自带 skill，源码在 `product/kit-skills/starworkAudit/`；规格仍保留在 `starworkAudit-spec.md`。
+`starworkKnowledgeProject` 是知识库能力的项目内业务 skill，源码在 `product/core/capabilities/knowledge/skills/starworkKnowledgeProject/`；它不参与全局安装。

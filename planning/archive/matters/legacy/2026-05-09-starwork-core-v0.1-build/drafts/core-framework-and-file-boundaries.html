@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StarWork Core 完整框架与文件边界草案</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f4ef;
+      --paper: #fffdf8;
+      --ink: #1f2933;
+      --muted: #667085;
+      --line: #ded8cc;
+      --accent: #1d6f78;
+      --accent-2: #9b4d2d;
+      --soft: #e8f2f1;
+      --soft-2: #f4e8de;
+      --code: #263238;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.75;
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 40px 24px 72px;
+    }
+
+    header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 28px;
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0;
+      margin: 0 0 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.08;
+      letter-spacing: 0;
+      max-width: 920px;
+    }
+
+    .subtitle {
+      margin: 18px 0 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 250px) minmax(0, 1fr);
+      gap: 32px;
+      align-items: start;
+    }
+
+    nav {
+      position: sticky;
+      top: 20px;
+      border-left: 4px solid var(--accent);
+      padding: 12px 0 12px 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    nav a {
+      display: block;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 6px 0;
+    }
+
+    nav a:hover {
+      color: var(--accent);
+    }
+
+    main {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      padding: 34px;
+    }
+
+    section {
+      border-top: 1px solid var(--line);
+      padding-top: 28px;
+      margin-top: 32px;
+    }
+
+    section:first-child {
+      border-top: 0;
+      padding-top: 0;
+      margin-top: 0;
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      font-size: 28px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 28px 0 10px;
+      font-size: 20px;
+      line-height: 1.35;
+      letter-spacing: 0;
+      color: var(--accent);
+    }
+
+    p {
+      margin: 10px 0;
+    }
+
+    ul,
+    ol {
+      margin: 10px 0 18px;
+      padding-left: 24px;
+    }
+
+    li {
+      margin: 4px 0;
+    }
+
+    .callout {
+      background: var(--soft);
+      border-left: 4px solid var(--accent);
+      padding: 16px 18px;
+      margin: 18px 0;
+    }
+
+    .warning {
+      background: var(--soft-2);
+      border-left-color: var(--accent-2);
+    }
+
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      color: var(--code);
+      background: #ece7dc;
+      padding: 0.12em 0.35em;
+      border-radius: 4px;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow-x: auto;
+      background: #1f2933;
+      color: #edf2f7;
+      padding: 18px;
+      border-radius: 6px;
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    pre code {
+      color: inherit;
+      background: transparent;
+      padding: 0;
+      border-radius: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 22px;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #efe9dc;
+    }
+
+    .summary {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent-2);
+    }
+
+    .visual-flow {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 20px 0;
+    }
+
+    .visual-box {
+      border: 1px solid var(--line);
+      background: #fbf7ef;
+      padding: 16px;
+      min-height: 124px;
+    }
+
+    .visual-box strong {
+      display: block;
+      color: var(--accent);
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+
+    .arrow-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin: 18px 0;
+    }
+
+    .arrow-step {
+      border-left: 4px solid var(--accent);
+      background: #fbf7ef;
+      padding: 12px 14px;
+      font-weight: 650;
+    }
+
+    .plain-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin: 18px 0;
+    }
+
+    .plain-card {
+      border: 1px solid var(--line);
+      background: #fffaf0;
+      padding: 16px;
+    }
+
+    .plain-card h3 {
+      margin-top: 0;
+    }
+
+    .switch-panel {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 18px 0;
+    }
+
+    .switch-card {
+      border: 1px solid var(--line);
+      background: #f8fbf8;
+      padding: 16px;
+    }
+
+    .switch-card strong {
+      display: block;
+      color: var(--accent-2);
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 860px) {
+      .page {
+        padding: 28px 16px 48px;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      nav {
+        position: static;
+        border-left: 0;
+        border-top: 4px solid var(--accent);
+        padding: 12px 0 0;
+      }
+
+      main {
+        padding: 22px;
+      }
+
+      .visual-flow,
+      .plain-grid,
+      .switch-panel {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <p class="eyebrow">StarWork Core v0.1 草案</p>
+      <h1>Core 框架与边界结论版</h1>
+      <p class="subtitle">只保留当前已收敛的产品判断：Core 是什么、最小可用形态是什么、多状态如何处理、CLI 如何配合。</p>
+    </header>
+
+    <div class="layout">
+      <nav aria-label="目录">
+        <a href="#one-line">一句话</a>
+        <a href="#baseline">最小地基</a>
+        <a href="#modes">两种模式</a>
+        <a href="#switches">三个开关</a>
+        <a href="#repo-structure">仓库结构</a>
+        <a href="#boundaries">文件边界</a>
+        <a href="#cli">CLI 配合</a>
+        <a href="#v01">v0.1 结论</a>
+      </nav>
+
+      <main>
+        <section id="one-line">
+          <h2>一、一句话结论</h2>
+          <p class="summary">StarWork Core v0.1 是一套 AI 工作区协议：规定 Agent 进来先读哪里、当前工作放哪里、正式成果放哪里、哪些内容不能乱改。</p>
+          <div class="visual-flow" aria-label="Core CLI Agent relationship">
+            <div class="visual-box">
+              <strong>Core</strong>
+              <p>规则和地基。定义工作区应该长什么样。</p>
+            </div>
+            <div class="visual-box">
+              <strong>CLI</strong>
+              <p>安装工和质检员。负责创建、检查、迁移。</p>
+            </div>
+            <div class="visual-box">
+              <strong>Agent</strong>
+              <p>真正干活的人。按 Core 规则读写项目。</p>
+            </div>
+          </div>
+          <p>Core 不是一个 App，也不是 CLI 本身；Core 是用户和 Agent 共同遵守的工作区说明书。</p>
+        </section>
+
+        <section id="baseline">
+          <h2>二、Core v0.1 最小地基</h2>
+          <p>Core v0.1 不追求大而全。一个工作区只要具备下面三个角色，就可以开始运行。</p>
+          <pre><code>AGENTS.md
+_系统/
+  上下文/
+    project-status.md
+  任务/
+    current-work.md</code></pre>
+          <table>
+            <thead>
+              <tr>
+                <th>文件</th>
+                <th>唯一职责</th>
+                <th>不要放什么</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AGENTS.md</code></td>
+                <td>跨 Agent 工作规则入口：先读什么、写哪里、哪些边界不能碰。</td>
+                <td>项目状态正文、任务清单、决策正文。</td>
+              </tr>
+              <tr>
+                <td><code>project-status.md</code></td>
+                <td>项目慢变量：目标、阶段、重点、风险、事实源位置。</td>
+                <td>单次对话记录、事项细节、草稿正文。</td>
+              </tr>
+              <tr>
+                <td><code>current-work.md</code></td>
+                <td>当前工作入口：现在做什么、卡在哪里、等谁确认。</td>
+                <td>长期背景、完整方案、历史流水账。</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="callout">
+            <p><code>decisions.md</code> 可以存在，但不是 Core 必需文件。它只记录高影响、已确认、会影响后续多个事项的决策。</p>
+          </div>
+        </section>
+
+        <section id="modes">
+          <h2>三、两种工作模式</h2>
+          <p>Core v0.1 必须兼容两类真实用户：不使用事项的轻量用户，以及需要长期接力的复杂项目用户。</p>
+          <div class="plain-grid">
+            <div class="plain-card">
+              <h3>Starter Mode</h3>
+              <p>兼容学员当前模板。适合轻量交付、资料整理、单次产出。</p>
+              <pre><code>references/        # 原始资料，只读
+outputs/drafts/    # AI 待审草稿
+outputs/final/     # 用户确认成果</code></pre>
+            </div>
+            <div class="plain-card">
+              <h3>Matter Mode</h3>
+              <p>增强工作追踪。适合长期事项、跨会话接力、过程沉淀。</p>
+              <pre><code>matters/registry.md
+matters/&lt;matter-id&gt;/
+  README.md
+  progress.md
+  notes.md
+  drafts/</code></pre>
+            </div>
+          </div>
+          <div class="callout">
+            <p><code>matters/registry.md</code> 不作为 Core 必需项。一个没有 matter、但具备 Core 最小地基和 Starter Mode 的项目，仍然可以是 StarWork Core 工作区。</p>
+          </div>
+          <p>启用 Matter Mode 时，应配套 <code>matter-workspace</code> skill，因为事项维护不是建目录这么简单，还包含创建、定位、更新、归档、草稿晋升等动作。</p>
+        </section>
+
+        <section id="switches">
+          <h2>四、三个开关处理多状态</h2>
+          <p>Core 不维护多套版本。所有用户共用同一个 Baseline，只是初始化时打开不同开关。</p>
+          <div class="switch-panel">
+            <div class="switch-card">
+              <strong>语言开关</strong>
+              <p>中文路径或英文路径。语义不变，只换目录名和模板语言。</p>
+            </div>
+            <div class="switch-card">
+              <strong>身份与教训开关</strong>
+              <p>单项目放本地；多项目由主库统一维护并分发。</p>
+            </div>
+            <div class="switch-card">
+              <strong>工作追踪开关</strong>
+              <p>Starter 输出模式、轻量事项、完整事项三档。</p>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>用户状态</th>
+                <th>Core 怎么落地</th>
+                <th>适合谁</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>中文单项目 Starter 版</td>
+                <td>中文路径 + 本地身份/教训 + <code>references/outputs</code></td>
+                <td>学员当前模板</td>
+              </tr>
+              <tr>
+                <td>中文单项目 Matter 版</td>
+                <td>中文路径 + 本地身份/教训 + 完整事项</td>
+                <td>想沉淀项目过程的用户</td>
+              </tr>
+              <tr>
+                <td>中文多项目完整版</td>
+                <td>中文路径 + 主库身份/教训 + 完整事项 + 跨项目联络</td>
+                <td>多卫星项目工作台</td>
+              </tr>
+              <tr>
+                <td>英文 Starter 版</td>
+                <td>英文路径 + 本地身份 + <code>references/outputs</code></td>
+                <td>开源和英文用户</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>状态应该允许升级，不要求用户一开始选到终局。</p>
+          <div class="arrow-row">
+            <div class="arrow-step">Starter 输出模式 -> Matter 模式</div>
+            <div class="arrow-step">轻量事项 -> 完整事项</div>
+            <div class="arrow-step">本地 identity/lessons -> 主库分发 identity/lessons</div>
+          </div>
+        </section>
+
+        <section id="repo-structure">
+          <h2>五、Core 仓库如何维护多状态</h2>
+          <p>StarWork 仓库不应该维护多套互相复制的 Core。正确方式是：一套源协议，多个路径 profile，多个可选 capability，再用 preset 组合出用户能直接使用的 kit。</p>
+          <pre><code>product/core/
+├── README.md
+├── baseline/              # Core 不变的共同语义
+│   ├── spec.md
+│   ├── roles.md
+│   ├── file-boundaries.md
+│   └── health-check.md
+├── profiles/              # 同一语义的路径和语言映射
+│   ├── zh/
+│   │   ├── profile.md
+│   │   ├── paths.json
+│   │   └── templates/
+│   └── en/
+│       ├── profile.md
+│       ├── paths.json
+│       └── templates/
+├── capabilities/          # 可启用能力，不复制 baseline
+│   ├── starter-outputs/
+│   ├── matter-mode/
+│   ├── decisions/
+│   ├── local-identity/
+│   ├── shared-identity/
+│   ├── local-lessons/
+│   └── shared-lessons/
+├── presets/               # 组合配方，给 CLI 和发布套件使用
+│   ├── zh-local-starter.yaml
+│   ├── zh-local-matter.yaml
+│   ├── zh-shared-matter.yaml
+│   └── en-local-starter.yaml
+└── kits/                  # 给用户直接复制的成品套件
+    ├── zh-local-starter/
+    ├── zh-local-matter/
+    └── en-local-starter/</code></pre>
+
+          <h3>每层只做一件事</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>层</th>
+                <th>职责</th>
+                <th>维护规则</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>baseline/</code></td>
+                <td>定义所有 Core 工作区共同遵守的语义。</td>
+                <td>只写一次，不按语言和用户类型复制。</td>
+              </tr>
+              <tr>
+                <td><code>profiles/</code></td>
+                <td>定义中文、英文等路径和模板语言。</td>
+                <td>只做映射，不改变 Core 语义。</td>
+              </tr>
+              <tr>
+                <td><code>capabilities/</code></td>
+                <td>定义 Starter、Matter、decisions、identity/lessons 等可选能力。</td>
+                <td>每个能力独立维护，可被不同 preset 复用。</td>
+              </tr>
+              <tr>
+                <td><code>presets/</code></td>
+                <td>描述某种用户状态由哪些 profile 和 capability 组成。</td>
+                <td>是组合配方，不放大段模板正文。</td>
+              </tr>
+              <tr>
+                <td><code>kits/</code></td>
+                <td>给用户直接复制的成品目录。</td>
+                <td>由 preset 组装生成或人工同步，不作为事实源。</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="callout">
+            <p>核心原则：改规则去改 <code>baseline/</code>；改中文路径去改 <code>profiles/zh/</code>；改事项能力去改 <code>capabilities/matter-mode/</code>；不要去每个 kit 里重复改一遍。</p>
+          </div>
+        </section>
+
+        <section id="boundaries">
+          <h2>六、关键文件边界</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>内容</th>
+                <th>放哪里</th>
+                <th>原则</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>项目目标、阶段、风险</td>
+                <td><code>project-status.md</code></td>
+                <td>低频更新，保持稳定。</td>
+              </tr>
+              <tr>
+                <td>现在要做什么、等谁确认</td>
+                <td><code>current-work.md</code></td>
+                <td>作为下一次接手入口，不写长篇过程。</td>
+              </tr>
+              <tr>
+                <td>原始资料</td>
+                <td><code>references/</code></td>
+                <td>默认只读，不直接改写来源。</td>
+              </tr>
+              <tr>
+                <td>AI 产出草稿</td>
+                <td><code>outputs/drafts/</code> 或 matter 的 <code>drafts/</code></td>
+                <td>未确认前不要混入正式事实源。</td>
+              </tr>
+              <tr>
+                <td>确认后的正式成果</td>
+                <td>项目声明的正式事实源</td>
+                <td>以正式事实源为准。</td>
+              </tr>
+              <tr>
+                <td>高影响决策</td>
+                <td><code>decisions.md</code></td>
+                <td>可选文件，只写已确认且会长期影响多个事项的判断。</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="callout warning">
+            <p>最重要的边界：过程材料不要直接塞进正式事实源；正式事实源也不要变成讨论记录。</p>
+          </div>
+        </section>
+
+        <section id="cli">
+          <h2>七、CLI 如何配合</h2>
+          <p>用户可以不装 CLI，直接复制模板使用 Core。CLI 的价值是把选择、创建、检查和迁移自动化。</p>
+          <pre><code>starwork init --lang zh --identity local --work starter
+starwork init --lang zh --identity shared --matters full
+starwork doctor
+starwork adapt codex</code></pre>
+          <table>
+            <thead>
+              <tr>
+                <th>CLI 能做</th>
+                <th>Core 负责</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>根据问答生成目录和模板。</td>
+                <td>从 <code>presets/</code> 读取组合配方。</td>
+              </tr>
+              <tr>
+                <td>检查缺失、冲突、旧命名。</td>
+                <td>根据 <code>baseline/</code> 和 capability 规则判断健康状态。</td>
+              </tr>
+              <tr>
+                <td>为 Matter Mode 安装或软链接 skill。</td>
+                <td>由 <code>capabilities/matter-mode/</code> 规定启用要求。</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="v01">
+          <h2>八、v0.1 当前结论</h2>
+          <ol>
+            <li>Core v0.1 的必需文件先收敛为 <code>AGENTS.md</code>、<code>project-status.md</code>、<code>current-work.md</code>。</li>
+            <li><code>matters/</code> 是增强能力，不是入门必需项。</li>
+            <li>Starter Mode 兼容学员现有 <code>references/outputs</code> 模式。</li>
+            <li>单项目与多项目通过身份/教训来源开关解决，不拆 Core 版本。</li>
+            <li>仓库用 <code>baseline + profiles + capabilities + presets + kits</code> 维护多状态。</li>
+            <li>CLI 以后负责生成、检查、迁移和安装 Matter Mode 所需 skill。</li>
+          </ol>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

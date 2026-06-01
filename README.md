@@ -50,6 +50,8 @@ npx skills add jennie-shawn/StarWork -g -a codex -y
 - `starworkMultiagent`：帮助 AI 把“登记当前会话为常用智能体”“管理多 AI 分工”“登记共享输出”等请求转换成 `starwork multiagent` 命令组合。
 - `starworkKnowledge`：帮助 AI 开启和维护项目本地知识库；创建结构时先调用 `starwork knowledge`，整理内容时区分主题页和综合判断。
 
+说明：`starworkKnowledge` 是全局入口 Skill。项目开启知识库后，CLI 会把 `starworkKnowledgeProject` 安装到当前项目的 `.agents/skills/` 和 `.claude/skills/`，它不属于全局安装清单。
+
 Kit 随附 Skills 不走全局安装命令，它们跟着具体工作台走：
 
 - `starworkSpawn`：项目中心自带 Skill，帮助已有项目中心设计 `starwork spawn --blueprint` 工作台定制单。
@@ -146,11 +148,27 @@ starwork pack install
 starwork multiagent
 ```
 
+## 产品规划资料
+
+StarWork 的功能规划、版本 SPEC、讨论沉淀、参考资料和验收材料统一放在：
+
+```text
+product/planning/
+```
+
+其中独立功能按功能点归档：
+
+```text
+product/planning/features/<feature>/
+```
+
+正式用户文档和 HTML 阅读稿仍放在 `product/docs/`。
+
 当前能力：
 
 - `init`：创建项目工作台或项目中心；交互默认推荐项目工作台。
 - `doctor`：检查工作台是否完整、关键文件是否还在；也会为旧模板和类似项目中心的旧工作区列出目录线索，交给 `starworkDoctor` 判断。
-- `knowledge`：开启、检查和按确认方案整理项目本地知识库；默认不会移动旧 `知识/` 或 `knowledge/`。
+- `knowledge`：开启、检查和按确认方案整理项目本地知识库；成功开启后安装项目内知识库助手，默认不会移动旧 `知识/` 或 `knowledge/`。
 - `spawn`：从已有项目中心创建并登记项目工作台，支持中文或英文目录镜像。
 - `upgrade`：按 `starworkDoctor` skill 生成的升级蓝图，把历史模板或类似项目中心的旧工作区安全接入 StarWork 工作台。
 - `adapt`：生成 Claude Code、Cursor 等 AI 工具的适配文件。
@@ -169,7 +187,8 @@ starwork multiagent
 ├── schemas/    # 结构化 schema
 ├── adapters/   # AI 工具适配规则
 ├── examples/   # 示例
-└── docs/       # 产品文档和 A 测指南
+├── docs/       # 产品文档和 A 测指南
+└── planning/   # 功能规划、版本 SPEC、讨论、参考和验收
 ```
 
 ## A 测反馈重点

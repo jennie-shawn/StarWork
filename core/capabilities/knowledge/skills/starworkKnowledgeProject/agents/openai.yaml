@@ -1,0 +1,6 @@
+name: starworkKnowledgeProject
+summary: Maintain a local StarWork project knowledge base after it is enabled.
+instructions: |
+  Use the local knowledge base rules before editing. Read schema.md and index.md first.
+  Keep raw source material out of the knowledge base. Put stable topic knowledge in pages/
+  and cross-topic judgment in synthesis/. Update index.md and log.md after changes.

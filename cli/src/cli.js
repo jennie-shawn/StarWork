@@ -8,6 +8,24 @@ const PACKAGE_VERSION = require(path.join(PRODUCT_ROOT, "package.json")).version
 const STARWORK_RULES_DIR = path.join(".starwork", "rules");
 const STARWORK_RULES_INDEX = path.join(STARWORK_RULES_DIR, "index.md");
 const STARWORK_RULES_MANIFEST = path.join(STARWORK_RULES_DIR, "manifest.json");
+const KNOWLEDGE_PROJECT_SKILL_ID = "starworkKnowledgeProject";
+const KNOWLEDGE_PROJECT_SKILL_SOURCE = path.join("core", "capabilities", "knowledge", "skills", KNOWLEDGE_PROJECT_SKILL_ID);
+const KNOWLEDGE_BLUEPRINT_ACTIONS = new Set([
+  "create_knowledge_base",
+  "create_dir",
+  "write_template",
+  "append_agents_rule",
+  "install_project_skill",
+  "copy_preserved_file",
+  "record_workspace_capability"
+]);
+const KNOWLEDGE_BLUEPRINT_BANNED_ACTIONS = new Set([
+  "delete",
+  "rename_without_preserve",
+  "summarize_source",
+  "generate_page_content",
+  "promote_to_project_center"
+]);
 
 const WORKSPACE_TYPES = {
   project: {
@@ -1296,7 +1314,8 @@ function knowledgeCheck(options) {
       }
     }
   }
-  const ok = (!status.enabled && !status.exists) || (missing.length === 0 && emptyImportant.length === 0);
+  const missingSkills = status.enabled || status.exists ? !status.skills.project_skill_installed : false;
+  const ok = (!status.enabled && !status.exists) || (missing.length === 0 && emptyImportant.length === 0 && !missingSkills);
   const result = {
     ok,
     enabled: status.enabled,
@@ -1304,6 +1323,7 @@ function knowledgeCheck(options) {
     root: status.root,
     missing: missing.map((entry) => entry.path),
     empty: emptyImportant,
+    skills: status.skills,
     legacy_candidates: status.legacy_candidates
   };
   if (options.json) {
@@ -1320,6 +1340,7 @@ function knowledgeCheck(options) {
     console.log(`项目知识库需要补齐：${status.root}`);
     for (const item of result.missing) console.log(`- 缺少：${item}`);
     for (const item of result.empty) console.log(`- 内容为空：${item}`);
+    if (missingSkills) console.log(`- 缺少项目内知识库助手：${status.skills.project_skill_ids.join("、")}`);
   }
   return result;
 }
@@ -1349,10 +1370,14 @@ function assertProjectKnowledgeWorkspace(state) {
 
 function buildKnowledgeInitPlan({ workspaceRoot, state, language, root }) {
   const normalizedRoot = normalizeSafeRelativePath(root, "knowledge root").replace(/\/$/, "");
+  const skillPlan = buildKnowledgeProjectSkillPlan({ targetDir: workspaceRoot, language, installedBy: "starwork knowledge init" });
+  const existingSkills = readProjectSkillsManifest(workspaceRoot).skills;
   const actions = [
     ...buildKnowledgeStructureActions(workspaceRoot, language, normalizedRoot),
     ...buildKnowledgeRuleActions(workspaceRoot, language, normalizedRoot),
-    overwriteFileAction(workspaceRoot, path.join(".starwork", "workspace.json"), renderKnowledgeWorkspaceState(state, language, normalizedRoot))
+    ...skillPlan.actions,
+    overwriteFileAction(workspaceRoot, path.join(".starwork", "workspace.json"), renderKnowledgeWorkspaceState(state, language, normalizedRoot)),
+    overwriteFileAction(workspaceRoot, path.join(".starwork", "skills.json"), renderProjectSkillsManifest(mergeSkillRecords(existingSkills, skillPlan.records)))
   ];
   return {
     targetDir: workspaceRoot,
@@ -1368,7 +1393,7 @@ function buildKnowledgeStructureActions(workspaceRoot, language, root) {
     actions.push(directoryAction(workspaceRoot, path.join(root, directory)));
   }
   for (const file of ["README.md", "index.md", "schema.md", "log.md"]) {
-    actions.push(fileAction(workspaceRoot, path.join(root, file), loadKnowledgeTemplate(language, file)));
+    actions.push(idempotentFileAction(workspaceRoot, path.join(root, file), loadKnowledgeTemplate(language, file)));
   }
   return actions;
 }
@@ -1398,14 +1423,21 @@ function renderKnowledgeWorkspaceState(state, language, root) {
     language: state.language || language,
     capabilities: {
       ...(state.capabilities || {}),
-      knowledge: {
-        enabled: true,
-        root,
-        mode: "local"
-      }
+      knowledge: renderKnowledgeCapabilityRecord(language, root)
     }
   };
   return `${JSON.stringify(nextState, null, 2)}\n`;
+}
+
+function renderKnowledgeCapabilityRecord(language, root) {
+  return {
+    enabled: true,
+    root,
+    language,
+    mode: "local",
+    version: "0.1",
+    project_skill_ids: [KNOWLEDGE_PROJECT_SKILL_ID]
+  };
 }
 
 function getKnowledgeDefaultRoot(language) {
@@ -1454,7 +1486,13 @@ function collectKnowledgeStatus(workspaceRoot, state, options = {}) {
       : fs.existsSync(absolute) && fs.statSync(absolute).isFile();
   }
   const exists = fs.existsSync(path.join(workspaceRoot, root));
-  const legacyCandidates = ["知识", "knowledge"]
+  const projectSkillIds = Array.isArray(declared.project_skill_ids) && declared.project_skill_ids.length
+    ? declared.project_skill_ids
+    : [KNOWLEDGE_PROJECT_SKILL_ID];
+  const projectSkillsManifest = readProjectSkillsManifest(workspaceRoot);
+  const projectSkillInstalled = projectSkillIds.every((id) => isProjectSkillInstalled(workspaceRoot, id));
+  const projectSkillRegistered = projectSkillIds.every((id) => projectSkillsManifest.skills.some((skill) => skill.id === id));
+  const legacyCandidates = ["知识", "knowledge", "资料库"]
     .filter((candidate) => candidate !== root && fs.existsSync(path.join(workspaceRoot, candidate)));
   const warnings = [];
   if (declared.enabled && !exists) {
@@ -1464,6 +1502,9 @@ function collectKnowledgeStatus(workspaceRoot, state, options = {}) {
     if ((declared.enabled || exists) && !structure[entry.key]) {
       warnings.push(`缺少知识库结构：${entry.path}`);
     }
+  }
+  if ((declared.enabled || exists) && !projectSkillInstalled) {
+    warnings.push(`缺少知识库项目内 Skill：${projectSkillIds.join(", ")}`);
   }
   return {
     ok: warnings.length === 0,
@@ -1478,9 +1519,23 @@ function collectKnowledgeStatus(workspaceRoot, state, options = {}) {
       inbox: countDirectoryEntries(path.join(workspaceRoot, root, "inbox")),
       sources: countDirectoryEntries(path.join(workspaceRoot, root, "sources"))
     },
+    skills: {
+      project_skill_installed: projectSkillInstalled,
+      project_skill_ids: projectSkillIds,
+      manifest_registered: projectSkillRegistered,
+      mounts: {
+        codex: projectSkillIds.every((id) => fs.existsSync(path.join(workspaceRoot, ".agents", "skills", id, "SKILL.md"))),
+        claude: projectSkillIds.every((id) => fs.existsSync(path.join(workspaceRoot, ".claude", "skills", id, "SKILL.md")))
+      }
+    },
     legacy_candidates: legacyCandidates,
     warnings
   };
+}
+
+function isProjectSkillInstalled(workspaceRoot, skillId) {
+  return fs.existsSync(path.join(workspaceRoot, ".agents", "skills", skillId, "SKILL.md"))
+    || fs.existsSync(path.join(workspaceRoot, ".claude", "skills", skillId, "SKILL.md"));
 }
 
 function getKnowledgeRequiredEntries(root) {
@@ -1539,10 +1594,15 @@ function loadKnowledgeBlueprint(blueprintPath) {
     throw new Error("knowledge blueprint 必须包含 actions。");
   }
   for (const action of blueprint.actions) {
-    if (["delete", "remove", "rm"].includes(action?.type)) {
-      throw new Error("knowledge blueprint 不允许删除动作。");
+    if (KNOWLEDGE_BLUEPRINT_BANNED_ACTIONS.has(action?.type) || ["remove", "rm"].includes(action?.type)) {
+      throw new Error(`knowledge blueprint 不允许 action.type：${action?.type}`);
+    }
+    if (!KNOWLEDGE_BLUEPRINT_ACTIONS.has(action?.type)) {
+      throw new Error(`knowledge blueprint 不支持 action.type：${action?.type}`);
     }
     if (action.path) normalizeSafeRelativePath(action.path, `knowledge action ${action.type}.path`);
+    if (action.from) normalizeSafeRelativePath(action.from, `knowledge action ${action.type}.from`);
+    if (action.to) normalizeSafeRelativePath(action.to, `knowledge action ${action.type}.to`);
   }
   return { ...blueprint, __path: filePath, __dir: path.dirname(filePath) };
 }
@@ -1550,25 +1610,47 @@ function loadKnowledgeBlueprint(blueprintPath) {
 function buildKnowledgeApplyPlan({ workspaceRoot, state, blueprint }) {
   const root = normalizeSafeRelativePath(blueprint.root, "knowledge root").replace(/\/$/, "");
   const actions = [];
+  const existingSkills = readProjectSkillsManifest(workspaceRoot).skills;
+  const skillPlans = [];
+  let shouldRecordCapability = false;
   for (const action of blueprint.actions) {
     if (action.type === "create_knowledge_base") {
       actions.push(...buildKnowledgeStructureActions(workspaceRoot, blueprint.language, normalizeSafeRelativePath(action.path || root, "knowledge action path").replace(/\/$/, "")));
+      shouldRecordCapability = true;
     } else if (action.type === "create_dir") {
       actions.push(directoryAction(workspaceRoot, normalizeSafeRelativePath(action.path, "knowledge create_dir.path")));
     } else if (action.type === "write_template") {
-      actions.push(fileAction(workspaceRoot, normalizeSafeRelativePath(action.path, "knowledge write_template.path"), loadKnowledgeNamedTemplate(action.template, blueprint.language)));
+      const targetPath = normalizeSafeRelativePath(action.path, "knowledge write_template.path");
+      const content = loadKnowledgeNamedTemplate(action.template, blueprint.language);
+      actions.push(action.overwrite === true ? overwriteFileAction(workspaceRoot, targetPath, content) : fileAction(workspaceRoot, targetPath, content));
     } else if (action.type === "append_agents_rule") {
       actions.push(...buildKnowledgeRuleActions(workspaceRoot, blueprint.language, root));
-    } else if (action.type === "copy_file") {
-      if (action.confirmed !== true) throw new Error("knowledge copy_file 需要 confirmed=true。");
-      const from = normalizeSafeSourcePath(action.from, blueprint.__dir, "knowledge copy_file.from");
-      const to = normalizeSafeRelativePath(action.to, "knowledge copy_file.to");
+    } else if (action.type === "install_project_skill") {
+      const skillPlan = buildKnowledgeProjectSkillPlan({ targetDir: workspaceRoot, language: blueprint.language, installedBy: "starwork knowledge apply" });
+      actions.push(...skillPlan.actions);
+      skillPlans.push(skillPlan);
+      shouldRecordCapability = true;
+    } else if (action.type === "copy_preserved_file") {
+      if (action.confirmed !== true) throw new Error("knowledge copy_preserved_file 需要 confirmed=true。");
+      const from = resolveWorkspaceSourceFile(workspaceRoot, action.from, "knowledge copy_preserved_file.from");
+      const to = normalizeSafeRelativePath(action.to, "knowledge copy_preserved_file.to");
       actions.push(strictFileAction(workspaceRoot, to, fs.readFileSync(from, "utf8")));
+    } else if (action.type === "record_workspace_capability") {
+      shouldRecordCapability = true;
     } else {
       throw new Error(`knowledge blueprint 不支持 action.type：${action.type}`);
     }
   }
-  actions.push(overwriteFileAction(workspaceRoot, path.join(".starwork", "workspace.json"), renderKnowledgeWorkspaceState(state, blueprint.language, root)));
+  if (shouldRecordCapability) {
+    actions.push(overwriteFileAction(workspaceRoot, path.join(".starwork", "workspace.json"), renderKnowledgeWorkspaceState(state, blueprint.language, root)));
+  }
+  if (skillPlans.length) {
+    actions.push(overwriteFileAction(
+      workspaceRoot,
+      path.join(".starwork", "skills.json"),
+      renderProjectSkillsManifest(mergeSkillRecords(existingSkills, skillPlans.flatMap((plan) => plan.records)))
+    ));
+  }
   return {
     targetDir: workspaceRoot,
     root,
@@ -2843,6 +2925,19 @@ function normalizeSafeSourcePath(relativePath, sourceRoot, label) {
   return resolved;
 }
 
+function resolveWorkspaceSourceFile(workspaceRoot, relativePath, label) {
+  const normalized = normalizeSafeRelativePath(relativePath, label);
+  const resolvedRoot = path.resolve(workspaceRoot);
+  const resolved = path.resolve(resolvedRoot, normalized);
+  if (resolved !== resolvedRoot && !resolved.startsWith(`${resolvedRoot}${path.sep}`)) {
+    throw new Error(`${label} 不能跳出工作区：${relativePath}`);
+  }
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+    throw new Error(`${label} 文件不存在：${relativePath}`);
+  }
+  return resolved;
+}
+
 function findStarWorkTrace(dir) {
   const traces = [
     "AGENTS.md",
@@ -3744,7 +3839,11 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
   const kitSkillPlan = includeSkills
     ? buildKitSkillPlan({ targetDir, kit: workspaceConfig.kit, language: pack.language || "zh", installedBy: "starwork init" })
     : { actions: [], records: [] };
+  const knowledgeSkillPlan = enableKnowledge && workspaceType !== "hub"
+    ? buildKnowledgeProjectSkillPlan({ targetDir, language: pack.language || "zh", installedBy: "starwork init --knowledge" })
+    : { actions: [], records: [] };
   actions.push(...kitSkillPlan.actions);
+  actions.push(...knowledgeSkillPlan.actions);
   if (workspaceType === "hub") {
     const hubPaths = getHubStandardPaths(pack.language || "zh");
     actions.push(fileAction(targetDir, path.join(hubPaths.formalSkills, "registry.json"), renderHubSkillRegistry([])));
@@ -3773,11 +3872,7 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
     },
     ...(enableKnowledge && workspaceType !== "hub" ? {
       capabilities: {
-        knowledge: {
-          enabled: true,
-          root: getKnowledgeDefaultRoot(pack.language || "zh"),
-          mode: "local"
-        }
+        knowledge: renderKnowledgeCapabilityRecord(pack.language || "zh", getKnowledgeDefaultRoot(pack.language || "zh"))
       }
     } : {}),
     ...(blueprint ? {
@@ -3811,7 +3906,7 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
     actions.push(...buildKnowledgeRuleActions(targetDir, pack.language || "zh", knowledgeRoot));
   }
   actions.push(fileAction(targetDir, path.join(".starwork", "workspace.json"), `${JSON.stringify(workspaceState, null, 2)}\n`));
-  actions.push(fileAction(targetDir, path.join(".starwork", "skills.json"), renderProjectSkillsManifest(kitSkillPlan.records)));
+  actions.push(fileAction(targetDir, path.join(".starwork", "skills.json"), renderProjectSkillsManifest(mergeSkillRecords(kitSkillPlan.records, knowledgeSkillPlan.records))));
 
   const filteredActions = blueprint?.removals?.length
     ? actions.filter((action) => !matchesAnyRemovedPath(action.relativePath, blueprint.removals))
@@ -3830,7 +3925,7 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
     businessWorkArea,
     knowledgeRoot: enableKnowledge && workspaceType !== "hub" ? getKnowledgeDefaultRoot(pack.language || "zh") : null,
     targetExists: fs.existsSync(targetDir),
-    skills: kitSkillPlan.records,
+    skills: mergeSkillRecords(kitSkillPlan.records, knowledgeSkillPlan.records),
     actions: dedupeActions(filteredActions)
   };
 }
@@ -4054,6 +4149,74 @@ function renderProjectSkillsManifest(records) {
     updated_at: new Date().toISOString(),
     skills: records
   }, null, 2)}\n`;
+}
+
+function readProjectSkillsManifest(workspaceRoot) {
+  const manifestPath = path.join(workspaceRoot, ".starwork", "skills.json");
+  if (!fs.existsSync(manifestPath)) {
+    return {
+      schema: "starwork.project_skills.v0.1",
+      skills: []
+    };
+  }
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    return {
+      ...manifest,
+      skills: Array.isArray(manifest.skills) ? manifest.skills : []
+    };
+  } catch (error) {
+    throw new Error(`无法读取项目 Skill 清单：${error.message}`);
+  }
+}
+
+function mergeSkillRecords(existingRecords, newRecords) {
+  const map = new Map();
+  for (const record of existingRecords || []) {
+    if (record?.id) map.set(record.id, record);
+  }
+  for (const record of newRecords || []) {
+    if (record?.id) map.set(record.id, record);
+  }
+  return Array.from(map.values());
+}
+
+function buildKnowledgeProjectSkillPlan({ targetDir, language = "zh", installedBy }) {
+  const sourceDir = path.join(PRODUCT_ROOT, KNOWLEDGE_PROJECT_SKILL_SOURCE);
+  if (!fs.existsSync(sourceDir)) {
+    throw new Error(`缺少知识库项目内 Skill：${KNOWLEDGE_PROJECT_SKILL_ID}`);
+  }
+
+  const mounts = [
+    { agent: "codex", path: path.join(".agents", "skills", KNOWLEDGE_PROJECT_SKILL_ID), mode: "copy" },
+    { agent: "claude", path: path.join(".claude", "skills", KNOWLEDGE_PROJECT_SKILL_ID), mode: "copy" }
+  ];
+  const actions = mounts.flatMap((mount) => copyDirectoryFiles(PRODUCT_ROOT, KNOWLEDGE_PROJECT_SKILL_SOURCE, targetDir, mount.path, { idempotent: true }));
+
+  return {
+    actions,
+    records: [{
+      id: KNOWLEDGE_PROJECT_SKILL_ID,
+      name: "StarWork Knowledge Project",
+      type: "capability-bundled",
+      source: {
+        kind: "core-capability",
+        capability: "knowledge",
+        manifest_id: KNOWLEDGE_PROJECT_SKILL_ID
+      },
+      distribution: "copy",
+      mounts: mounts.map((mount) => ({
+        agent: mount.agent,
+        path: normalizeRelativePath(mount.path),
+        mode: mount.mode
+      })),
+      reason: language === "en"
+        ? "Installed after enabling the local project knowledge base."
+        : "开启项目本地知识库后安装，用于维护当前项目知识库。",
+      installed_by: installedBy,
+      installed_at: new Date().toISOString()
+    }]
+  };
 }
 
 function renderHubSkillRegistry(skills) {
@@ -5289,13 +5452,16 @@ function buildBlueprintVariables(blueprint, { projectName, projectId, mode, mode
   };
 }
 
-function copyDirectoryFiles(sourceRoot, sourceRelativeDir, targetRoot, targetRelativeDir) {
+function copyDirectoryFiles(sourceRoot, sourceRelativeDir, targetRoot, targetRelativeDir, options = {}) {
   const sourceDir = path.join(sourceRoot, sourceRelativeDir);
   if (!fs.existsSync(sourceDir)) return [];
   return walkFiles(sourceDir).map((source) => {
     const relativePath = path.relative(sourceDir, source);
     const targetRelativePath = path.join(targetRelativeDir, relativePath);
-    return fileAction(targetRoot, targetRelativePath, fs.readFileSync(source, "utf8"));
+    const content = fs.readFileSync(source, "utf8");
+    return options.idempotent
+      ? idempotentFileAction(targetRoot, targetRelativePath, content)
+      : fileAction(targetRoot, targetRelativePath, content);
   });
 }
 
@@ -6217,6 +6383,18 @@ function fileAction(targetDir, relativePath, content) {
   }
   const alternate = nextAvailableSibling(target);
   return { type: "file", mode: "create-new", target: alternate, originalTarget: target, relativePath: path.relative(targetDir, alternate), content };
+}
+
+function idempotentFileAction(targetDir, relativePath, content) {
+  const target = path.join(targetDir, relativePath);
+  if (!fs.existsSync(target)) {
+    return { type: "file", mode: "create", target, relativePath, content };
+  }
+  const existing = fs.readFileSync(target, "utf8");
+  if (!existing.trim()) {
+    return { type: "file", mode: "overwrite-empty", target, relativePath, content };
+  }
+  return { type: "file", mode: "skip", target, relativePath, content: "" };
 }
 
 function strictFileAction(targetDir, relativePath, content) {

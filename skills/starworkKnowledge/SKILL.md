@@ -14,6 +14,7 @@ description: 'Help users create, inspect, and maintain a local StarWork project 
 ```text
 starwork knowledge = 创建和检查知识库结构
 starworkKnowledge skill = 判断、采访、整理、写入知识内容
+starworkKnowledgeProject = 项目开启知识库后安装到当前项目里的维护助手
 ```
 
 必须优先使用 CLI：
@@ -24,6 +25,8 @@ starworkKnowledge skill = 判断、采访、整理、写入知识内容
 - 涉及旧 `知识/`、`knowledge/` 或定制路径：先生成 `starwork.knowledge` blueprint，再运行 `starwork knowledge apply --blueprint <file> --dry-run`，用户确认后执行。
 
 不要绕过 CLI 手写另一套目录结构。
+
+`starwork knowledge init` 成功后，CLI 会把 `starworkKnowledgeProject` 安装进当前项目。不要让用户把这个项目内业务 Skill 装到全局。
 
 ## 工作流程
 
@@ -97,6 +100,18 @@ starwork knowledge check
 - 普通历史目录
 
 然后和用户确认，再生成 blueprint。blueprint 只能做结构性动作，不能让 CLI 生成知识正文，也不能默认提交到项目中心。
+
+v0.1 blueprint 只使用这些动作：
+
+- `create_knowledge_base`
+- `create_dir`
+- `write_template`
+- `append_agents_rule`
+- `install_project_skill`
+- `copy_preserved_file`
+- `record_workspace_capability`
+
+复制旧文件时必须使用 `copy_preserved_file`，并设置 `confirmed: true`。它只能复制，不能移动原文件。
 
 ## `pages/` 和 `synthesis/`
 

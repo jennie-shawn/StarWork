@@ -42,6 +42,20 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
+function listFiles(dir) {
+  if (!fs.existsSync(dir)) return [];
+  const result = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      result.push(...listFiles(entryPath));
+    } else {
+      result.push(entryPath);
+    }
+  }
+  return result;
+}
+
 function fakeCodexBin({ exitCode = 0, stderr = "", inputPath } = {}) {
   const dir = tempDir();
   const binDir = path.join(dir, "bin");
@@ -221,6 +235,7 @@ test("knowledge init creates an optional local project knowledge base", () => {
   const preview = runCommand(["knowledge", "init", "--target", dir, "--dry-run"]);
   assert.equal(preview.status, 0);
   assert.match(preview.stdout, /知识库\/schema\.md/);
+  assert.match(preview.stdout, /starworkKnowledgeProject\/SKILL\.md/);
   assert.equal(fs.existsSync(path.join(dir, "知识库")), false);
 
   const result = runCommand(["knowledge", "init", "--target", dir, "--yes"]);
@@ -233,6 +248,9 @@ test("knowledge init creates an optional local project knowledge base", () => {
   assert.equal(result.status, 0);
   assert.equal(state.capabilities.knowledge.enabled, true);
   assert.equal(state.capabilities.knowledge.root, "知识库");
+  assert.equal(state.capabilities.knowledge.language, "zh");
+  assert.equal(state.capabilities.knowledge.version, "0.1");
+  assert.deepEqual(state.capabilities.knowledge.project_skill_ids, ["starworkKnowledgeProject"]);
   assert.equal(fs.existsSync(path.join(dir, "知识库", "README.md")), true);
   assert.equal(fs.existsSync(path.join(dir, "知识库", "index.md")), true);
   assert.equal(fs.existsSync(path.join(dir, "知识库", "schema.md")), true);
@@ -241,12 +259,37 @@ test("knowledge init creates an optional local project knowledge base", () => {
   assert.equal(fs.existsSync(path.join(dir, "知识库", "synthesis")), true);
   assert.match(fs.readFileSync(path.join(dir, "知识库", "schema.md"), "utf8"), /`pages\/` 写作规则/);
   assert.match(fs.readFileSync(path.join(dir, "知识库", "schema.md"), "utf8"), /`synthesis\/` 写作规则/);
+  assert.equal(fs.existsSync(path.join(dir, ".agents", "skills", "starworkKnowledgeProject", "SKILL.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, ".claude", "skills", "starworkKnowledgeProject", "SKILL.md")), true);
+  const skills = readJson(path.join(dir, ".starwork", "skills.json"));
+  assert.equal(skills.skills.some((skill) => skill.id === "starworkKnowledgeProject"), true);
   assert.equal(status.status, 0);
   assert.equal(report.enabled, true);
   assert.equal(report.root, "知识库");
+  assert.equal(report.skills.project_skill_installed, true);
+  assert.deepEqual(report.skills.project_skill_ids, ["starworkKnowledgeProject"]);
   assert.equal(Object.hasOwn(report, "next_steps"), false);
   assert.equal(doctor.status, 0);
   assert.equal(doctorReport.knowledge.enabled, true);
+});
+
+test("knowledge init is idempotent and preserves user-edited knowledge files", () => {
+  const dir = tempDir();
+  runInit(["--type", "project", "--pack", "general", "--target", dir, "--yes"]);
+
+  const first = runCommand(["knowledge", "init", "--target", dir, "--yes"]);
+  assert.equal(first.status, 0);
+  fs.writeFileSync(path.join(dir, "知识库", "schema.md"), "# Custom Schema\n", "utf8");
+  const second = runCommand(["knowledge", "init", "--target", dir, "--yes"]);
+  const check = runCommand(["knowledge", "check", "--target", dir, "--json"]);
+  const report = JSON.parse(check.stdout);
+  const noisyFiles = listFiles(dir).filter((file) => file.includes(".starwork-new"));
+
+  assert.equal(second.status, 0);
+  assert.deepEqual(noisyFiles, []);
+  assert.equal(fs.readFileSync(path.join(dir, "知识库", "schema.md"), "utf8"), "# Custom Schema\n");
+  assert.equal(report.ok, true);
+  assert.equal(report.skills.project_skill_installed, true);
 });
 
 test("knowledge status reports facts only when the capability is not enabled", () => {
@@ -261,6 +304,7 @@ test("knowledge status reports facts only when the capability is not enabled", (
   assert.equal(status.status, 0);
   assert.equal(report.enabled, false);
   assert.equal(report.exists, false);
+  assert.equal(report.skills.project_skill_installed, false);
   assert.equal(Object.hasOwn(report, "next_steps"), false);
   assert.equal(check.status, 0);
   assert.match(check.stdout, /还没有开启知识库/);
@@ -277,7 +321,10 @@ test("init --knowledge creates the English knowledge-base structure", () => {
 
   assert.equal(state.capabilities.knowledge.enabled, true);
   assert.equal(state.capabilities.knowledge.root, "knowledge-base");
+  assert.equal(state.capabilities.knowledge.language, "en");
+  assert.deepEqual(state.capabilities.knowledge.project_skill_ids, ["starworkKnowledgeProject"]);
   assert.equal(fs.existsSync(path.join(dir, "knowledge-base", "schema.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, ".agents", "skills", "starworkKnowledgeProject", "SKILL.md")), true);
   assert.match(fs.readFileSync(path.join(dir, "knowledge-base", "README.md"), "utf8"), /Project Knowledge Base/);
   assert.equal(report.enabled, true);
   assert.equal(report.root, "knowledge-base");
@@ -298,7 +345,10 @@ test("knowledge apply creates structure from a blueprint without moving legacy k
     root: "知识库",
     actions: [
       { type: "create_knowledge_base", path: "知识库" },
-      { type: "append_agents_rule", path: "AGENTS.md", section: "知识库" }
+      { type: "append_agents_rule", path: "AGENTS.md", section: "知识库" },
+      { type: "install_project_skill" },
+      { type: "copy_preserved_file", from: "知识/old.md", to: "知识库/inbox/old.md", confirmed: true },
+      { type: "record_workspace_capability" }
     ],
     preserve: ["知识/"]
   }, null, 2), "utf8");
@@ -312,7 +362,29 @@ test("knowledge apply creates structure from a blueprint without moving legacy k
   assert.equal(state.capabilities.knowledge.root, "知识库");
   assert.equal(fs.existsSync(path.join(dir, "知识库", "schema.md")), true);
   assert.equal(fs.existsSync(path.join(dir, "知识", "old.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, "知识库", "inbox", "old.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, ".agents", "skills", "starworkKnowledgeProject", "SKILL.md")), true);
   assert.deepEqual(report.legacy_candidates, ["知识"]);
+});
+
+test("knowledge blueprint rejects unsafe actions", () => {
+  const dir = tempDir();
+  const blueprintDir = tempDir();
+  const blueprintPath = path.join(blueprintDir, "knowledge-blueprint.json");
+  runInit(["--type", "project", "--pack", "general", "--target", dir, "--yes"]);
+  fs.writeFileSync(blueprintPath, JSON.stringify({
+    version: "0.1",
+    type: "starwork.knowledge",
+    language: "zh",
+    root: "知识库",
+    actions: [
+      { type: "promote_to_project_center", path: "知识库" }
+    ]
+  }, null, 2), "utf8");
+
+  const result = runCommand(["knowledge", "apply", "--target", dir, "--blueprint", blueprintPath, "--yes"]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /不允许 action\.type：promote_to_project_center/);
 });
 
 test("init creates a customized workspace from a blueprint", () => {

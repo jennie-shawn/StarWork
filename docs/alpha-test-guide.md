@@ -49,6 +49,8 @@ npx skills add jennie-shawn/StarWork -l
 - `starworkMultiagent`
 - `starworkKnowledge`
 
+不应看到 `starworkKnowledgeProject`。它是项目开启知识库后才写入当前项目的业务 Skill，不是全局系统 Skill。
+
 安装后验证：
 
 ```bash

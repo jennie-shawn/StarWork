@@ -51,10 +51,22 @@ When enabled, `.starwork/workspace.json` records:
     "knowledge": {
       "enabled": true,
       "root": "知识库",
-      "mode": "local"
+      "language": "zh",
+      "mode": "local",
+      "version": "0.1",
+      "project_skill_ids": ["starworkKnowledgeProject"]
     }
   }
 }
 ```
 
 This only means the current project has a local knowledge base. It does not imply Project Center submission or synchronization.
+
+After `starwork knowledge init` succeeds, StarWork also installs the project-local skill:
+
+```text
+.agents/skills/starworkKnowledgeProject/
+.claude/skills/starworkKnowledgeProject/
+```
+
+`starworkKnowledge` is the global entry skill. `starworkKnowledgeProject` is the project business skill and should only appear inside projects that have enabled this capability.

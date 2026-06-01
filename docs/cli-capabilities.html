@@ -634,8 +634,9 @@
           <p>给项目工作台开启本地知识库。知识库用于长期沉淀项目理解，不是原始资料夹。</p>
           <ul>
             <li><code>init</code> 创建 <code>知识库/</code> 或 <code>knowledge-base/</code> 标准结构。</li>
-            <li><code>status --json</code> 只输出事实，不给 AI 下一步建议。</li>
-            <li><code>check</code> 检查基础结构是否完整。</li>
+            <li>开启成功后安装当前项目专用的 <code>starworkKnowledgeProject</code>，不会装到全局 Skills。</li>
+            <li><code>status --json</code> 只输出事实，包括目录、数量、旧目录线索和项目内 Skill 状态，不给 AI 下一步建议。</li>
+            <li><code>check</code> 检查基础结构和项目内知识库助手是否完整。</li>
             <li><code>apply --blueprint</code> 按确认方案执行结构性变更，不自动迁移旧 <code>知识/</code> 或 <code>knowledge/</code>。</li>
           </ul>
           <pre>node cli/bin/starwork.js knowledge init --target ./workspace --dry-run</pre>

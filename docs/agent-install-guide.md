@@ -96,6 +96,8 @@ npx skills ls -g -a codex --json
 
 确认不应该把 Kit 随附 Skills 安装到全局，例如 `starworkSpawn`、`starworkAudit` 和 `neat-freak`。它们应由 `starwork init` 按工作区类型写入具体工作台。
 
+也不要把能力开启后才需要的项目内业务 Skill 安装到全局，例如 `starworkKnowledgeProject`。它只应在项目执行 `starwork knowledge init` 后进入当前项目。
+
 ## Step 5：询问是否继续初始化
 
 安装和验证完成后，先向用户汇报结果，然后询问：
