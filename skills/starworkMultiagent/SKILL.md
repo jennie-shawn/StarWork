@@ -35,7 +35,14 @@ _系统/上下文/product-principles.md
 _系统/任务/current-work.md
 _系统/协作/agent-lanes.md
 _系统/协作/shared.md
+_system/context/current-project.md
+_system/context/decisions.md
+_system/tasks/current-work.md
+_system/collaboration/agent-lanes.md
+_system/collaboration/shared.md
 ```
+
+中文项目使用 `_系统/协作/`；英文项目使用 `_system/collaboration/`。不要在英文项目里新建中文协作路径，也不要在中文项目里新建英文协作路径。
 
 如果用户指定了目标目录，所有命令都加 `--target <path>`。如果没有指定，默认目标是当前工作区。
 
@@ -62,7 +69,7 @@ _系统/协作/shared.md
 这是最常见入口。
 
 1. 读取当前工作区状态和 Agent Lanes 文件。
-2. 如果 `_系统/协作/agent-lanes.md` 不存在，先建议或执行：
+2. 如果当前语言对应的 `agent-lanes.md` 不存在，先建议或执行：
 
 ```bash
 starwork multiagent init --target <path> --dry-run
@@ -72,7 +79,7 @@ starwork multiagent init --target <path> --dry-run
    - lane ID，例如 `research`、`writing`、`review`。这些只是示例，不是默认值。
    - 职责描述。
    - 可主动修改的路径范围。
-   - 该 lane 的过程工作区，默认是 `_系统/协作/lanes/<lane-id>/workspace/`。
+   - 该 lane 的过程工作区，中文项目默认是 `_系统/协作/lanes/<lane-id>/workspace/`，英文项目默认是 `_system/collaboration/lanes/<lane-id>/workspace/`。
    - 当前 session ID；无法自动识别时，请用户提供 `agent:session-id`。
    - 宿主会话显示名称；仅当用户希望在 Codex 等宿主会话列表中同步改名时使用。
 4. 生成 dry-run 命令：
@@ -263,13 +270,14 @@ starwork multiagent launch --lanes product-planning,development,review --target 
 
 ```text
 _系统/协作/lanes/<lane-id>/workspace/
+_system/collaboration/lanes/<lane-id>/workspace/
 ```
 
 使用规则：
 
 - 草稿、调研笔记、中间分析和临时实验结果，优先放入当前 lane workspace。
 - 用户认可的最终交付物、项目正式文档、发布稿和确认稿，应晋升到项目正式输出目录。
-- workspace 内容需要其他 lane 读取时，用 `starwork multiagent share` 登记到 `_系统/协作/shared.md`。
+- workspace 内容需要其他 lane 读取时，用 `starwork multiagent share` 登记到当前语言对应的 `shared.md`。
 - 晋升后，以项目正式输出目录中的文件为准；workspace 保留过程记录。
 - 不要把 workspace 当成新的长期事实源或归档库。
 

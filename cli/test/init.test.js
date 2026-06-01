@@ -63,31 +63,31 @@ function fakeCodexBin({ exitCode = 0, stderr = "", inputPath } = {}) {
   const codex = path.join(binDir, "codex");
   fs.writeFileSync(codex, `#!/usr/bin/env node
 const fs = require("fs");
-const input = fs.readFileSync(0, "utf8");
-if (process.env.STARWORK_FAKE_CODEX_INPUT) {
-  fs.appendFileSync(process.env.STARWORK_FAKE_CODEX_INPUT, input);
-}
+const readline = require("readline");
 if (${JSON.stringify(stderr)}) process.stderr.write(${JSON.stringify(stderr)});
-if (${exitCode} === 0) {
-  const requests = input.trim().split(/\\n+/).filter(Boolean).map((line) => JSON.parse(line));
-  for (const request of requests) {
-    if (request.method === "thread/read") {
-      console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { thread: { id: request.params.threadId, name: "Fake Codex Thread", cwd: "/fake/project", status: "idle", turns: [{ id: "turn-1", status: "completed" }, { id: "turn-2", status: "completed" }] } } }));
-    } else if (request.method === "thread/start") {
-      console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { threadId: "launched-thread-1" } }));
-    } else if (request.method === "turn/start") {
-      console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { turnId: "turn-started-1" } }));
-      console.log(JSON.stringify({ jsonrpc: "2.0", method: "turn/started", params: { turnId: "turn-started-1" } }));
-      console.log(JSON.stringify({ jsonrpc: "2.0", method: "turn/completed", params: { turnId: "turn-started-1" } }));
-    } else {
-      console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: {} }));
-    }
-  }
-} else {
-  console.log(JSON.stringify({ jsonrpc: "2.0", id: 1, result: {} }));
-  console.log(JSON.stringify({ jsonrpc: "2.0", id: 2, error: { message: "rename failed" } }));
+if (${exitCode} !== 0) {
+  process.exit(${exitCode});
 }
-process.exit(${exitCode});
+const rl = readline.createInterface({ input: process.stdin });
+rl.on("line", (line) => {
+  if (process.env.STARWORK_FAKE_CODEX_INPUT) {
+    fs.appendFileSync(process.env.STARWORK_FAKE_CODEX_INPUT, line + "\\n");
+  }
+  const request = JSON.parse(line);
+  if (request.method === "thread/read") {
+    console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { thread: { id: request.params.threadId, name: "Fake Codex Thread", cwd: "/fake/project", status: "idle", turns: [{ id: "turn-1", status: "completed" }, { id: "turn-2", status: "completed" }] } } }));
+  } else if (request.method === "thread/start") {
+    console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { threadId: "launched-thread-1" } }));
+  } else if (request.method === "thread/list") {
+    console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { data: [{ id: "dev-thread-2", name: "Fake Codex Thread" }] } }));
+  } else if (request.method === "turn/start") {
+    console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { turnId: "turn-started-1" } }));
+    console.log(JSON.stringify({ jsonrpc: "2.0", method: "turn/started", params: { turnId: "turn-started-1" } }));
+    console.log(JSON.stringify({ jsonrpc: "2.0", method: "turn/completed", params: { turnId: "turn-started-1" } }));
+  } else {
+    console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: {} }));
+  }
+});
 `, "utf8");
   fs.chmodSync(codex, 0o755);
   return {
@@ -817,20 +817,24 @@ test("multiagent status --host and read expose Codex observations", () => {
 
   const fakeCodex = fakeCodexBin({ inputPath });
   const status = runCommand(["multiagent", "status", "--host", "--target", dir, "--json"], { env: fakeCodex.env });
+  const statusLoad = runCommand(["multiagent", "status", "--host", "--load", "--target", dir, "--json"], { env: fakeCodex.env });
   const read = runCommand(["multiagent", "read", "development", "--turns", "1", "--target", dir, "--json"], { env: fakeCodex.env });
   const report = JSON.parse(status.stdout);
+  const loadReport = JSON.parse(statusLoad.stdout);
   const readReport = JSON.parse(read.stdout);
   const input = fs.readFileSync(inputPath, "utf8");
 
   assert.equal(status.status, 0);
+  assert.equal(statusLoad.status, 0);
   assert.equal(report.schema, "starwork.agent_lanes.host_status.v0.2");
+  assert.equal(loadReport.schema, "starwork.agent_lanes.host_status.v0.2");
   assert.equal(report.lanes[0].starwork.session, "codex:dev-thread-2");
   assert.equal(report.lanes[0].host.status, "idle");
   assert.equal(report.lanes[0].host.turn_count, 2);
   assert.equal(read.status, 0);
   assert.equal(readReport.host.turns.length, 1);
   assert.match(input, /"method":"thread\/read"/);
-  assert.doesNotMatch(input, /"method":"thread\/resume"/);
+  assert.match(input, /"method":"thread\/resume"/);
 });
 
 test("multiagent instruct records shared request and sends formatted Codex instruction", () => {

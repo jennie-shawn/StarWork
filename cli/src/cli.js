@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
-const { spawnSync } = require("child_process");
+const { spawn } = require("child_process");
 
 const PRODUCT_ROOT = path.resolve(__dirname, "..", "..");
 const PACKAGE_VERSION = require(path.join(PRODUCT_ROOT, "package.json")).version;
@@ -794,11 +794,11 @@ async function lanesCommand(argv) {
     return;
   }
   if (subcommand === "status") {
-    lanesStatus(argv.slice(1));
+    await lanesStatus(argv.slice(1));
     return;
   }
   if (subcommand === "read") {
-    lanesRead(argv.slice(1));
+    await lanesRead(argv.slice(1));
     return;
   }
   if (subcommand === "instruct") {
@@ -945,7 +945,7 @@ async function lanesBind(argv) {
   if (options.dryRun) return;
   await confirmOrThrow(options, `是否将当前会话绑定到 Lane ${laneId}？`);
   applyPlan(plan);
-  const sessionNameSync = renameHostSessionBestEffort({ session, sessionName });
+  const sessionNameSync = await renameHostSessionBestEffort({ session, sessionName });
   const pinSync = pinHostThreadBestEffort({ session, requested: Boolean(options.pin) });
   if (options.json) {
     console.log(JSON.stringify(renderLanesBindResult({
@@ -985,7 +985,7 @@ async function lanesRelease(argv) {
   console.log(`请在交棒前更新工作记录：${lane.worklog}`);
 }
 
-function lanesStatus(argv) {
+async function lanesStatus(argv) {
   const options = parseArgs(argv);
   if (options.help) {
     printLanesStatusHelp();
@@ -995,7 +995,7 @@ function lanesStatus(argv) {
   const registry = readLanesRegistry(workspaceRoot);
   const shared = readSharedContext(workspaceRoot);
   if (options.host) {
-    const report = collectLanesHostStatus(workspaceRoot, registry, { load: Boolean(options.load) });
+    const report = await collectLanesHostStatus(workspaceRoot, registry, { load: Boolean(options.load) });
     if (options.json) {
       console.log(JSON.stringify(report, null, 2));
       return;
@@ -1038,13 +1038,13 @@ function lanesStatus(argv) {
   }
 }
 
-function collectLanesHostStatus(workspaceRoot, registry, options = {}) {
+async function collectLanesHostStatus(workspaceRoot, registry, options = {}) {
   const lanesState = readAgentLanesState(workspaceRoot);
-  const lanes = registry.lanes.map((lane) => {
+  const lanes = await Promise.all(registry.lanes.map(async (lane) => {
     const hostState = lanesState.lanes?.[lane.lane] || {};
     const threadId = hostState.thread_id || extractCodexThreadId(hostState.current_session || lane.current_session);
     const host = threadId
-      ? observeCodexThread({ threadId, includeTurns: false, load: Boolean(options.load) })
+      ? await observeCodexThread({ threadId, includeTurns: false, load: Boolean(options.load) })
       : {
           adapter: "none",
           readable: false,
@@ -1065,7 +1065,7 @@ function collectLanesHostStatus(workspaceRoot, registry, options = {}) {
       },
       host
     };
-  });
+  }));
   return {
     schema: "starwork.agent_lanes.host_status.v0.2",
     workspace_root: workspaceRoot,
@@ -1091,7 +1091,7 @@ function printLanesHostStatus(report) {
   console.log("提示：这是 Codex host observation；正式交接仍以 lane worklog 和 shared outputs 为准。");
 }
 
-function lanesRead(argv) {
+async function lanesRead(argv) {
   const options = parseArgs(argv);
   if (options.help) {
     printLanesReadHelp();
@@ -1108,7 +1108,7 @@ function lanesRead(argv) {
   if (options.turns && (!Number.isInteger(turnLimit) || turnLimit < 1)) {
     throw new Error("--turns 必须是正整数。");
   }
-  const observation = observeCodexThread({ threadId, includeTurns: Boolean(options.includeTurns || turnLimit), load: false, turnLimit });
+  const observation = await observeCodexThread({ threadId, includeTurns: Boolean(options.includeTurns || turnLimit), load: false, turnLimit });
   const report = {
     schema: "starwork.agent_lanes.read.v0.2",
     lane: laneId,
@@ -1197,7 +1197,7 @@ async function lanesInstruct(argv) {
   if (options.dryRun) return;
   await confirmOrThrow(options, `是否向 Lane ${toLane} 发送指令？`);
   const delivery = threadId
-    ? sendCodexInstruction({ threadId, message, timeout: parsePositiveInt(options.timeout, 30000) })
+    ? await sendCodexInstruction({ threadId, message, timeout: parsePositiveInt(options.timeout, 30000) })
     : { adapter: "codex", status: "needs_manual_delivery", thread_id: null, warning: "Target lane has no Codex thread" };
   const finalRequest = buildSharedRequestRow({
     id: requestId,
@@ -1271,10 +1271,10 @@ async function lanesLaunch(argv) {
   let lanesState = readAgentLanesState(workspaceRoot);
   for (const lane of lanes) {
     const launchMessage = renderMultiagentLaunchMessage({ lane, fromLane: options.from || "user", workspaceRoot, collaboration });
-    const launch = launchCodexLane({ message: launchMessage, timeout: parsePositiveInt(options.timeout, 30000) });
+    const launch = await launchCodexLane({ message: launchMessage, timeout: parsePositiveInt(options.timeout, 30000) });
     const session = launch.thread_id ? `codex:${launch.thread_id}` : "unbound";
     if (launch.thread_id) {
-      const sessionNameSync = renameHostSessionBestEffort({ session, sessionName: normalizeMarkdownCell(options.sessionName || "") });
+      const sessionNameSync = await renameHostSessionBestEffort({ session, sessionName: normalizeMarkdownCell(options.sessionName || "") });
       const pinSync = pinHostThreadBestEffort({ session, requested: Boolean(options.pin) });
       nextRegistryLanes = nextRegistryLanes.map((item) => item.lane === lane.lane ? { ...item, current_session: session } : item);
       lanesState = updateAgentLaneHostState(lanesState, lane.lane, {
@@ -1324,6 +1324,8 @@ async function lanesShare(argv) {
     throw new Error("multiagent share 需要 --audience <lane-list>。");
   }
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  const state = readWorkspaceState(workspaceRoot);
+  const collaboration = getCollaborationPaths(state);
   const registry = readLanesRegistry(workspaceRoot);
   findLaneOrThrow(registry.lanes, from);
   const outputPath = normalizeSafeRelativePath(options.path, "multiagent share --path");
@@ -1347,7 +1349,7 @@ async function lanesShare(argv) {
   applyPlan(plan);
   console.log("");
   console.log(`已登记共享输出：${row.title}`);
-  console.log(`其他职责位可以查看：_系统/协作/shared.md，并按受众范围读取 ${row.path}`);
+  console.log(`其他职责位可以查看：${collaboration.shared}，并按受众范围读取 ${row.path}`);
 }
 
 async function packInstall(argv) {
@@ -6654,7 +6656,7 @@ function printHostPinResult(result) {
   }
 }
 
-function renameHostSessionBestEffort({ session, sessionName }) {
+async function renameHostSessionBestEffort({ session, sessionName }) {
   if (!sessionName) {
     return createSessionNameSyncResult({
       requested: false,
@@ -6683,20 +6685,9 @@ function extractCodexThreadId(session) {
   return null;
 }
 
-function renameCodexThreadBestEffort({ threadId, sessionName }) {
-  const request = [
-    {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        clientInfo: {
-          name: "starwork",
-          version: PACKAGE_VERSION
-        },
-        capabilities: null
-      }
-    },
+async function renameCodexThreadBestEffort({ threadId, sessionName }) {
+  const result = await runCodexAppServer([
+    codexInitializeMessage(1),
     {
       jsonrpc: "2.0",
       id: 2,
@@ -6706,32 +6697,17 @@ function renameCodexThreadBestEffort({ threadId, sessionName }) {
         name: sessionName
       }
     }
-  ].map((message) => JSON.stringify(message)).join("\n") + "\n";
-
-  const result = spawnSync("codex", ["app-server", "--listen", "stdio://"], {
-    input: request,
-    encoding: "utf8",
-    timeout: 5000
-  });
-  if (result.error) {
+  ], { timeout: 5000 });
+  if (!result.ok) {
     return createSessionNameSyncResult({
       requested: true,
       supported: true,
       status: "warning",
       name: sessionName,
-      warning: result.error.message
+      warning: result.warning
     });
   }
-  if (result.status !== 0) {
-    return createSessionNameSyncResult({
-      requested: true,
-      supported: true,
-      status: "warning",
-      name: sessionName,
-      warning: (result.stderr || `codex app-server exited with status ${result.status}`).trim()
-    });
-  }
-  const response = parseJsonRpcResponse(result.stdout, 2);
+  const response = result.responses.find((message) => message.id === 2);
   if (!response || response.error) {
     return createSessionNameSyncResult({
       requested: true,
@@ -6749,7 +6725,7 @@ function renameCodexThreadBestEffort({ threadId, sessionName }) {
   });
 }
 
-function observeCodexThread({ threadId, includeTurns = false, load = false, turnLimit = 0 }) {
+async function observeCodexThread({ threadId, includeTurns = false, load = false, turnLimit = 0 }) {
   const messages = [
     codexInitializeMessage(1)
   ];
@@ -6769,7 +6745,7 @@ function observeCodexThread({ threadId, includeTurns = false, load = false, turn
     method: "thread/read",
     params: { threadId, includeTurns: Boolean(includeTurns) }
   });
-  const result = runCodexAppServer(messages, { timeout: 5000 });
+  const result = await runCodexAppServer(messages, { timeout: 5000 });
   if (!result.ok) {
     return {
       adapter: "codex",
@@ -6805,33 +6781,33 @@ function observeCodexThread({ threadId, includeTurns = false, load = false, turn
   };
 }
 
-function readCodexThread(threadId, options = {}) {
+async function readCodexThread(threadId, options = {}) {
   return observeCodexThread({ threadId, includeTurns: Boolean(options.includeTurns), load: false, turnLimit: options.turnLimit || 0 });
 }
 
-function resumeCodexThread(threadId) {
+async function resumeCodexThread(threadId) {
   return runCodexAppServer([
     codexInitializeMessage(1),
     { jsonrpc: "2.0", id: 2, method: "thread/resume", params: { threadId, excludeTurns: true } }
   ], { timeout: 5000 });
 }
 
-function startCodexTurn(threadId, formattedMessage, options = {}) {
+async function startCodexTurn(threadId, formattedMessage, options = {}) {
   return sendCodexInstruction({ threadId, message: formattedMessage, timeout: options.timeout || 30000 });
 }
 
-function listCodexThreads(options = {}) {
-  const result = runCodexAppServer([
+async function listCodexThreads(options = {}) {
+  const result = await runCodexAppServer([
     codexInitializeMessage(1),
     { jsonrpc: "2.0", id: 2, method: "thread/list", params: {} }
   ], { timeout: options.timeout || 5000 });
   if (!result.ok) return { ok: false, warning: result.warning, threads: [] };
   const response = result.responses.find((item) => item.id === 2);
   if (!response || response.error) return { ok: false, warning: response?.error?.message || "Codex thread/list failed", threads: [] };
-  return { ok: true, threads: response.result?.threads || response.result || [] };
+  return { ok: true, threads: response.result?.data || response.result?.threads || response.result || [] };
 }
 
-function sendCodexInstruction({ threadId, message, timeout }) {
+async function sendCodexInstruction({ threadId, message, timeout }) {
   const messages = [
     codexInitializeMessage(1),
     {
@@ -6862,7 +6838,14 @@ function sendCodexInstruction({ threadId, message, timeout }) {
       params: { threadId, includeTurns: true }
     }
   ];
-  const result = runCodexAppServer(messages, { timeout });
+  const result = await runCodexAppServer(messages, {
+    timeout,
+    waitAfter: {
+      id: 4,
+      method: "turn/completed",
+      timeout: Math.max(1000, Math.min(parsePositiveInt(timeout, 30000), 30000))
+    }
+  });
   if (!result.ok) {
     return { adapter: "codex", status: "failed", thread_id: threadId, warning: result.warning };
   }
@@ -6888,7 +6871,7 @@ function sendCodexInstruction({ threadId, message, timeout }) {
   };
 }
 
-function launchCodexLane({ message, timeout }) {
+async function launchCodexLane({ message, timeout }) {
   const messages = [
     codexInitializeMessage(1),
     {
@@ -6898,15 +6881,15 @@ function launchCodexLane({ message, timeout }) {
       params: {}
     }
   ];
-  const start = runCodexAppServer(messages, { timeout });
+  const start = await runCodexAppServer(messages, { timeout });
   if (!start.ok) return { adapter: "codex", status: "failed", warning: start.warning };
   const response = start.responses.find((item) => item.id === 2);
   if (!response || response.error) {
     return { adapter: "codex", status: "failed", warning: response?.error?.message || "Codex thread/start failed" };
   }
-  const threadId = response.result?.threadId || response.result?.thread?.id || response.result?.id;
+  const threadId = response.result?.threadId || response.result?.data?.threadId || response.result?.data?.thread?.id || response.result?.thread?.id || response.result?.id;
   if (!threadId) return { adapter: "codex", status: "failed", warning: "Codex thread/start did not return thread id" };
-  const delivery = sendCodexInstruction({ threadId, message, timeout });
+  const delivery = await sendCodexInstruction({ threadId, message, timeout });
   return {
     adapter: "codex",
     status: delivery.status,
@@ -6949,24 +6932,149 @@ function codexInitializeMessage(id) {
 }
 
 function runCodexAppServer(messages, options = {}) {
-  const request = messages.map((message) => JSON.stringify(message)).join("\n") + "\n";
-  const result = spawnSync("codex", ["app-server", "--listen", "stdio://"], {
-    input: request,
-    encoding: "utf8",
-    timeout: options.timeout || 10000
+  return new Promise((resolve) => {
+    const timeout = options.timeout || 10000;
+    const deadline = Date.now() + timeout;
+    const responses = [];
+    const events = [];
+    let stderr = "";
+    let settled = false;
+    let pendingResponse = null;
+    let pendingEvent = null;
+
+    const child = spawn("codex", ["app-server", "--listen", "stdio://"], {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearPendingResponse();
+      clearPendingEvent();
+      try {
+        child.stdin.end();
+      } catch {
+        // Ignore shutdown races.
+      }
+      if (!child.killed) {
+        child.kill("SIGTERM");
+      }
+      resolve({
+        responses,
+        events,
+        ...result
+      });
+    };
+
+    const fail = (warning) => {
+      finish({ ok: false, warning: warning || stderr.trim() || "Codex app-server failed" });
+    };
+
+    const remaining = () => Math.max(1, deadline - Date.now());
+
+    const clearPendingResponse = () => {
+      if (pendingResponse?.timer) clearTimeout(pendingResponse.timer);
+      pendingResponse = null;
+    };
+
+    const clearPendingEvent = () => {
+      if (pendingEvent?.timer) clearTimeout(pendingEvent.timer);
+      pendingEvent = null;
+    };
+
+    const waitForResponse = (id) => new Promise((waitResolve, waitReject) => {
+      const existing = responses.find((message) => message.id === id);
+      if (existing) {
+        waitResolve(existing);
+        return;
+      }
+      clearPendingResponse();
+      pendingResponse = {
+        id,
+        resolve: waitResolve,
+        reject: waitReject,
+        timer: setTimeout(() => waitReject(new Error(`Codex app-server did not return response ${id}`)), remaining())
+      };
+    });
+
+    const waitForEvent = (method, eventTimeout) => new Promise((waitResolve, waitReject) => {
+      const existing = events.find((message) => message.method === method);
+      if (existing) {
+        waitResolve(existing);
+        return;
+      }
+      clearPendingEvent();
+      pendingEvent = {
+        method,
+        resolve: waitResolve,
+        reject: waitReject,
+        timer: setTimeout(() => waitReject(new Error(`Codex app-server did not emit ${method}`)), Math.min(remaining(), eventTimeout || timeout))
+      };
+    });
+
+    const handleMessage = (message) => {
+      if (Object.hasOwn(message, "id")) {
+        responses.push(message);
+        if (pendingResponse && message.id === pendingResponse.id) {
+          const pending = pendingResponse;
+          clearPendingResponse();
+          pending.resolve(message);
+        }
+      }
+      if (message.method) {
+        events.push(message);
+        if (pendingEvent && message.method === pendingEvent.method) {
+          const pending = pendingEvent;
+          clearPendingEvent();
+          pending.resolve(message);
+        }
+      }
+    };
+
+    child.on("error", (error) => fail(error.message));
+    child.on("exit", (code) => {
+      if (!settled && code !== 0) {
+        fail(stderr.trim() || `codex app-server exited with status ${code}`);
+      }
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    const rl = readline.createInterface({ input: child.stdout });
+    rl.on("line", (line) => {
+      try {
+        handleMessage(JSON.parse(String(line).trim()));
+      } catch {
+        // Ignore non-JSON app-server output.
+      }
+    });
+
+    const writeMessage = (message) => {
+      child.stdin.write(`${JSON.stringify(message)}\n`);
+    };
+
+    (async () => {
+      try {
+        for (const message of messages) {
+          if (settled) return;
+          writeMessage(message);
+          await waitForResponse(message.id);
+          if (options.waitAfter?.id === message.id) {
+            try {
+              await waitForEvent(options.waitAfter.method, options.waitAfter.timeout);
+            } catch {
+              // Returning sent/timeout is handled by the caller from collected events.
+            }
+          }
+        }
+        finish({ ok: true, warning: stderr.trim() || null });
+      } catch (error) {
+        fail(error.message);
+      }
+    })();
   });
-  if (result.error) {
-    return { ok: false, warning: result.error.message, responses: [], events: [] };
-  }
-  if (result.status !== 0) {
-    return { ok: false, warning: (result.stderr || `codex app-server exited with status ${result.status}`).trim(), responses: [], events: [] };
-  }
-  const messagesOut = parseJsonRpcMessages(result.stdout);
-  return {
-    ok: true,
-    responses: messagesOut.filter((message) => Object.hasOwn(message, "id")),
-    events: messagesOut.filter((message) => message.method)
-  };
 }
 
 function parseJsonRpcMessages(stdout) {

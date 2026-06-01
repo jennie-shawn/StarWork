@@ -6,7 +6,125 @@
 
 | ID | 标题 | 类型 | 优先级 | 状态 | 负责人 | 来源 | 关联 | 下一步 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ISSUE-002 | MultiAgent v0.2 真实 Codex app-server 调用失败 | cli | P0 | fixed-pending-review | development lane | MultiAgent v0.2 产品验收 | `product/planning/features/multiagent/specs/v0.2-codex-orchestration.md`；`product/planning/features/multiagent/acceptance/2026-06-01-v0.2-acceptance-report.md` | 已修复 app-server 长连接顺序调用、英文路径提示和 skill 路径说明，等待产品 lane 复验。 |
 | ISSUE-001 | `starwork knowledge init` 重复运行生成 `.starwork-new` 噪音文件 | cli | P1 | closed | optimization lane | M2.11 Knowledge Capability 验收 | `product/planning/features/knowledge-base/specs/v0.1.md`；`_系统/协作/lanes/product-planning/workspace/m2.11-knowledge-acceptance-report.md` | 已复验通过并关闭：重复运行不生成噪音文件，用户修改不被覆盖，健康检查通过。 |
+
+## ISSUE-002：MultiAgent v0.2 真实 Codex app-server 调用失败
+
+### 基本信息
+
+| 字段 | 内容 |
+| --- | --- |
+| 类型 | cli |
+| 优先级 | P0 |
+| 状态 | fixed-pending-review |
+| 来源 | MultiAgent v0.2 产品验收 |
+| 发现日期 | 2026-06-01 |
+| 关联 SPEC | `product/planning/features/multiagent/specs/v0.2-codex-orchestration.md` |
+| 关联验收 | `product/planning/features/multiagent/acceptance/2026-06-01-v0.2-acceptance-report.md` |
+| 负责人 | development lane |
+
+### 现象
+
+- 用户可见表现：`status --host`、`read`、`instruct` 在真实 Codex thread 上无法稳定读取或发送。
+- 期望表现：CLI 可以通过 Codex app-server 读取 thread、resume thread、发送格式化跨会话指令，并留下项目内记录。
+- 实际表现：单测通过，但真实 app-server 上 CLI 只稳定收到 `initialize` 响应，后续 JSON-RPC 请求可能被丢弃。
+
+### 证据
+
+在临时 StarWork 项目中绑定真实 Codex 测试 thread 后执行：
+
+```bash
+starwork multiagent status --host --target <tmp> --json
+```
+
+返回：
+
+```json
+{
+  "adapter": "codex",
+  "readable": false,
+  "status": "notLoaded",
+  "warning": "Codex app-server did not return thread/read"
+}
+```
+
+执行真实发送：
+
+```bash
+starwork multiagent instruct development --from product-planning --message "..." --target <tmp> --json --yes
+```
+
+返回：
+
+```json
+{
+  "host_delivery": {
+    "adapter": "codex",
+    "status": "failed",
+    "warning": "Codex thread/read failed before send"
+  }
+}
+```
+
+对照验证：用长连接方式启动 `codex app-server --listen stdio://`，先发送 `initialize` 并等待响应，再顺序发送 `thread/list`、`thread/read`、`thread/resume`，可以拿到真实数据。
+
+### 影响范围
+
+- 影响的功能：`multiagent status --host`、`multiagent read`、`multiagent instruct`、`multiagent launch`。
+- 影响的用户：所有希望用 Codex 多会话编排的用户。
+- 是否影响发布 / 升级 / A 测：影响 MultiAgent v0.2 对外可用性，应阻塞该能力发布。
+- 是否有绕行方式：可以继续使用项目内 lane registry、shared context 和手动转发；不能依赖 CLI 自动跨会话发送。
+
+### 初步判断
+
+当前实现用 `spawnSync` 一次性把多条 JSON-RPC 消息写入 app-server stdin 并立即关闭输入。真实 app-server 需要长连接和顺序等待响应，否则会出现后续请求被丢弃的问题。
+
+另外，`thread/list` 的真实返回结构是 `result.data`，当前 `listCodexThreads()` 解析逻辑也需要同步修复。
+
+### 分流结果
+
+- 是否转 SPEC：不需要新 SPEC，属于 v0.2 实现缺陷。
+- 是否转 GitHub：暂不需要，先由 development lane 修复。
+- 是否转开发 lane：是。
+- 是否需要用户补信息：不需要。
+
+### 下一步
+
+development lane 修复 Codex app-server adapter：
+
+- 改为长连接 / 顺序 JSON-RPC 调用。
+- `status --host --load` 先 `thread/resume` 再 `thread/read`。
+- `instruct` 先 `thread/resume`，再 `turn/start`，并等待 `turn/completed` 或超时。
+- 修复 `thread/list` 的 `result.data` 解析。
+- 增加接近真实 app-server 行为的测试，避免 fake codex 因同步一次性返回造成误判。
+
+### 处理结果
+
+2026-06-01 development lane 已完成修复：
+
+- `codex app-server` 调用从一次性 stdin 输入改为长连接顺序 JSON-RPC：发送一条请求，等待对应 response，再继续下一条。
+- `status --host --load` 会先 `thread/resume`，再 `thread/read`。
+- `instruct` 会先确认 `thread/read`，再 `thread/resume`、`turn/start`，并等待 `turn/completed` 或超时。
+- `launch` 会创建 Codex thread，再通过同一套顺序调用发送 Launch Message。
+- `thread/list` 兼容真实返回结构 `result.data`。
+- fake codex 测试改为按 stdin 行即时响应，避免一次性输入造成假阳性。
+- 修复英文工作区 `multiagent share` 完成提示仍显示中文协作路径的问题。
+- `starworkMultiagent` skill 补充中文 / 英文协作路径说明。
+
+### 开发复验
+
+- `node --check cli/src/cli.js` 通过。
+- `node --test cli/test/init.test.js` 通过：69 个测试全部通过。
+- 对当前项目真实 Codex thread 运行 `multiagent read optimization --json --turns 1` 通过：返回 `readable: true`、`status: idle`、真实 thread name/cwd/turn_count。
+
+### 验收方式
+
+- 对真实 Codex thread 运行 `status --host --json`，能返回 thread 元信息。
+- 对 notLoaded thread 运行 `status --host --load --json`，能 resume 后返回 idle。
+- 对真实 Codex thread 运行 `instruct --yes --json`，目标 thread 收到 `STARWORK:MULTIAGENT_MESSAGE v1` 消息，返回 `sent` 或 `completed`。
+- `launch --yes --json` 能创建 thread、发送 Launch Message、写入 lane binding。
+- `npm test` 通过。
 
 ## ISSUE-001：`starwork knowledge init` 重复运行生成 `.starwork-new` 噪音文件
 
