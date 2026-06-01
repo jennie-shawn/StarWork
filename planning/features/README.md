@@ -25,6 +25,7 @@
 ## 当前功能档案
 
 - `knowledge-base/`：项目本地知识库能力。
+- `multiagent/`：多 AI 会话职责分工、跨会话指令和宿主会话编排能力。
 - `project-structure/`：当前 StarWork 产品工作台结构重整。
 
 ## 使用规则

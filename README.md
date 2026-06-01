@@ -47,7 +47,7 @@ npx skills add jennie-shawn/StarWork -g -a codex -y
 
 - `starworkInit`：帮助 AI 判断是创建项目工作台还是项目中心，选择语言；用户确认创建时，会带着 `starwork init` dry-run、执行并用 `doctor` 验证。
 - `starworkDoctor`：帮助 AI 基于 `starwork doctor --json` 解释目录问题、识别旧模板或类似项目中心的旧工作区；用户明确要求升级时，生成可预览、可确认的升级方案。
-- `starworkMultiagent`：帮助 AI 把“登记当前会话为常用智能体”“管理多 AI 分工”“登记共享输出”等请求转换成 `starwork multiagent` 命令组合。
+- `starworkMultiagent`：帮助 AI 把“登记当前会话为常用智能体”“管理多 AI 分工”“跨会话指令”“读取其他 lane 状态”等请求转换成 `starwork multiagent` 命令组合。
 - `starworkKnowledge`：帮助 AI 开启和维护项目本地知识库；创建结构时先调用 `starwork knowledge`，整理内容时区分主题页和综合判断。
 
 说明：`starworkKnowledge` 是全局入口 Skill。项目开启知识库后，CLI 会把 `starworkKnowledgeProject` 安装到当前项目的 `.agents/skills/` 和 `.claude/skills/`，它不属于全局安装清单。
@@ -173,7 +173,7 @@ product/planning/features/<feature>/
 - `upgrade`：按 `starworkDoctor` skill 生成的升级蓝图，把历史模板或类似项目中心的旧工作区安全接入 StarWork 工作台。
 - `adapt`：生成 Claude Code、Cursor 等 AI 工具的适配文件。
 - `pack install`：向兼容工作台安装支持的场景能力。
-- `multiagent`：为同一项目建立自定义 AI 职责位、绑定会话，并登记跨 lane 共享输出。
+- `multiagent`：为同一项目建立自定义 AI 职责位、绑定会话、登记跨 lane 共享输出，并支持 Codex 多会话读取、launch 和格式化指令发送。
 
 ## 仓库结构
 

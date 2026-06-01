@@ -645,6 +645,14 @@ function parseArgs(argv) {
       options.strict = true;
     } else if (arg === "--verbose") {
       options.verbose = true;
+    } else if (arg === "--host") {
+      options.host = true;
+    } else if (arg === "--load") {
+      options.load = true;
+    } else if (arg === "--pin") {
+      options.pin = true;
+    } else if (arg === "--include-turns") {
+      options.includeTurns = true;
     } else if (arg === "--no-skills") {
       options.noSkills = true;
     } else if (arg === "--knowledge") {
@@ -677,6 +685,14 @@ function parseArgs(argv) {
       options.session = readValue(argv, ++i, arg);
     } else if (arg === "--session-name") {
       options.sessionName = readValue(argv, ++i, arg);
+    } else if (arg === "--from") {
+      options.from = readValue(argv, ++i, arg);
+    } else if (arg === "--message") {
+      options.message = readValue(argv, ++i, arg);
+    } else if (arg === "--turns") {
+      options.turns = readValue(argv, ++i, arg);
+    } else if (arg === "--timeout") {
+      options.timeout = readValue(argv, ++i, arg);
     } else if (arg === "--title") {
       options.title = readValue(argv, ++i, arg);
     } else if (arg === "--path") {
@@ -781,6 +797,18 @@ async function lanesCommand(argv) {
     lanesStatus(argv.slice(1));
     return;
   }
+  if (subcommand === "read") {
+    lanesRead(argv.slice(1));
+    return;
+  }
+  if (subcommand === "instruct") {
+    await lanesInstruct(argv.slice(1));
+    return;
+  }
+  if (subcommand === "launch") {
+    await lanesLaunch(argv.slice(1));
+    return;
+  }
   if (subcommand === "share") {
     await lanesShare(argv.slice(1));
     return;
@@ -828,6 +856,7 @@ async function lanesAdd(argv) {
   }
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
   const registry = readLanesRegistry(workspaceRoot);
+  const collaboration = getCollaborationPaths(readWorkspaceState(workspaceRoot));
   if (registry.lanes.some((lane) => lane.lane === laneId)) {
     throw new Error(`Lane 已存在：${laneId}`);
   }
@@ -840,8 +869,8 @@ async function lanesAdd(argv) {
     workspace: defaultLaneWorkspacePath(laneId)
   };
   const plan = buildLanesRegistryPlan(workspaceRoot, [...registry.lanes, lane], [
-    fileAction(workspaceRoot, path.join("_系统", "协作", "lanes", laneId, "worklog.md"), renderLaneWorklog(laneId)),
-    fileAction(workspaceRoot, path.join("_系统", "协作", "lanes", laneId, "workspace", "README.md"), renderLaneWorkspaceReadme(laneId))
+    fileAction(workspaceRoot, path.join(collaboration.root, lane.worklog), renderLaneWorklog(laneId)),
+    fileAction(workspaceRoot, path.join(collaboration.root, lane.workspace, "README.md"), renderLaneWorkspaceReadme(laneId, collaboration))
   ]);
   printGenericPlan(options.dryRun ? "新增 Lane 预览（dry run）：" : "新增 Lane 计划：", plan.actions);
   if (options.dryRun) return;
@@ -866,7 +895,17 @@ async function lanesBind(argv) {
     throw new Error(`Lane ${laneId} 已绑定 ${lane.current_session}。如需覆盖，请传入 --yes。`);
   }
   const nextLanes = registry.lanes.map((item) => item.lane === laneId ? { ...item, current_session: session } : item);
-  const plan = buildLanesRegistryPlan(workspaceRoot, nextLanes);
+  const lanesState = readAgentLanesState(workspaceRoot);
+  const nextLanesState = updateAgentLaneHostState(lanesState, laneId, {
+    host: extractCodexThreadId(session) ? "codex" : (options.agent || "manual"),
+    current_session: session,
+    thread_id: extractCodexThreadId(session),
+    session_name: normalizeMarkdownCell(options.sessionName || ""),
+    pinned: false,
+    created_by: "starwork multiagent bind",
+    created_at: new Date().toISOString()
+  });
+  const plan = buildLanesRegistryPlan(workspaceRoot, nextLanes, [stateFileAction(workspaceRoot, nextLanesState)]);
   const sessionName = normalizeMarkdownCell(options.sessionName || "");
   const dryRunSessionNameSync = createSessionNameSyncResult({
     requested: Boolean(sessionName),
@@ -875,13 +914,20 @@ async function lanesBind(argv) {
     name: sessionName,
     warning: sessionName ? "Dry run only; host session was not renamed." : null
   });
+  const dryRunPinSync = createHostPinResult({
+    requested: Boolean(options.pin),
+    supported: null,
+    status: options.pin ? "dry_run" : "not_requested",
+    warning: options.pin ? "Dry run only; host thread was not pinned." : null
+  });
   if (options.json && options.dryRun) {
     console.log(JSON.stringify(renderLanesBindResult({
       workspaceRoot,
       laneId,
       session,
       dryRun: true,
-      sessionNameSync: dryRunSessionNameSync
+      sessionNameSync: dryRunSessionNameSync,
+      pinSync: dryRunPinSync
     }), null, 2));
     return;
   }
@@ -891,24 +937,31 @@ async function lanesBind(argv) {
       console.log(`将尝试同步宿主会话名：${sessionName}（best effort）`);
       console.log("");
     }
+    if (options.pin) {
+      console.log("将尝试置顶 Codex thread（best effort；当前 Codex 版本可能不支持）。");
+      console.log("");
+    }
   }
   if (options.dryRun) return;
   await confirmOrThrow(options, `是否将当前会话绑定到 Lane ${laneId}？`);
   applyPlan(plan);
   const sessionNameSync = renameHostSessionBestEffort({ session, sessionName });
+  const pinSync = pinHostThreadBestEffort({ session, requested: Boolean(options.pin) });
   if (options.json) {
     console.log(JSON.stringify(renderLanesBindResult({
       workspaceRoot,
       laneId,
       session,
       dryRun: false,
-      sessionNameSync
+      sessionNameSync,
+      pinSync
     }), null, 2));
     return;
   }
   console.log("");
   console.log(`Lane ${laneId} 已绑定到 ${session}。`);
   printSessionNameSyncResult(sessionNameSync);
+  printHostPinResult(pinSync);
 }
 
 async function lanesRelease(argv) {
@@ -941,6 +994,15 @@ function lanesStatus(argv) {
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
   const registry = readLanesRegistry(workspaceRoot);
   const shared = readSharedContext(workspaceRoot);
+  if (options.host) {
+    const report = collectLanesHostStatus(workspaceRoot, registry, { load: Boolean(options.load) });
+    if (options.json) {
+      console.log(JSON.stringify(report, null, 2));
+      return;
+    }
+    printLanesHostStatus(report);
+    return;
+  }
   if (options.json) {
     console.log(JSON.stringify({
       schema: "starwork.agent_lanes.status.v0.1",
@@ -974,6 +1036,275 @@ function lanesStatus(argv) {
     console.log("待处理协作请求：");
     openRequests.forEach((request) => console.log(`- ${request.from} -> ${request.to}: ${request.request} (${request.status})`));
   }
+}
+
+function collectLanesHostStatus(workspaceRoot, registry, options = {}) {
+  const lanesState = readAgentLanesState(workspaceRoot);
+  const lanes = registry.lanes.map((lane) => {
+    const hostState = lanesState.lanes?.[lane.lane] || {};
+    const threadId = hostState.thread_id || extractCodexThreadId(hostState.current_session || lane.current_session);
+    const host = threadId
+      ? observeCodexThread({ threadId, includeTurns: false, load: Boolean(options.load) })
+      : {
+          adapter: "none",
+          readable: false,
+          status: "unbound",
+          warning: "Lane has no Codex thread binding",
+          ui_visibility: "not_guaranteed"
+        };
+    return {
+      lane: lane.lane,
+      starwork: {
+        bound: Boolean(lane.current_session && lane.current_session !== "unbound"),
+        session: lane.current_session || "unbound",
+        worklog: lane.worklog,
+        write_scope: lane.write_scope,
+        warning: hostState.current_session && hostState.current_session !== lane.current_session
+          ? `state.json session ${hostState.current_session} differs from agent-lanes.md ${lane.current_session || "unbound"}`
+          : null
+      },
+      host
+    };
+  });
+  return {
+    schema: "starwork.agent_lanes.host_status.v0.2",
+    workspace_root: workspaceRoot,
+    lanes
+  };
+}
+
+function printLanesHostStatus(report) {
+  console.log("");
+  console.log("StarWork 多 AI 协作状态（含 Codex host observation）");
+  console.log("");
+  for (const item of report.lanes) {
+    console.log(`- ${item.lane}`);
+    console.log(`  StarWork state: ${item.starwork.bound ? item.starwork.session : "unbound"}；worklog=${item.starwork.worklog}；write_scope=${item.starwork.write_scope}`);
+    if (item.starwork.warning) console.log(`  Warning: ${item.starwork.warning}`);
+    console.log(`  Codex host observation: ${item.host.status}${item.host.name ? `；name=${item.host.name}` : ""}${item.host.cwd ? `；cwd=${item.host.cwd}` : ""}${Number.isInteger(item.host.turn_count) ? `；turns=${item.host.turn_count}` : ""}`);
+    if (item.host.status === "notLoaded") {
+      console.log("  说明：notLoaded 表示 thread 可能存在于历史中，但当前 app-server 尚未加载；可显式使用 --load。");
+    }
+    if (item.host.warning) console.log(`  Warning: ${item.host.warning}`);
+  }
+  console.log("");
+  console.log("提示：这是 Codex host observation；正式交接仍以 lane worklog 和 shared outputs 为准。");
+}
+
+function lanesRead(argv) {
+  const options = parseArgs(argv);
+  if (options.help) {
+    printLanesReadHelp();
+    return;
+  }
+  const laneId = normalizeLaneId(options._?.[0], "lane");
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  const registry = readLanesRegistry(workspaceRoot);
+  const lane = findLaneOrThrow(registry.lanes, laneId);
+  const lanesState = readAgentLanesState(workspaceRoot);
+  const threadId = lanesState.lanes?.[laneId]?.thread_id || extractCodexThreadId(lanesState.lanes?.[laneId]?.current_session || lane.current_session);
+  if (!threadId) throw new Error(`Lane ${laneId} 没有绑定 Codex thread。`);
+  const turnLimit = options.turns ? Number.parseInt(options.turns, 10) : 0;
+  if (options.turns && (!Number.isInteger(turnLimit) || turnLimit < 1)) {
+    throw new Error("--turns 必须是正整数。");
+  }
+  const observation = observeCodexThread({ threadId, includeTurns: Boolean(options.includeTurns || turnLimit), load: false, turnLimit });
+  const report = {
+    schema: "starwork.agent_lanes.read.v0.2",
+    lane: laneId,
+    starwork: {
+      session: lane.current_session,
+      worklog: lane.worklog,
+      write_scope: lane.write_scope
+    },
+    host: observation
+  };
+  if (options.json) {
+    console.log(JSON.stringify(report, null, 2));
+    return;
+  }
+  console.log("");
+  console.log(`Lane ${laneId} 的 Codex host observation`);
+  console.log("");
+  console.log(`状态：${observation.status}`);
+  if (observation.name) console.log(`标题：${observation.name}`);
+  if (observation.cwd) console.log(`cwd：${observation.cwd}`);
+  if (Number.isInteger(observation.turn_count)) console.log(`turn 数：${observation.turn_count}`);
+  if (observation.turns?.length) {
+    console.log("");
+    console.log(`最近 ${observation.turns.length} 个 turns：`);
+    for (const turn of observation.turns) {
+      console.log(`- ${turn.id || "(unknown turn)"} ${turn.status || ""}`.trim());
+    }
+  }
+  if (observation.warning) console.log(`Warning: ${observation.warning}`);
+  console.log("");
+  console.log("这是 Codex host observation。正式交接仍以 lane worklog 和 shared outputs 为准。");
+}
+
+async function lanesInstruct(argv) {
+  const options = parseArgs(argv);
+  if (options.help) {
+    printLanesInstructHelp();
+    return;
+  }
+  const toLane = normalizeLaneId(options._?.[0], "to-lane");
+  const fromLane = normalizeLaneId(options.from || "user", "from lane");
+  if (!options.message) throw new Error("multiagent instruct 需要 --message <text>。");
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  const state = readWorkspaceState(workspaceRoot);
+  const collaboration = getCollaborationPaths(state);
+  const registry = readLanesRegistry(workspaceRoot);
+  const targetLane = findLaneOrThrow(registry.lanes, toLane);
+  if (fromLane !== "user") findLaneOrThrow(registry.lanes, fromLane);
+  const lanesState = readAgentLanesState(workspaceRoot);
+  const requestId = buildLaneRequestId(toLane);
+  const message = renderMultiagentInstructionMessage({
+    requestId,
+    fromLane,
+    toLane,
+    message: options.message,
+    collaboration,
+    targetLane,
+    workspaceRoot
+  });
+  const threadId = lanesState.lanes?.[toLane]?.thread_id || extractCodexThreadId(lanesState.lanes?.[toLane]?.current_session || targetLane.current_session);
+  const dryRunRequest = buildSharedRequestRow({
+    id: requestId,
+    from: fromLane,
+    to: toLane,
+    request: options.message,
+    status: threadId ? "recorded" : "needs_manual_delivery",
+    hostDelivery: threadId ? "pending" : "none",
+    link: collaboration.shared
+  });
+  const shared = readSharedContext(workspaceRoot);
+  const dryPlan = buildSharedContextPlan(workspaceRoot, {
+    outputs: shared.outputs,
+    requests: [...shared.requests, dryRunRequest],
+    agreements: shared.agreements
+  });
+  if (options.json && options.dryRun) {
+    console.log(JSON.stringify({ schema: "starwork.agent_lanes.instruct.v0.2", dry_run: true, request: dryRunRequest, formatted_message: message }, null, 2));
+    return;
+  }
+  if (!options.json) {
+    printGenericPlan(options.dryRun ? "跨会话指令预览（dry run）：" : "跨会话指令计划：", dryPlan.actions);
+    if (threadId) console.log(`将发送到 Codex thread：${threadId}`);
+    else console.log("目标 lane 没有 Codex thread，将只记录为 needs_manual_delivery。");
+    console.log("");
+  }
+  if (options.dryRun) return;
+  await confirmOrThrow(options, `是否向 Lane ${toLane} 发送指令？`);
+  const delivery = threadId
+    ? sendCodexInstruction({ threadId, message, timeout: parsePositiveInt(options.timeout, 30000) })
+    : { adapter: "codex", status: "needs_manual_delivery", thread_id: null, warning: "Target lane has no Codex thread" };
+  const finalRequest = buildSharedRequestRow({
+    id: requestId,
+    from: fromLane,
+    to: toLane,
+    request: options.message,
+    status: delivery.status === "completed" ? "completed" : delivery.status === "sent" ? "sent" : delivery.status,
+    hostDelivery: delivery.status,
+    link: collaboration.shared
+  });
+  const nextState = {
+    ...lanesState,
+    requests: [...(lanesState.requests || []), {
+      id: requestId,
+      from: fromLane,
+      to: toLane,
+      message_type: "instruction",
+      recorded_in: collaboration.shared,
+      host_delivery: delivery
+    }]
+  };
+  applyPlan({
+    targetDir: workspaceRoot,
+    actions: [
+      ...buildSharedContextPlan(workspaceRoot, {
+        outputs: shared.outputs,
+        requests: [...shared.requests, finalRequest],
+        agreements: shared.agreements
+      }).actions,
+      stateFileAction(workspaceRoot, nextState)
+    ]
+  });
+  if (options.json) {
+    console.log(JSON.stringify({ schema: "starwork.agent_lanes.instruct.v0.2", request: finalRequest, host_delivery: delivery }, null, 2));
+    return;
+  }
+  console.log("");
+  console.log(`已记录跨 lane 指令：${requestId}`);
+  console.log(`Host delivery：${delivery.status}${delivery.warning ? ` (${delivery.warning})` : ""}`);
+}
+
+async function lanesLaunch(argv) {
+  const options = parseArgs(argv);
+  if (options.help) {
+    printLanesLaunchHelp();
+    return;
+  }
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  const state = readWorkspaceState(workspaceRoot);
+  const collaboration = getCollaborationPaths(state);
+  const registry = readLanesRegistry(workspaceRoot);
+  const laneIds = options.lanes ? parseLaneList(options.lanes) : [normalizeLaneId(options._?.[0], "lane")];
+  const lanes = laneIds.map((laneId) => findLaneOrThrow(registry.lanes, laneId));
+  const actions = [];
+  const launchResults = [];
+  if (options.dryRun) {
+    for (const lane of lanes) {
+      launchResults.push({ lane: lane.lane, dry_run: true, message: renderMultiagentLaunchMessage({ lane, fromLane: options.from || "user", workspaceRoot, collaboration }) });
+    }
+    if (options.json) {
+      console.log(JSON.stringify({ schema: "starwork.agent_lanes.launch.v0.2", dry_run: true, launches: launchResults }, null, 2));
+      return;
+    }
+    console.log("");
+    console.log("Codex lane launch 预览（dry run）：");
+    lanes.forEach((lane) => console.log(`- ${lane.lane}`));
+    return;
+  }
+  await confirmOrThrow(options, `是否 launch ${lanes.length} 个 Codex lane thread？`);
+  let nextRegistryLanes = registry.lanes;
+  let lanesState = readAgentLanesState(workspaceRoot);
+  for (const lane of lanes) {
+    const launchMessage = renderMultiagentLaunchMessage({ lane, fromLane: options.from || "user", workspaceRoot, collaboration });
+    const launch = launchCodexLane({ message: launchMessage, timeout: parsePositiveInt(options.timeout, 30000) });
+    const session = launch.thread_id ? `codex:${launch.thread_id}` : "unbound";
+    if (launch.thread_id) {
+      const sessionNameSync = renameHostSessionBestEffort({ session, sessionName: normalizeMarkdownCell(options.sessionName || "") });
+      const pinSync = pinHostThreadBestEffort({ session, requested: Boolean(options.pin) });
+      nextRegistryLanes = nextRegistryLanes.map((item) => item.lane === lane.lane ? { ...item, current_session: session } : item);
+      lanesState = updateAgentLaneHostState(lanesState, lane.lane, {
+        host: "codex",
+        current_session: session,
+        thread_id: launch.thread_id,
+        session_name: normalizeMarkdownCell(options.sessionName || ""),
+        pinned: pinSync.status === "ok",
+        pin_status: pinSync.status,
+        created_by: "starwork multiagent launch",
+        created_at: new Date().toISOString(),
+        last_host_status: {
+          type: launch.status,
+          observed_at: new Date().toISOString()
+        }
+      });
+      launch.session_name_sync = sessionNameSync;
+      launch.pin_sync = pinSync;
+    }
+    launchResults.push({ lane: lane.lane, ...launch });
+  }
+  actions.push(...buildLanesRegistryPlan(workspaceRoot, nextRegistryLanes).actions);
+  actions.push(stateFileAction(workspaceRoot, lanesState));
+  applyPlan({ targetDir: workspaceRoot, actions: dedupeActions(actions) });
+  if (options.json) {
+    console.log(JSON.stringify({ schema: "starwork.agent_lanes.launch.v0.2", launches: launchResults }, null, 2));
+    return;
+  }
+  console.log("");
+  launchResults.forEach((result) => console.log(`Lane ${result.lane}: ${result.status}${result.thread_id ? ` (${result.thread_id})` : ""}${result.warning ? ` - ${result.warning}` : ""}`));
 }
 
 async function lanesShare(argv) {
@@ -5887,14 +6218,18 @@ function cleanProjectFactText(text) {
 }
 
 function buildLanesInitPlan({ workspaceRoot, lanes }) {
+  const state = readWorkspaceState(workspaceRoot);
+  const collaboration = getCollaborationPaths(state);
   const actions = [
-    directoryAction(workspaceRoot, path.join("_系统", "协作")),
-    fileAction(workspaceRoot, path.join("_系统", "协作", "agent-lanes.md"), renderAgentLanesRegistry(lanes)),
-    fileAction(workspaceRoot, path.join("_系统", "协作", "shared.md"), renderSharedContext({ outputs: [], requests: [], agreements: [] }))
+    directoryAction(workspaceRoot, collaboration.root),
+    directoryAction(workspaceRoot, path.join(".starwork", "agent-lanes")),
+    fileAction(workspaceRoot, collaboration.registry, renderAgentLanesRegistry(lanes)),
+    fileAction(workspaceRoot, collaboration.shared, renderSharedContext({ outputs: [], requests: [], agreements: [] })),
+    fileAction(workspaceRoot, path.join(".starwork", "agent-lanes", "state.json"), renderAgentLanesState(defaultAgentLanesState()))
   ];
   for (const lane of lanes) {
-    actions.push(fileAction(workspaceRoot, path.join("_系统", "协作", "lanes", lane.lane, "worklog.md"), renderLaneWorklog(lane.lane)));
-    actions.push(fileAction(workspaceRoot, path.join("_系统", "协作", "lanes", lane.lane, "workspace", "README.md"), renderLaneWorkspaceReadme(lane.lane)));
+    actions.push(fileAction(workspaceRoot, path.join(collaboration.root, lane.worklog), renderLaneWorklog(lane.lane)));
+    actions.push(fileAction(workspaceRoot, path.join(collaboration.root, lane.workspace, "README.md"), renderLaneWorkspaceReadme(lane.lane, collaboration)));
   }
   return {
     targetDir: workspaceRoot,
@@ -5903,26 +6238,76 @@ function buildLanesInitPlan({ workspaceRoot, lanes }) {
 }
 
 function buildLanesRegistryPlan(workspaceRoot, lanes, extraActions = []) {
+  const collaboration = getCollaborationPaths(readWorkspaceState(workspaceRoot));
   return {
     targetDir: workspaceRoot,
     actions: dedupeActions([
-      overwriteFileAction(workspaceRoot, path.join("_系统", "协作", "agent-lanes.md"), renderAgentLanesRegistry(lanes)),
+      overwriteFileAction(workspaceRoot, collaboration.registry, renderAgentLanesRegistry(lanes)),
       ...extraActions
     ])
   };
 }
 
+function getCollaborationPaths(state = {}) {
+  const root = state.language === "en" ? path.join("_system", "collaboration") : path.join("_系统", "协作");
+  return {
+    root,
+    registry: path.join(root, "agent-lanes.md"),
+    shared: path.join(root, "shared.md")
+  };
+}
+
+function agentLanesStatePath(workspaceRoot) {
+  return path.join(workspaceRoot, ".starwork", "agent-lanes", "state.json");
+}
+
+function defaultAgentLanesState() {
+  return {
+    version: 1,
+    lanes: {},
+    requests: []
+  };
+}
+
+function readAgentLanesState(workspaceRoot) {
+  const statePath = agentLanesStatePath(workspaceRoot);
+  if (!fs.existsSync(statePath)) return defaultAgentLanesState();
+  try {
+    const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    return {
+      version: 1,
+      lanes: state.lanes && typeof state.lanes === "object" ? state.lanes : {},
+      requests: Array.isArray(state.requests) ? state.requests : []
+    };
+  } catch (error) {
+    throw new Error(`无法读取 Agent Lanes 机器状态：${error.message}`);
+  }
+}
+
+function renderAgentLanesState(state) {
+  return `${JSON.stringify({
+    version: 1,
+    lanes: state.lanes || {},
+    requests: state.requests || []
+  }, null, 2)}\n`;
+}
+
+function stateFileAction(workspaceRoot, state) {
+  return overwriteFileAction(workspaceRoot, path.join(".starwork", "agent-lanes", "state.json"), renderAgentLanesState(state));
+}
+
 function buildSharedContextPlan(workspaceRoot, shared) {
+  const collaboration = getCollaborationPaths(readWorkspaceState(workspaceRoot));
   return {
     targetDir: workspaceRoot,
     actions: [
-      overwriteFileAction(workspaceRoot, path.join("_系统", "协作", "shared.md"), renderSharedContext(shared))
+      overwriteFileAction(workspaceRoot, collaboration.shared, renderSharedContext(shared))
     ]
   };
 }
 
 function readLanesRegistry(workspaceRoot) {
-  const registryPath = path.join(workspaceRoot, "_系统", "协作", "agent-lanes.md");
+  const registryPath = path.join(workspaceRoot, getCollaborationPaths(readWorkspaceState(workspaceRoot)).registry);
   if (!fs.existsSync(registryPath)) {
     throw new Error("当前工作台尚未启用 Agent Lanes。请先运行 starwork multiagent init。");
   }
@@ -5934,14 +6319,24 @@ function readLanesRegistry(workspaceRoot) {
 }
 
 function readSharedContext(workspaceRoot) {
-  const sharedPath = path.join(workspaceRoot, "_系统", "协作", "shared.md");
+  const sharedPath = path.join(workspaceRoot, getCollaborationPaths(readWorkspaceState(workspaceRoot)).shared);
   if (!fs.existsSync(sharedPath)) {
     return { outputs: [], requests: [], agreements: [] };
   }
   const content = fs.readFileSync(sharedPath, "utf8");
+  const requests = parseMarkdownTableSection(content, "## Cross-Lane Requests", ["id", "from", "to", "request", "status", "host_delivery", "link", "updated"]);
   return {
     outputs: parseMarkdownTableSection(content, "## Shared Outputs", ["from", "title", "path", "audience", "status", "updated"]),
-    requests: parseMarkdownTableSection(content, "## Cross-Lane Requests", ["from", "to", "request", "status", "link"]),
+    requests: requests.length ? requests : parseMarkdownTableSection(content, "## Cross-Lane Requests", ["from", "to", "request", "status", "link"]).map((row) => ({
+      id: "",
+      from: row.from,
+      to: row.to,
+      request: row.request,
+      status: row.status,
+      host_delivery: "",
+      link: row.link,
+      updated: ""
+    })),
     agreements: parseMarkdownTableSection(content, "## Shared Agreements", ["agreement", "owner", "status", "link"])
   };
 }
@@ -6008,9 +6403,9 @@ ${shared.outputs.map((row) => `| ${escapeMarkdownCell(row.from)} | ${escapeMarkd
 
 ## Cross-Lane Requests
 
-| from | to | request | status | link |
-|---|---|---|---|---|
-${shared.requests.map((row) => `| ${escapeMarkdownCell(row.from)} | ${escapeMarkdownCell(row.to)} | ${escapeMarkdownCell(row.request)} | ${escapeMarkdownCell(row.status)} | ${escapeMarkdownCell(row.link)} |`).join("\n")}
+| id | from | to | request | status | host_delivery | link | updated |
+|---|---|---|---|---|---|---|---|
+${shared.requests.map((row) => `| ${escapeMarkdownCell(row.id)} | ${escapeMarkdownCell(row.from)} | ${escapeMarkdownCell(row.to)} | ${escapeMarkdownCell(row.request)} | ${escapeMarkdownCell(row.status)} | ${escapeMarkdownCell(row.host_delivery)} | ${escapeMarkdownCell(row.link)} | ${escapeMarkdownCell(row.updated)} |`).join("\n")}
 
 ## Shared Agreements
 
@@ -6048,7 +6443,7 @@ function renderLaneWorklog(laneId) {
 `;
 }
 
-function renderLaneWorkspaceReadme(laneId) {
+function renderLaneWorkspaceReadme(laneId, collaboration = { shared: path.join("_系统", "协作", "shared.md") }) {
   const title = laneId.split(/[-_]/).filter(Boolean).map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`).join(" ") || "Lane";
   return `# ${title} Workspace
 
@@ -6057,8 +6452,82 @@ function renderLaneWorkspaceReadme(laneId) {
 ## 边界
 
 - 这是过程工作区，不是项目正式输出目录。
-- 需要其他 lane 读取的材料，应通过 \`_系统/协作/shared.md\` 登记。
+- 需要其他 lane 读取的材料，应通过 \`${collaboration.shared}\` 登记。
 - 成熟产物应晋升到项目正式事实源，例如 \`product/\`、\`输出/确认成果/\` 或项目约定的正式输出目录。
+`;
+}
+
+function renderMultiagentLaunchMessage({ lane, fromLane, workspaceRoot, collaboration }) {
+  return `<!-- STARWORK:MULTIAGENT_MESSAGE v1 -->
+
+# StarWork MultiAgent Launch
+
+message_type: launch
+from_lane: ${fromLane}
+to_lane: ${lane.lane}
+workspace: ${workspaceRoot}
+created_at: ${new Date().toISOString()}
+
+## 你的职责
+
+${lane.purpose}
+
+## 你可以主动修改的范围
+
+${lane.write_scope}
+
+## 你启动后必须先读取
+
+1. AGENTS.md
+2. ${collaboration.registry}
+3. ${path.posix.join(collaboration.root.replace(/\\/g, "/"), lane.worklog)}
+4. ${collaboration.shared}
+
+## 当前要求
+
+请先完成初始化阅读，确认你已经理解自己的 lane 职责和写入边界。
+除非后续收到明确指令，否则不要主动修改项目文件。
+
+## 回报方式
+
+完成初始化后，在本会话回复一句：
+
+已进入 ${lane.lane} lane，等待下一步指令。
+
+<!-- /STARWORK:MULTIAGENT_MESSAGE -->
+`;
+}
+
+function renderMultiagentInstructionMessage({ requestId, fromLane, toLane, message, collaboration, targetLane, workspaceRoot }) {
+  return `<!-- STARWORK:MULTIAGENT_MESSAGE v1 -->
+
+# StarWork MultiAgent Instruction
+
+message_type: instruction
+request_id: ${requestId}
+from_lane: ${fromLane}
+to_lane: ${toLane}
+created_at: ${new Date().toISOString()}
+recorded_in: ${collaboration.shared}
+
+## 消息内容
+
+${message}
+
+## 边界
+
+- 只在你的 write_scope 内主动修改：${targetLane.write_scope}
+- 如需修改 write_scope 之外的文件，先在 ${collaboration.shared} 记录请求或在回复中说明需要授权。
+- 不要修改与本任务无关的文件。
+- 当前工作区：${workspaceRoot}
+
+## 完成后请回报
+
+1. 更新你的 lane worklog：${path.posix.join(collaboration.root.replace(/\\/g, "/"), targetLane.worklog)}
+2. 如有正式输出，登记到 ${collaboration.shared} 的 Shared Outputs。
+3. 如需验收，向 ${fromLane} 发送回传指令或在回复中明确说明。
+
+<!-- /STARWORK:MULTIAGENT_MESSAGE -->
 `;
 }
 
@@ -6100,14 +6569,28 @@ function resolveLaneSession(options) {
   throw new Error("无法自动识别当前会话。请传入 --session <agent:session-id>。");
 }
 
-function renderLanesBindResult({ workspaceRoot, laneId, session, dryRun, sessionNameSync }) {
+function updateAgentLaneHostState(state, laneId, hostPatch) {
+  return {
+    ...state,
+    lanes: {
+      ...(state.lanes || {}),
+      [laneId]: {
+        ...((state.lanes || {})[laneId] || {}),
+        ...hostPatch
+      }
+    }
+  };
+}
+
+function renderLanesBindResult({ workspaceRoot, laneId, session, dryRun, sessionNameSync, pinSync }) {
   return {
     schema: "starwork.agent_lanes.bind_result.v0.1",
     target: workspaceRoot,
     lane: laneId,
     session,
     dry_run: Boolean(dryRun),
-    session_name_sync: sessionNameSync
+    session_name_sync: sessionNameSync,
+    pin_sync: pinSync || createHostPinResult({ requested: false, supported: false, status: "not_requested" })
   };
 }
 
@@ -6129,6 +6612,45 @@ function printSessionNameSyncResult(result) {
   }
   if (result.warning) {
     console.log(`Warning: session name sync failed: ${result.warning}`);
+  }
+}
+
+function createHostPinResult({ requested, supported, status, warning = null }) {
+  return {
+    requested: Boolean(requested),
+    supported,
+    status,
+    warning: warning || null
+  };
+}
+
+function pinHostThreadBestEffort({ session, requested }) {
+  if (!requested) {
+    return createHostPinResult({ requested: false, supported: false, status: "not_requested" });
+  }
+  const threadId = extractCodexThreadId(session);
+  if (!threadId) {
+    return createHostPinResult({
+      requested: true,
+      supported: false,
+      status: "skipped",
+      warning: "Current session adapter does not support pinning"
+    });
+  }
+  return createHostPinResult({
+    requested: true,
+    supported: false,
+    status: "unsupported",
+    warning: "Codex app-server pin method is not stable in this StarWork version"
+  });
+}
+
+function printHostPinResult(result) {
+  if (!result.requested) return;
+  if (result.status === "ok") {
+    console.log("宿主 thread 已置顶。");
+  } else if (result.warning) {
+    console.log(`Warning: host thread pin skipped: ${result.warning}`);
   }
 }
 
@@ -6227,6 +6749,239 @@ function renameCodexThreadBestEffort({ threadId, sessionName }) {
   });
 }
 
+function observeCodexThread({ threadId, includeTurns = false, load = false, turnLimit = 0 }) {
+  const messages = [
+    codexInitializeMessage(1)
+  ];
+  let nextId = 2;
+  if (load) {
+    messages.push({
+      jsonrpc: "2.0",
+      id: nextId++,
+      method: "thread/resume",
+      params: { threadId, excludeTurns: true }
+    });
+  }
+  const readId = nextId;
+  messages.push({
+    jsonrpc: "2.0",
+    id: readId,
+    method: "thread/read",
+    params: { threadId, includeTurns: Boolean(includeTurns) }
+  });
+  const result = runCodexAppServer(messages, { timeout: 5000 });
+  if (!result.ok) {
+    return {
+      adapter: "codex",
+      readable: false,
+      status: "systemError",
+      warning: result.warning,
+      ui_visibility: "not_guaranteed"
+    };
+  }
+  const read = result.responses.find((message) => message.id === readId);
+  if (!read || read.error) {
+    return {
+      adapter: "codex",
+      readable: false,
+      status: "notLoaded",
+      warning: read?.error?.message || "Codex app-server did not return thread/read",
+      ui_visibility: "not_guaranteed"
+    };
+  }
+  const thread = read.result?.thread || read.result || {};
+  const turns = Array.isArray(thread.turns) ? thread.turns : Array.isArray(read.result?.turns) ? read.result.turns : [];
+  const recentTurns = turnLimit > 0 ? turns.slice(-turnLimit) : (includeTurns ? turns : []);
+  return {
+    adapter: "codex",
+    readable: true,
+    status: inferCodexThreadStatus(thread),
+    name: thread.name || thread.title || read.result?.name || null,
+    cwd: thread.cwd || read.result?.cwd || null,
+    turn_count: turns.length || Number(read.result?.turn_count || read.result?.turnCount || 0),
+    updated_at: thread.updated_at || thread.updatedAt || read.result?.updated_at || null,
+    turns: recentTurns.map(summarizeCodexTurn),
+    ui_visibility: "not_guaranteed"
+  };
+}
+
+function readCodexThread(threadId, options = {}) {
+  return observeCodexThread({ threadId, includeTurns: Boolean(options.includeTurns), load: false, turnLimit: options.turnLimit || 0 });
+}
+
+function resumeCodexThread(threadId) {
+  return runCodexAppServer([
+    codexInitializeMessage(1),
+    { jsonrpc: "2.0", id: 2, method: "thread/resume", params: { threadId, excludeTurns: true } }
+  ], { timeout: 5000 });
+}
+
+function startCodexTurn(threadId, formattedMessage, options = {}) {
+  return sendCodexInstruction({ threadId, message: formattedMessage, timeout: options.timeout || 30000 });
+}
+
+function listCodexThreads(options = {}) {
+  const result = runCodexAppServer([
+    codexInitializeMessage(1),
+    { jsonrpc: "2.0", id: 2, method: "thread/list", params: {} }
+  ], { timeout: options.timeout || 5000 });
+  if (!result.ok) return { ok: false, warning: result.warning, threads: [] };
+  const response = result.responses.find((item) => item.id === 2);
+  if (!response || response.error) return { ok: false, warning: response?.error?.message || "Codex thread/list failed", threads: [] };
+  return { ok: true, threads: response.result?.threads || response.result || [] };
+}
+
+function sendCodexInstruction({ threadId, message, timeout }) {
+  const messages = [
+    codexInitializeMessage(1),
+    {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "thread/read",
+      params: { threadId, includeTurns: false }
+    },
+    {
+      jsonrpc: "2.0",
+      id: 3,
+      method: "thread/resume",
+      params: { threadId, excludeTurns: true }
+    },
+    {
+      jsonrpc: "2.0",
+      id: 4,
+      method: "turn/start",
+      params: {
+        threadId,
+        input: [{ type: "text", text: message }]
+      }
+    },
+    {
+      jsonrpc: "2.0",
+      id: 5,
+      method: "thread/read",
+      params: { threadId, includeTurns: true }
+    }
+  ];
+  const result = runCodexAppServer(messages, { timeout });
+  if (!result.ok) {
+    return { adapter: "codex", status: "failed", thread_id: threadId, warning: result.warning };
+  }
+  const initialRead = result.responses.find((item) => item.id === 2);
+  if (!initialRead || initialRead.error) {
+    return { adapter: "codex", status: "failed", thread_id: threadId, warning: initialRead?.error?.message || "Codex thread/read failed before send" };
+  }
+  const start = result.responses.find((item) => item.id === 4);
+  if (!start || start.error) {
+    return { adapter: "codex", status: "failed", thread_id: threadId, warning: start?.error?.message || "Codex turn/start failed" };
+  }
+  const completed = result.events.find((item) => item.method === "turn/completed");
+  const started = result.events.find((item) => item.method === "turn/started");
+  const finalRead = result.responses.find((item) => item.id === 5);
+  return {
+    adapter: "codex",
+    status: completed ? "completed" : "sent",
+    thread_id: threadId,
+    turn_id: completed?.params?.turnId || completed?.params?.turn?.id || started?.params?.turnId || started?.params?.turn?.id || start.result?.turnId || null,
+    completed_at: completed ? new Date().toISOString() : null,
+    verified_by_thread_read: Boolean(finalRead && !finalRead.error),
+    ui_visibility: "not_guaranteed"
+  };
+}
+
+function launchCodexLane({ message, timeout }) {
+  const messages = [
+    codexInitializeMessage(1),
+    {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "thread/start",
+      params: {}
+    }
+  ];
+  const start = runCodexAppServer(messages, { timeout });
+  if (!start.ok) return { adapter: "codex", status: "failed", warning: start.warning };
+  const response = start.responses.find((item) => item.id === 2);
+  if (!response || response.error) {
+    return { adapter: "codex", status: "failed", warning: response?.error?.message || "Codex thread/start failed" };
+  }
+  const threadId = response.result?.threadId || response.result?.thread?.id || response.result?.id;
+  if (!threadId) return { adapter: "codex", status: "failed", warning: "Codex thread/start did not return thread id" };
+  const delivery = sendCodexInstruction({ threadId, message, timeout });
+  return {
+    adapter: "codex",
+    status: delivery.status,
+    thread_id: threadId,
+    turn_id: delivery.turn_id || null,
+    warning: delivery.warning || null,
+    ui_visibility: "not_guaranteed"
+  };
+}
+
+function inferCodexThreadStatus(thread) {
+  const raw = String(thread.status || thread.state || "").toLowerCase();
+  if (["active", "running", "in_progress", "busy"].includes(raw)) return "active";
+  if (["error", "failed", "systemerror"].includes(raw)) return "systemError";
+  return "idle";
+}
+
+function summarizeCodexTurn(turn) {
+  return {
+    id: turn.id || turn.turnId || null,
+    status: turn.status || turn.state || null,
+    created_at: turn.created_at || turn.createdAt || null,
+    updated_at: turn.updated_at || turn.updatedAt || null
+  };
+}
+
+function codexInitializeMessage(id) {
+  return {
+    jsonrpc: "2.0",
+    id,
+    method: "initialize",
+    params: {
+      clientInfo: {
+        name: "starwork",
+        version: PACKAGE_VERSION
+      },
+      capabilities: null
+    }
+  };
+}
+
+function runCodexAppServer(messages, options = {}) {
+  const request = messages.map((message) => JSON.stringify(message)).join("\n") + "\n";
+  const result = spawnSync("codex", ["app-server", "--listen", "stdio://"], {
+    input: request,
+    encoding: "utf8",
+    timeout: options.timeout || 10000
+  });
+  if (result.error) {
+    return { ok: false, warning: result.error.message, responses: [], events: [] };
+  }
+  if (result.status !== 0) {
+    return { ok: false, warning: (result.stderr || `codex app-server exited with status ${result.status}`).trim(), responses: [], events: [] };
+  }
+  const messagesOut = parseJsonRpcMessages(result.stdout);
+  return {
+    ok: true,
+    responses: messagesOut.filter((message) => Object.hasOwn(message, "id")),
+    events: messagesOut.filter((message) => message.method)
+  };
+}
+
+function parseJsonRpcMessages(stdout) {
+  const messages = [];
+  const lines = String(stdout || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  for (const line of lines) {
+    try {
+      messages.push(JSON.parse(line));
+    } catch {
+      // Ignore non-JSON app-server output.
+    }
+  }
+  return messages;
+}
+
 function parseJsonRpcResponse(stdout, id) {
   const lines = String(stdout || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   for (const line of lines) {
@@ -6250,6 +7005,33 @@ function escapeMarkdownCell(value) {
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function buildLaneRequestId(toLane) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z").replace("T", "-");
+  return `REQ-${stamp}-${toLane}`;
+}
+
+function buildSharedRequestRow({ id, from, to, request, status, hostDelivery, link }) {
+  return {
+    id,
+    from,
+    to,
+    request: normalizeMarkdownCell(request),
+    status,
+    host_delivery: hostDelivery,
+    link,
+    updated: todayIsoDate()
+  };
+}
+
+function parsePositiveInt(value, fallback) {
+  if (value == null || value === "") return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error("timeout/turns 必须是正整数。");
+  }
+  return parsed;
 }
 
 function slugifyProjectId(value) {
@@ -6990,7 +7772,7 @@ function printLanesHelp() {
   console.log(`StarWork Multiagent
 
 Usage:
-  starwork multiagent <init|add|bind|release|status|share> [options]
+  starwork multiagent <init|add|bind|release|status|read|instruct|launch|share> [options]
 
 Agent Lanes 用于同一项目内多个 Agent 会话按项目自定义职责位协作。
 
@@ -6999,13 +7781,18 @@ Subcommands:
   add        新增一个 lane。
   bind       将当前会话绑定到 lane。
   release    释放 lane 的当前会话绑定。
-  status     查看 lane 分工和共享请求。
+  status     查看 lane 分工和共享请求，可加 --host 观察 Codex thread。
+  read       读取某个 lane 绑定的 Codex thread 近况。
+  instruct   向另一个 lane 发送格式化跨会话指令。
+  launch     为已有 lane 创建并绑定 Codex thread。
   share      登记一个跨 lane 可读输出。
 
 示例：
   starwork multiagent init --lanes research,writing,review --target ./my-workspace --yes
   starwork multiagent add review --purpose "审校和风险检查" --write "reviews/**,product/docs/**" --target ./my-workspace --yes
   starwork multiagent bind research --session codex:manual-research-1 --session-name "Research Agent" --target ./my-workspace --yes
+  starwork multiagent status --host --target ./my-workspace --json
+  starwork multiagent instruct development --from product-planning --message "请根据 SPEC 开始实现。" --target ./my-workspace --yes
 `);
 }
 
@@ -7052,12 +7839,14 @@ Options:
   --agent <codex|claude|cursor|trae|manual>
   --session <agent:session-id>
   --session-name <name>
+  --pin
   --json
   --dry-run
   --yes, -y
 
 说明：
   --session-name 会在绑定成功后 best-effort 同步宿主工具的会话名称。
+  --pin 会尝试置顶 Codex thread；当前无稳定接口时只输出 warning，不回滚绑定。
   当前仅 Codex session 支持；失败不会回滚 lane binding。
 `);
 }
@@ -7084,6 +7873,58 @@ Usage:
 Options:
   --target <path>
   --json
+  --host
+  --load
+`);
+}
+
+function printLanesReadHelp() {
+  console.log(`StarWork Multiagent Read
+
+Usage:
+  starwork multiagent read <lane-id> [options]
+
+Options:
+  --target <path>
+  --turns <n>
+  --include-turns
+  --json
+`);
+}
+
+function printLanesInstructHelp() {
+  console.log(`StarWork Multiagent Instruct
+
+Usage:
+  starwork multiagent instruct <to-lane> --from <from-lane> --message <text> [options]
+
+Options:
+  --target <path>
+  --from <lane-id>
+  --message <text>
+  --timeout <ms>
+  --json
+  --dry-run
+  --yes, -y
+`);
+}
+
+function printLanesLaunchHelp() {
+  console.log(`StarWork Multiagent Launch
+
+Usage:
+  starwork multiagent launch <lane-id> [options]
+  starwork multiagent launch --lanes <lane1,lane2> [options]
+
+Options:
+  --target <path>
+  --lanes <lane1,lane2>
+  --session-name <name>
+  --pin
+  --timeout <ms>
+  --json
+  --dry-run
+  --yes, -y
 `);
 }
 

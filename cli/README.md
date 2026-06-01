@@ -36,7 +36,7 @@ v0.1 只覆盖最小可用安装和适配能力：
 - `starwork upgrade` 第一版：可以读取 `starworkDoctor` skill 生成的升级蓝图，把历史模板、非标准目录或类似项目中心的旧主库安全升级为 StarWork 工作台；alpha.9 支持 `hub + preserve-names + pack:null`，旧主库接入时不会创建重复标准目录；v0.1 只支持 `--blueprint`，不自动判断升级方案。
 - `starwork adapt` 第一版：可以为 Codex、Claude Code、Cursor、Trae 生成或登记轻量适配入口。
 - `starwork pack install` 第一版：可以在健康工作台上补装 Pack，并更新路径、规则、模板和 workspace state。
-- `starwork multiagent` 第一版：可以初始化 Agent Lanes、按项目自定义职责新增 lane、绑定 / 释放会话、可选同步 Codex 宿主会话名、查看状态，并登记跨 lane 可读输出。
+- `starwork multiagent` v0.2：在原有 Agent Lanes 基础上增加 Codex 多会话编排；支持 `status --host`、`read`、`instruct`、`launch` 和 `bind --pin`，并把跨会话指令写入项目内 shared context 与 `.starwork/agent-lanes/state.json`。
 - `starwork audit` 第一版：可以从项目中心读取语言映射后的项目注册表，批量巡检中心管理的项目工作台，并复用 `doctor` 聚合健康事实。
 - `starwork repair` 第一版：可以执行 `starworkAudit` 生成的保守 repair blueprint，支持补目录、补缺失文件、重写 sync、更新 registry 和更新 workspace state。
 - Skill 管理与分发第一版：工作台模板可以自带 Skill，项目中心可以托管用户常用 Skill；`init` 写入 `.starwork/skills.json`，`spawn` 按项目中心 registry 选择性分发 Skill，`doctor` 暴露 Skill manifest / registry / mount 事实。
@@ -62,6 +62,7 @@ CLI 不在 v0.1 阶段处理账号、授权、消息平台 gateway 或复杂商�
 - [`starwork repair` SPEC](./repair-spec.md)
 - [`starwork multiagent` SPEC](../core/agent-lanes-spec.md)
 - [`Agent Lanes 宿主会话命名增强 SPEC`](../core/agent-lanes-session-naming-spec.md)
+- [`MultiAgent v0.2 Codex 多会话编排 SPEC`](../planning/features/multiagent/specs/v0.2-codex-orchestration.md)
 
 ## 本地运行
 
@@ -78,6 +79,8 @@ node cli/bin/starwork.js doctor --target ./my-workspace
 node cli/bin/starwork.js knowledge init --target ./my-workspace --dry-run
 node cli/bin/starwork.js multiagent init --lanes research,writing,review --target ./my-workspace --yes
 node cli/bin/starwork.js multiagent bind research --session codex:manual-research-1 --session-name "Research Agent" --target ./my-workspace --yes
+node cli/bin/starwork.js multiagent status --host --target ./my-workspace --json
+node cli/bin/starwork.js multiagent instruct development --from product-planning --message "请根据 SPEC 开始实现。" --target ./my-workspace --dry-run
 node cli/bin/starwork.js adapt claude --target ./my-workspace --yes
 node cli/bin/starwork.js pack install content-creator --target ./my-workspace --yes
 ```

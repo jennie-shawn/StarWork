@@ -65,11 +65,28 @@ function fakeCodexBin({ exitCode = 0, stderr = "", inputPath } = {}) {
 const fs = require("fs");
 const input = fs.readFileSync(0, "utf8");
 if (process.env.STARWORK_FAKE_CODEX_INPUT) {
-  fs.writeFileSync(process.env.STARWORK_FAKE_CODEX_INPUT, input);
+  fs.appendFileSync(process.env.STARWORK_FAKE_CODEX_INPUT, input);
 }
 if (${JSON.stringify(stderr)}) process.stderr.write(${JSON.stringify(stderr)});
-console.log(JSON.stringify({ jsonrpc: "2.0", id: 1, result: {} }));
-console.log(JSON.stringify(${exitCode === 0 ? "{ jsonrpc: \"2.0\", id: 2, result: {} }" : "{ jsonrpc: \"2.0\", id: 2, error: { message: \"rename failed\" } }"}));
+if (${exitCode} === 0) {
+  const requests = input.trim().split(/\\n+/).filter(Boolean).map((line) => JSON.parse(line));
+  for (const request of requests) {
+    if (request.method === "thread/read") {
+      console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { thread: { id: request.params.threadId, name: "Fake Codex Thread", cwd: "/fake/project", status: "idle", turns: [{ id: "turn-1", status: "completed" }, { id: "turn-2", status: "completed" }] } } }));
+    } else if (request.method === "thread/start") {
+      console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { threadId: "launched-thread-1" } }));
+    } else if (request.method === "turn/start") {
+      console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { turnId: "turn-started-1" } }));
+      console.log(JSON.stringify({ jsonrpc: "2.0", method: "turn/started", params: { turnId: "turn-started-1" } }));
+      console.log(JSON.stringify({ jsonrpc: "2.0", method: "turn/completed", params: { turnId: "turn-started-1" } }));
+    } else {
+      console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: {} }));
+    }
+  }
+} else {
+  console.log(JSON.stringify({ jsonrpc: "2.0", id: 1, result: {} }));
+  console.log(JSON.stringify({ jsonrpc: "2.0", id: 2, error: { message: "rename failed" } }));
+}
 process.exit(${exitCode});
 `, "utf8");
   fs.chmodSync(codex, 0o755);
@@ -626,6 +643,21 @@ test("multiagent init creates custom agent lanes without built-in defaults", () 
   assert.equal(fs.existsSync(path.join(dir, "_系统", "协作", "lanes", "research", "workspace", "README.md")), true);
 });
 
+test("multiagent init uses English collaboration paths for English workspaces", () => {
+  const dir = tempDir();
+  runInit(["--type", "project", "--pack", "general", "--language", "en", "--target", dir, "--yes"]);
+
+  const lanes = runCommand(["multiagent", "init", "--target", dir, "--lanes", "research", "--yes"]);
+  const registry = fs.readFileSync(path.join(dir, "_system", "collaboration", "agent-lanes.md"), "utf8");
+  const workspaceReadme = fs.readFileSync(path.join(dir, "_system", "collaboration", "lanes", "research", "workspace", "README.md"), "utf8");
+
+  assert.equal(lanes.status, 0);
+  assert.match(registry, /\| research \| 待补充 \| unbound/);
+  assert.match(workspaceReadme, /_system\/collaboration\/shared\.md/);
+  assert.equal(fs.existsSync(path.join(dir, "_系统", "协作")), false);
+  assert.equal(fs.existsSync(path.join(dir, ".starwork", "agent-lanes", "state.json")), true);
+});
+
 test("multiagent add bind share and status update markdown state", () => {
   const dir = tempDir();
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
@@ -740,6 +772,120 @@ test("multiagent bind keeps binding when host session rename fails", () => {
   assert.equal(result.session_name_sync.status, "warning");
   assert.match(result.session_name_sync.warning, /app-server unavailable/);
   assert.match(registry, /codex:test-thread-2/);
+});
+
+test("multiagent bind --pin records host metadata without rollback when pin is unsupported", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand([
+    "multiagent", "add", "development",
+    "--purpose", "功能开发",
+    "--write", "product/cli/**",
+    "--target", dir,
+    "--yes"
+  ]);
+
+  const fakeCodex = fakeCodexBin();
+  const bind = runCommand([
+    "multiagent", "bind", "development",
+    "--session", "codex:dev-thread-1",
+    "--session-name", "StarWork 开发 Agent",
+    "--pin",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ], { env: fakeCodex.env });
+  const result = JSON.parse(bind.stdout);
+  const registry = fs.readFileSync(path.join(dir, "_系统", "协作", "agent-lanes.md"), "utf8");
+  const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
+
+  assert.equal(bind.status, 0);
+  assert.equal(result.pin_sync.status, "unsupported");
+  assert.match(registry, /codex:dev-thread-1/);
+  assert.equal(state.lanes.development.thread_id, "dev-thread-1");
+  assert.equal(state.lanes.development.current_session, "codex:dev-thread-1");
+});
+
+test("multiagent status --host and read expose Codex observations", () => {
+  const dir = tempDir();
+  const inputPath = path.join(tempDir(), "codex-input.jsonl");
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "bind", "development", "--session", "codex:dev-thread-2", "--target", dir, "--yes"], { env: fakeCodexBin().env });
+
+  const fakeCodex = fakeCodexBin({ inputPath });
+  const status = runCommand(["multiagent", "status", "--host", "--target", dir, "--json"], { env: fakeCodex.env });
+  const read = runCommand(["multiagent", "read", "development", "--turns", "1", "--target", dir, "--json"], { env: fakeCodex.env });
+  const report = JSON.parse(status.stdout);
+  const readReport = JSON.parse(read.stdout);
+  const input = fs.readFileSync(inputPath, "utf8");
+
+  assert.equal(status.status, 0);
+  assert.equal(report.schema, "starwork.agent_lanes.host_status.v0.2");
+  assert.equal(report.lanes[0].starwork.session, "codex:dev-thread-2");
+  assert.equal(report.lanes[0].host.status, "idle");
+  assert.equal(report.lanes[0].host.turn_count, 2);
+  assert.equal(read.status, 0);
+  assert.equal(readReport.host.turns.length, 1);
+  assert.match(input, /"method":"thread\/read"/);
+  assert.doesNotMatch(input, /"method":"thread\/resume"/);
+});
+
+test("multiagent instruct records shared request and sends formatted Codex instruction", () => {
+  const dir = tempDir();
+  const inputPath = path.join(tempDir(), "codex-input.jsonl");
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "bind", "development", "--session", "codex:dev-thread-3", "--target", dir, "--yes"], { env: fakeCodexBin().env });
+
+  const fakeCodex = fakeCodexBin({ inputPath });
+  const instruct = runCommand([
+    "multiagent", "instruct", "development",
+    "--from", "product-planning",
+    "--message", "请开始实现 v0.2。",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ], { env: fakeCodex.env });
+  const result = JSON.parse(instruct.stdout);
+  const shared = fs.readFileSync(path.join(dir, "_系统", "协作", "shared.md"), "utf8");
+  const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
+  const input = fs.readFileSync(inputPath, "utf8");
+
+  assert.equal(instruct.status, 0);
+  assert.equal(result.host_delivery.status, "completed");
+  assert.match(shared, /Cross-Lane Requests/);
+  assert.match(shared, /product-planning \| development \| 请开始实现 v0\.2。 \| completed \| completed/);
+  assert.equal(state.requests[0].host_delivery.thread_id, "dev-thread-3");
+  assert.match(input, /"method":"thread\/resume"/);
+  assert.match(input, /"method":"turn\/start"/);
+  assert.match(input, /STARWORK:MULTIAGENT_MESSAGE v1/);
+});
+
+test("multiagent launch creates and binds Codex threads with launch message", () => {
+  const dir = tempDir();
+  const inputPath = path.join(tempDir(), "codex-input.jsonl");
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+
+  const fakeCodex = fakeCodexBin({ inputPath });
+  const launch = runCommand(["multiagent", "launch", "development", "--target", dir, "--json", "--yes"], { env: fakeCodex.env });
+  const result = JSON.parse(launch.stdout);
+  const registry = fs.readFileSync(path.join(dir, "_系统", "协作", "agent-lanes.md"), "utf8");
+  const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
+  const input = fs.readFileSync(inputPath, "utf8");
+
+  assert.equal(launch.status, 0);
+  assert.equal(result.launches[0].thread_id, "launched-thread-1");
+  assert.match(registry, /codex:launched-thread-1/);
+  assert.equal(state.lanes.development.thread_id, "launched-thread-1");
+  assert.match(input, /"method":"thread\/start"/);
+  assert.match(input, /StarWork MultiAgent Launch/);
 });
 
 test("multiagent status infers workspace for legacy registries", () => {

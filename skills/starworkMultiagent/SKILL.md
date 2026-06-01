@@ -1,11 +1,11 @@
 ---
 name: starworkMultiagent
-description: 'Design and maintain StarWork Agent Lanes with `starwork multiagent`: init, update, bind, release, inspect, and share collaboration state.'
+description: 'Design and maintain StarWork Agent Lanes with `starwork multiagent`: init, update, bind, release, inspect, share, launch, and send cross-session instructions.'
 ---
 
 # starworkMultiagent
 
-使用这个 skill，把用户关于“常用智能体”“当前会话职责”“多 Agent 分工”“跨 Agent 输出共享”的自然语言请求，转换成安全的 `starwork multiagent` 命令组合。
+使用这个 skill，把用户关于“常用智能体”“当前会话职责”“多 Agent 分工”“跨 Agent 输出共享”“跨会话指令”“查看其他 lane 进度”“创建 lane thread”的自然语言请求，转换成安全的 `starwork multiagent` 命令组合。
 
 `starworkMultiagent` 不是 `starwork multiagent` 命令本身。它负责判断用户意图、确认 lane 语义和写入边界，并在写入前优先 dry-run 或请求确认。CLI 只负责稳定执行。
 
@@ -18,6 +18,7 @@ description: 'Design and maintain StarWork Agent Lanes with `starwork multiagent
 ```text
 ../starworkMultiagent-spec.md
 ../../core/agent-lanes-spec.md
+../../planning/features/multiagent/specs/v0.2-codex-orchestration.md
 ```
 
 不要在 skill 内重复维护 Agent Lanes 协议细节；以 Core SPEC 为事实源。
@@ -51,6 +52,10 @@ _系统/协作/shared.md
 | “这个会话不再负责 X” | 释放 lane 当前绑定 | `multiagent release` |
 | “看看现在有哪些 Agent 分工” | 读取协作状态 | `multiagent status --json` |
 | “这个输出给其他 Agent 看” | 登记共享输出索引 | `multiagent share` |
+| “让开发 lane 开始开发” | 向目标 lane 发送格式化跨会话指令 | `multiagent instruct <lane>` |
+| “看看开发 lane 做到哪了” | 读取目标 lane 的 Codex host 观察结果 | `multiagent read <lane>` 或 `multiagent status --host` |
+| “帮我创建产品、开发、验收三个智能体” | 为已有 lanes 创建并绑定 Codex threads | `multiagent launch --lanes ...` |
+| “把这个 lane 固定起来” | 绑定 lane 后 best-effort 置顶 Codex thread | `multiagent bind --pin` |
 
 ## 常用流程：登记当前会话为常用智能体
 
@@ -149,6 +154,14 @@ starwork multiagent bind <lane> --session <agent:session-id> --session-name "<di
 
 例如 `StarWork CLI 维护 Agent`。当前只有 Codex session 支持同步宿主会话名；失败只作为 warning，不影响绑定。
 
+如果用户要求置顶这个 lane，可加入：
+
+```bash
+starwork multiagent bind <lane> --session <agent:session-id> --pin --target <path> --dry-run
+```
+
+`--pin` 是宿主增强能力；当前 Codex 接口不稳定时 CLI 会输出 unsupported warning，不回滚 StarWork binding。
+
 ### release
 
 释放 lane 当前绑定。
@@ -177,6 +190,20 @@ starwork multiagent status --target <path> --json
 - 每个 lane 的 workspace 路径。
 - shared outputs 和 cross-lane requests 中需要关注的内容。
 
+如果用户问“其他 lane 现在做到哪了”，优先使用：
+
+```bash
+starwork multiagent status --host --target <path> --json
+```
+
+如果用户指定某一个 lane：
+
+```bash
+starwork multiagent read <lane> --turns 5 --target <path> --json
+```
+
+解释时必须提醒：这是 Codex host observation，正式交接仍以 lane worklog 和 shared outputs 为准。Codex 前端不刷新不等于发送失败。
+
 ### share
 
 登记某个 lane 的输出，供其他 lane 读取。
@@ -196,6 +223,39 @@ starwork multiagent share <from-lane> --title "<title>" --path "<relative-path>"
 ```
 
 只登记索引，不移动、不复制文件。
+
+### instruct
+
+向另一个 lane 发送结构化跨会话指令。
+
+必须确认或推断：
+
+- from lane
+- to lane
+- 指令内容
+- 目标 lane 的写入边界
+- 完成后如何回报
+
+命令：
+
+```bash
+starwork multiagent instruct <to-lane> --from <from-lane> --message "<text>" --target <path> --dry-run
+```
+
+用户确认后再执行 `--yes`。CLI 会先把请求写入 shared context，再通过 Codex app-server 发送格式化消息；发送失败时，项目内记录仍保留。
+
+### launch
+
+为已有 lane 创建 Codex thread，并发送 StarWork 格式化 Launch Message。
+
+命令：
+
+```bash
+starwork multiagent launch <lane> --target <path> --dry-run
+starwork multiagent launch --lanes product-planning,development,review --target <path> --dry-run
+```
+
+不要自动创建 lane。lane 不存在时，先用 `multiagent add` 设计职责和写入范围。
 
 ## Lane Workspace 与正式输出
 

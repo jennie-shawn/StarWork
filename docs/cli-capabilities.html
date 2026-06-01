@@ -662,14 +662,18 @@
             <h3><code>multiagent</code></h3>
             <span class="badge">协作</span>
           </div>
-          <p>为同一项目建立自定义 AI 职责位，绑定具体会话，并登记跨 lane 可读输出。</p>
+          <p>为同一项目建立自定义 AI 职责位，绑定具体会话，登记跨 lane 可读输出，并编排 Codex lane thread。</p>
           <ul>
             <li>不内置固定职责，lane 由项目场景定义。</li>
             <li>使用 <code>_系统/协作/agent-lanes.md</code> 作为分工索引。</li>
             <li>使用 <code>_系统/协作/shared.md</code> 登记跨 lane 共享输出。</li>
-            <li>不写入任务系统或锁机制。</li>
+            <li>使用 <code>.starwork/agent-lanes/state.json</code> 记录 Codex host metadata 和 delivery state。</li>
+            <li>支持 <code>status --host</code>、<code>read</code>、<code>instruct</code>、<code>launch</code> 和 <code>bind --pin</code>。</li>
+            <li>不写入任务系统或锁机制，不依赖 Codex 前端是否即时刷新。</li>
           </ul>
-          <pre>node cli/bin/starwork.js multiagent init --lanes research,writing,review --target ./workspace --yes</pre>
+          <pre>node cli/bin/starwork.js multiagent init --lanes research,writing,review --target ./workspace --yes
+node cli/bin/starwork.js multiagent status --host --target ./workspace --json
+node cli/bin/starwork.js multiagent instruct development --from product-planning --message "请根据 SPEC 开始实现。" --target ./workspace --dry-run</pre>
         </article>
 
         <article class="command">

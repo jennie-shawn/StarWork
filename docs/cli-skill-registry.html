@@ -566,10 +566,10 @@
           <tr>
             <td><strong><code>starwork multiagent</code></strong></td>
             <td>管理同一项目内多个 AI 会话的职责位协作。</td>
-            <td>初始化 Agent Lanes；新增自定义 lane；维护 lane worklog；绑定或释放 session；可选同步 Codex 宿主会话名；查看状态；登记跨 lane 可读输出。</td>
-            <td><code>init</code>、<code>add</code>、<code>bind</code>、<code>release</code>、<code>status</code>、<code>share</code>、<code>--target</code>、<code>--session</code>、<code>--session-name</code></td>
-            <td><code>_系统/协作/agent-lanes.md</code>、<code>_系统/协作/shared.md</code> 和 lane <code>worklog.md</code>。</td>
-            <td>不内置固定职责；不做任务系统、锁或调度。</td>
+            <td>初始化 Agent Lanes；新增自定义 lane；维护 lane worklog；绑定或释放 session；可选同步 Codex 宿主会话名；观察 host 状态；读取、launch 和 instruct Codex lane thread；登记跨 lane 可读输出。</td>
+            <td><code>init</code>、<code>add</code>、<code>bind --pin</code>、<code>release</code>、<code>status --host</code>、<code>read</code>、<code>instruct</code>、<code>launch</code>、<code>share</code></td>
+            <td><code>_系统/协作/agent-lanes.md</code>、<code>_系统/协作/shared.md</code>、<code>.starwork/agent-lanes/state.json</code> 和 lane <code>worklog.md</code>。</td>
+            <td>不内置固定职责；不做自动调度、文件锁或并发冲突仲裁；不依赖 Codex 前端是否即时刷新。</td>
             <td><span class="status done">已实现</span></td>
           </tr>
           <tr>
@@ -642,9 +642,9 @@
           <tr>
             <td><strong><code>starworkMultiagent</code></strong></td>
             <td>多 AI 协作命令包装助手。</td>
-            <td>用户想把当前会话登记为常用智能体、管理 AI 职责位、绑定或释放 session、查看分工、登记共享输出。</td>
-            <td>判断用户语义；确认 lane ID、职责、写入范围、session 和可选宿主会话显示名称；把请求翻译成 <code>multiagent init/add/bind/release/status/share</code> 命令组合。</td>
-            <td>multiagent dry-run 命令、确认后的执行命令、当前分工解释、过程材料放置建议。</td>
+            <td>用户想把当前会话登记为常用智能体、管理 AI 职责位、绑定或释放 session、查看分工、登记共享输出、读取其他 lane 状态、向其他 lane 发指令或创建 lane thread。</td>
+            <td>判断用户语义；确认 lane ID、职责、写入范围、session、跨会话指令内容和回报方式；把请求翻译成 <code>multiagent init/add/bind/read/instruct/launch/status/share</code> 命令组合。</td>
+            <td>multiagent dry-run 命令、确认后的执行命令、当前分工解释、Codex host observation 解释、过程材料放置建议。</td>
             <td><code>starwork multiagent</code></td>
             <td><span class="status done">已实现</span></td>
           </tr>
