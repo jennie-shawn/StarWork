@@ -46,7 +46,7 @@ development lane 已修复：
 
 第三次产品验收通过：
 
-- `npm test` 通过：71 个测试全部通过。
+- `npm test` 通过：72 个测试全部通过。
 - `git -C product diff --check` 通过。
 - 真实 `multiagent launch launch-test --json --yes` 返回 `status: completed`、`verified_by_thread_read: true`。
 - 随后 `multiagent read launch-test --turns 3 --json` 可读到 1 个 completed turn。

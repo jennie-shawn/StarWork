@@ -18,7 +18,7 @@
 - 实现代码不放这里，仍进入 `product/core/`、`product/cli/`、`product/skills/`、`product/kit-skills/`、`product/packs/` 等实现目录。
 - 面向用户或 Agent 的正式阅读文档仍进入 `product/docs/`。
 - `product/planning/` 解释“为什么这样做、功能如何演变、如何验收”。
-- `issues/` 只记录问题事实、状态和下一步；完整方案仍进入对应功能 SPEC 或开发计划。
+- `issues/index.md` 只做轻量看板；每个问题的完整事实、证据、处理记录和验收方式写入独立 `ISSUE-XXX.md`。完整方案仍进入对应功能 SPEC 或开发计划。
 
 ## 当前试点
 

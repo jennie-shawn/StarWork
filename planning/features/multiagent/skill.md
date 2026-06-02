@@ -16,4 +16,6 @@
 - Prefer `--dry-run` before write or host-mutation commands.
 - Do not auto-create lanes during `launch`; ask the user to define lane purpose and write scope first.
 - Explain that Codex front-end refresh is not the success signal. Use host delivery and project records instead.
+- If `instruct` returns `started_unverified`, do not tell the user the other lane has completed the work. Run `starwork multiagent read <lane>` or explain that delivery still needs confirmation.
+- If `launch` fails to deliver the Launch Message, do not bind the lane manually unless the user explicitly asks and understands the risk.
 - Remind the target lane to update its worklog and shared outputs after completing an instruction.

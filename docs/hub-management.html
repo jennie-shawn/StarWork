@@ -394,7 +394,7 @@
 
         <div class="quick-row">
           <div class="quick"><b>项目中心管共享</b><span>统一维护身份、教训、知识、skills、项目注册和跨项目联络。</span></div>
-          <div class="quick"><b>项目工作台管执行</b><span>每个具体项目维护自己的状态、事项、过程材料和正式成果。</span></div>
+          <div class="quick"><b>项目工作台管执行</b><span>每个具体项目维护自己的状态、当前工作、过程材料和正式成果。</span></div>
           <div class="quick"><b>Registry 管发现</b><span>项目中心只登记项目在哪里、是否活跃，不吞掉项目进度正文。</span></div>
           <div class="quick"><b>联络单管通信</b><span>项目之间的请求、同步、依赖和交接，用联络单留痕。</span></div>
         </div>
@@ -442,7 +442,7 @@
             <rect x="32" y="396" width="168" height="158" rx="14" fill="#d7e4ea" stroke="#1d211d" stroke-width="2"></rect>
             <text x="116" y="430" text-anchor="middle" font-size="21" font-weight="900" fill="#1d211d">项目 A</text>
             <text x="116" y="459" text-anchor="middle" font-size="14" fill="#62675f">具体项目执行</text>
-            <text x="116" y="494" text-anchor="middle" font-size="13" fill="#1d211d">项目状态 / 事项</text>
+            <text x="116" y="494" text-anchor="middle" font-size="13" fill="#1d211d">项目状态 / 当前工作</text>
             <text x="116" y="522" text-anchor="middle" font-size="13" fill="#1d211d">过程材料 / 成果</text>
           </g>
 
@@ -450,7 +450,7 @@
             <rect x="236" y="396" width="168" height="158" rx="14" fill="#d7e4ea" stroke="#1d211d" stroke-width="2"></rect>
             <text x="320" y="430" text-anchor="middle" font-size="21" font-weight="900" fill="#1d211d">项目 B</text>
             <text x="320" y="459" text-anchor="middle" font-size="14" fill="#62675f">具体项目执行</text>
-            <text x="320" y="494" text-anchor="middle" font-size="13" fill="#1d211d">项目状态 / 事项</text>
+            <text x="320" y="494" text-anchor="middle" font-size="13" fill="#1d211d">项目状态 / 当前工作</text>
             <text x="320" y="522" text-anchor="middle" font-size="13" fill="#1d211d">过程材料 / 成果</text>
           </g>
 
@@ -458,7 +458,7 @@
             <rect x="440" y="396" width="168" height="158" rx="14" fill="#d7e4ea" stroke="#1d211d" stroke-width="2"></rect>
             <text x="524" y="430" text-anchor="middle" font-size="21" font-weight="900" fill="#1d211d">项目 C</text>
             <text x="524" y="459" text-anchor="middle" font-size="14" fill="#62675f">具体项目执行</text>
-            <text x="524" y="494" text-anchor="middle" font-size="13" fill="#1d211d">项目状态 / 事项</text>
+            <text x="524" y="494" text-anchor="middle" font-size="13" fill="#1d211d">项目状态 / 当前工作</text>
             <text x="524" y="522" text-anchor="middle" font-size="13" fill="#1d211d">过程材料 / 成果</text>
           </g>
 
@@ -503,7 +503,7 @@
         <article class="panel blue">
           <span class="tag">02 / 项目工作台</span>
           <h3>中心管理的项目工作台</h3>
-          <p>每个具体项目自己的工作台。项目状态、当前工作、事项、资料、过程材料、正式成果，都留在这里独立维护。</p>
+          <p>每个具体项目自己的工作台。项目状态、当前工作、资料、过程材料、正式成果，都留在这里独立维护。</p>
         </article>
 
         <article class="panel amber">
@@ -565,7 +565,7 @@
         <div class="flow-step">
           <span class="tag">Step 3</span>
           <h3>项目内推进</h3>
-          <p>Agent 在 项目工作台 内维护项目状态、事项、资料和成果。项目中心只知道项目在哪里、是否活跃、如何同步。</p>
+          <p>Agent 在 项目工作台 内维护项目状态、当前工作、资料和成果。项目中心只知道项目在哪里、是否活跃、如何同步。</p>
         </div>
       </div>
 
@@ -630,9 +630,9 @@ starwork doctor --target ~/projects/content-site</pre>
               <td>项目事实必须留在项目工作台内。</td>
             </tr>
             <tr>
-              <td>项目产物、资料、事项</td>
+              <td>项目产物、资料、当前工作</td>
               <td>不存正文</td>
-              <td><code>输出/</code>、<code>参考资料/</code>、<code>事项/</code></td>
+              <td><code>输出/</code>、<code>参考资料/</code>、<code>_系统/任务/当前工作.md</code></td>
               <td>这些是具体项目的执行内容，不属于项目中心公共层。</td>
             </tr>
             <tr>
@@ -662,13 +662,13 @@ starwork doctor --target ~/projects/content-site</pre>
         <article class="panel green">
           <span class="tag">它是什么</span>
           <h3>项目之间的正式留言</h3>
-          <p>当项目 A 需要项目 B 提供信息、同步进展、确认边界、交接材料，或者向 项目中心 说明一个跨项目事项时，就写联络单。它应该有明确发送方、接收方、背景、请求、截止时间和期望回复。</p>
+          <p>当项目 A 需要项目 B 提供信息、同步进展、确认边界、交接材料，或者向 项目中心 说明一个跨项目请求时，就写联络单。它应该有明确发送方、接收方、背景、请求、截止时间和期望回复。</p>
         </article>
 
         <article class="panel amber">
           <span class="tag">它不是什么</span>
           <h3>不是项目进度，也不是知识回写</h3>
-          <p>联络单不存项目完整进度，项目进度仍在项目自己的状态和事项里；它也不直接把内容合并进 项目中心的身份、教训或知识。可复用内容仍应走 <code>.incoming/</code> 审核。</p>
+          <p>联络单不存项目完整进度，项目进度仍在项目自己的状态和当前工作里；它也不直接把内容合并进 项目中心的身份、教训或知识。可复用内容仍应走 <code>.incoming/</code> 审核。</p>
         </article>
       </div>
 
@@ -706,7 +706,7 @@ starwork doctor --target ~/projects/content-site</pre>
       <div class="grid-2">
         <article class="panel">
           <h3>项目中心不是项目进度数据库</h3>
-          <p>项目中心的项目注册表只回答“有哪些项目、在哪里、什么状态”。具体进度、事项、判断和产物仍在各自项目工作台。</p>
+          <p>项目中心的项目注册表只回答“有哪些项目、在哪里、什么状态”。具体进度、当前工作、判断和产物仍在各自项目工作台。</p>
         </article>
 
         <article class="panel">

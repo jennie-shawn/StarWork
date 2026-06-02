@@ -7,6 +7,7 @@
 - [product-direction.md](product-direction.md)：StarWork 产品方向、四层结构和关键约束
 - [agent-install-guide.md](agent-install-guide.md)：面向用户 Agent 的 StarWork CLI 与 Skills 安装指导
 - [alpha-test-guide.md](alpha-test-guide.md)：StarWork A 测 CLI 与 Skills 安装、测试和反馈指南
+- [cli-skill-registry.html](cli-skill-registry.html)：当前 CLI 与 StarWork 自研 Skill 的能力注册表、分发边界和配合链路
 - [m2.6-alpha-core-flows-optimization-spec.md](m2.6-alpha-core-flows-optimization-spec.md)：M2.6 A 测核心链路优化规格，覆盖安装、init、doctor/upgrade、项目中心 管理和 multiagent
 - [m2.6-project-init-feedback/README.md](m2.6-project-init-feedback/README.md)：单项目初始化反馈专项 SPEC 索引，包含 5 个可独立实现和验收的反馈项
 - [m2.7-init-github-issues-optimization-spec.md](m2.7-init-github-issues-optimization-spec.md)：GitHub Issues #1/#2 对应的 init 目标路径确认与自定义 AGENTS 一致性优化 SPEC
@@ -19,7 +20,7 @@
 - [product-shape-business-model.html](product-shape-business-model.html)：StarWork 产品形态与商业模式 HTML 可视化阅读版
 - [roadmap.md](roadmap.md)：StarWork 从当前状态到 v0.1 发布、v0.2 扩展和 v1.0 稳定产品的里程碑
 - [roadmap.html](roadmap.html)：里程碑 HTML 阅读版，包含 SVG 总路线图和当前焦点图
-- [v0.1-plan.md](v0.1-plan.md)：StarWork v0.1 三条并行工作线与首轮事项安排
+- [v0.1-plan.md](v0.1-plan.md)：StarWork v0.1 三条并行工作线与首轮工作安排
 - [multiagent/](multiagent/)：StarWork multiagent 课程交付前的 Codex 调研，以及 Cursor / Trae 原生客户端会话管理调研指令
 
 相关事实源：

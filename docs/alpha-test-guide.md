@@ -7,7 +7,7 @@
 - npm package：`@jennie-shawn/starwork`
 - CLI command：`starwork`
 - A 测 tag：`latest`
-- 当前 `latest`：`0.1.0-alpha.13`
+- 当前 `latest`：`0.1.0-alpha.17`
 
 ## A 测用户安装 CLI
 
@@ -25,6 +25,8 @@ starwork --help
 npx @jennie-shawn/starwork --version
 npx @jennie-shawn/starwork --help
 ```
+
+预期版本应为 `0.1.0-alpha.17` 或更新版本。
 
 ## A 测用户安装系统 Skills
 
@@ -118,6 +120,50 @@ starwork spawn \
 starwork doctor --target ~/Desktop/starwork-alpha-project
 ```
 
+### 4. 可选：验证 Codex 多会话协作
+
+这一步只适合正在使用 Codex，并且希望测试多个 Codex 会话协作的用户。
+
+先初始化项目内的职责位：
+
+```bash
+starwork multiagent init \
+  --lanes product-planning,development \
+  --target ~/Desktop/starwork-alpha-project \
+  --yes
+```
+
+为 development 职责位创建 Codex 会话并发送启动消息：
+
+```bash
+starwork multiagent launch development \
+  --target ~/Desktop/starwork-alpha-project \
+  --json \
+  --yes
+```
+
+向 development 职责位发送一条跨会话指令：
+
+```bash
+starwork multiagent instruct development \
+  --from product-planning \
+  --message "请读取当前项目入口，并用一句话汇报你看到的工作台状态。" \
+  --target ~/Desktop/starwork-alpha-project \
+  --json \
+  --yes
+```
+
+读取目标职责位最近状态：
+
+```bash
+starwork multiagent read development \
+  --turns 3 \
+  --target ~/Desktop/starwork-alpha-project \
+  --json
+```
+
+预期：`launch` 和简单 `instruct` 应返回 `completed`。如果返回 `started_unverified`，说明 CLI 没观察到目标会话完成，应继续用 `read` 复核，不要把它当作已完成交付。
+
 ## 反馈重点
 
 请 A 测用户重点反馈：
@@ -131,6 +177,7 @@ starwork doctor --target ~/Desktop/starwork-alpha-project
 - 系统 skills 是否能被 Codex 识别和调用：`starworkInit`、`starworkDoctor`、`starworkMultiagent`、`starworkKnowledge`。
 - `starworkMultiagent` 是否能把“登记当前会话为常用智能体”正确转换成 `starwork multiagent init/add/bind` 建议。
 - `starwork multiagent bind --session-name` 是否能正确同步 Codex 宿主会话名；失败时是否能看懂 warning。
+- `starwork multiagent launch/instruct/read` 在 Codex 中是否能完成多会话读取和指令交付；如果未完成，`started_unverified` 是否容易理解。
 - 项目中心自带的 `starworkSpawn`、`starworkAudit` 与项目工作台自带的 `neat-freak` 是否能在对应工作台内被发现。
 
 ## 发布前检查

@@ -7,6 +7,8 @@ User-facing docs should explain Codex orchestration in plain terms:
 - `status --host` and `read` show Codex host observations, not project truth.
 - Codex Desktop may not refresh immediately; this does not mean delivery failed.
 - `notLoaded` means a thread may exist but is not loaded by the current app-server session.
+- `launch` binds the lane only after the launch message is delivered or confirmed completed by a final read.
+- `instruct` defaults to waiting for the target turn to complete. If the result is `started_unverified`, the instruction may have started but is not confirmed complete; users should run `read <lane>` before trusting the handoff.
 
 Docs that mention multiagent should include the new command family:
 

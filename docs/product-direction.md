@@ -51,18 +51,20 @@ CLI v0.1 安装与适配
 
 ## v0.1 当前收敛
 
-截至 2026-05-20，Core 被定义为开源 AI 工作区协议；Kit 是协议的参考落地结构；CLI 负责稳定生成、检查、升级、适配、安装 Pack 和分发 Kit 自带 Skill；Skill 负责帮助 Agent 生成配置、诊断目录、生成 blueprint 和调用工具；Pack 负责场景定制。
+截至 2026-06-02，Core 被定义为开源 AI 工作区协议；Kit 是协议的参考落地结构；CLI 负责稳定生成、检查、升级、适配、安装 Pack、分发 Kit 自带 Skill 和组织多会话协作；Skill 负责帮助 Agent 生成配置、诊断目录、生成 blueprint 和调用工具；Pack 负责场景定制。
 
 当前已经形成：
 
-- Core v0.1 协议入口与五类 Kit 结构。
-- `starwork init`、`starwork spawn`、`starwork doctor`、`starwork upgrade`、`starwork adapt`、`starwork pack install` 第一版。
+- Core v0.1 协议入口与 Project Kit / 项目中心 Kit 两类参考结构。
+- `starwork init`、`starwork spawn`、`starwork doctor`、`starwork knowledge`、`starwork upgrade`、`starwork adapt`、`starwork pack install`、`starwork multiagent` 第一版。
 - `starwork spawn --blueprint` 第一版，可按工作台定制单从项目中心创建定制化项目工作台。
 - `starworkSpawn` skill 第一版，用于帮助 Agent 设计 Spawn Blueprint。
 - `starworkInit` skill 第一版，用于帮助 Agent 采访用户并生成初始化建议。
 - `starworkDoctor` 第一版，用于把历史模板诊断和升级蓝图生成交给 Agent 判断，再由 CLI 保守执行。
+- `starworkKnowledge` 第一版，用于引导开启和维护项目本地知识库。
+- `starworkMultiagent` 第一版，用于把多 Agent 分工、Codex 多会话读取、launch 和跨会话指令转换成 CLI 命令组合。
 - Skill 管理与分发第一版：系统 Skill、工作台模板自带 Skill、项目中心托管 Skill、Pack 自带 Skill 和项目本地 Skill 已有基本边界。
-- 公开 A 测分发入口：GitHub `jennie-shawn/StarWork` 与 npm `@jennie-shawn/starwork`。
+- 公开 A 测分发入口：GitHub `jennie-shawn/StarWork` 与 npm `@jennie-shawn/starwork@0.1.0-alpha.17`。
 - Pack 源包结构：语言无关业务角色 + `languages/` 多语言落地配置。
 
-下一步重点不是继续扩张 Core，而是先验证 CLI 与 Skills 能否被 A 测用户顺利安装和调用，并打磨 `init`、`doctor`、`upgrade` 和 Skill 分发体验；安装链路稳定后，再进入内容创作者 Pack 的场景验证。
+下一步重点不是继续扩张 Core，而是先围绕 alpha.17 做发布后验证：确认 CLI 与 Skills 能被 A 测用户顺利安装和调用，并打磨 `init`、`doctor`、`upgrade`、`knowledge`、项目中心管理和 MultiAgent Codex 多会话链路；安装与基础链路稳定后，再进入内容创作者 Pack 的场景验证。
