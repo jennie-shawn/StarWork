@@ -6,7 +6,7 @@
 | --- | --- |
 | 类型 | cli |
 | 优先级 | P1 |
-| 状态 | fixed-pending-review |
+| 状态 | closed |
 | 来源 | MultiAgent v0.2 产品验收 |
 | 发现日期 | 2026-06-01 |
 | 关联 SPEC | `product/planning/features/multiagent/specs/v0.2-codex-orchestration.md` |
@@ -89,6 +89,21 @@ starwork multiagent instruct development --from product-planning --message "验�
 - `node --check cli/src/cli.js && node --check cli/test/init.test.js` 通过。
 - `node --test cli/test/init.test.js` 通过：72 个测试全部通过。
 - 真实 Codex app-server 临时项目复验通过：默认 `multiagent instruct --yes --json` 返回 `host_delivery.status: completed`，`verified_by_thread_read: true`；随后 `multiagent read development --turns 2 --json` 显示目标 instruct turn 为 `completed`。
+
+## 产品 lane 复验
+
+2026-06-02 产品 lane 再次复验通过：
+
+- `npm test` 通过：72 个测试全部通过。
+- `git -C product diff --check` 通过。
+- `node --check product/cli/src/cli.js && node --check product/cli/test/init.test.js` 通过。
+- 临时 StarWork 项目中绑定真实 Codex 测试 thread 后，默认执行 `multiagent instruct --yes --json` 返回 `host_delivery.status: completed`。
+- 返回结果包含 `verified_by_thread_read: true` 和 `verification_warning: null`。
+- 随后执行 `multiagent read development --turns 3 --json`，新 instruct turn 状态为 `completed`，没有复现 `interrupted`。
+
+## 关闭结论
+
+`ISSUE-003` 已关闭。默认 `instruct` 主链路通过真实 Codex app-server 复验；未完成状态也已有 `started_unverified` 回归测试保护。
 
 ## 验收方式
 
