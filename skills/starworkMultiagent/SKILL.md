@@ -251,6 +251,14 @@ starwork multiagent instruct <to-lane> --from <from-lane> --message "<text>" --t
 
 用户确认后再执行 `--yes`。CLI 会先把请求写入 shared context，再通过 Codex app-server 发送格式化消息；发送失败时，项目内记录仍保留。
 
+默认情况下，`instruct` 会等待目标 Codex turn 完成，避免过早关闭连接导致目标 turn 被打断。若返回 `started_unverified`，说明消息已经启动但 CLI 没有观察到完成；此时不要告诉用户“已经完成交付”，应立即运行：
+
+```bash
+starwork multiagent read <to-lane> --turns 3 --target <path> --json
+```
+
+只有看到目标 turn 为 `completed`，或目标 lane 后续明确回报，才把这次跨会话指令视为完成。
+
 ### launch
 
 为已有 lane 创建 Codex thread，并发送 StarWork 格式化 Launch Message。

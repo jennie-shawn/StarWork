@@ -1197,14 +1197,14 @@ async function lanesInstruct(argv) {
   if (options.dryRun) return;
   await confirmOrThrow(options, `是否向 Lane ${toLane} 发送指令？`);
   const delivery = threadId
-    ? await sendCodexInstruction({ threadId, message, timeout: parsePositiveInt(options.timeout, 30000) })
+    ? await sendCodexInstruction({ threadId, message, timeout: parsePositiveInt(options.timeout, 300000) })
     : { adapter: "codex", status: "needs_manual_delivery", thread_id: null, warning: "Target lane has no Codex thread" };
   const finalRequest = buildSharedRequestRow({
     id: requestId,
     from: fromLane,
     to: toLane,
     request: options.message,
-    status: delivery.status === "completed" ? "completed" : delivery.status === "sent" ? "sent" : delivery.status,
+    status: delivery.status,
     hostDelivery: delivery.status,
     link: collaboration.shared
   });
@@ -6793,7 +6793,7 @@ async function resumeCodexThread(threadId) {
 }
 
 async function startCodexTurn(threadId, formattedMessage, options = {}) {
-  return sendCodexInstruction({ threadId, message: formattedMessage, timeout: options.timeout || 30000 });
+  return sendCodexInstruction({ threadId, message: formattedMessage, timeout: options.timeout || 300000 });
 }
 
 async function listCodexThreads(options = {}) {
@@ -6844,7 +6844,7 @@ async function sendCodexInstruction({ threadId, message, timeout }) {
     waitAfter: {
       id: 4,
       method: "turn/completed",
-      timeout: Math.max(1000, Math.min(parsePositiveInt(timeout, 30000), 30000))
+      timeout: Math.max(1000, parsePositiveInt(timeout, 300000))
     }
   });
   if (!result.ok) {
@@ -6863,12 +6863,14 @@ async function sendCodexInstruction({ threadId, message, timeout }) {
   const finalRead = result.responses.find((item) => item.id === 5);
   return {
     adapter: "codex",
-    status: completed ? "completed" : "sent",
+    status: completed ? "completed" : "started_unverified",
     thread_id: threadId,
     turn_id: completed?.params?.turnId || completed?.params?.turn?.id || started?.params?.turnId || started?.params?.turn?.id || start.result?.turnId || null,
     completed_at: completed ? new Date().toISOString() : null,
     verified_by_thread_read: Boolean(finalRead && !finalRead.error),
-    verification_warning: finalRead?.error?.message || result.optional_warnings?.[0] || null,
+    verification_warning: completed
+      ? finalRead?.error?.message || result.optional_warnings?.[0] || null
+      : "Codex turn/completed was not observed; run multiagent read to verify the target lane before assuming delivery completed",
     ui_visibility: "not_guaranteed"
   };
 }
@@ -6880,7 +6882,11 @@ async function launchCodexLane({ message, workspaceRoot, timeout }) {
       jsonrpc: "2.0",
       id: 2,
       method: "thread/start",
-      params: { cwd: workspaceRoot }
+      params: {
+        cwd: workspaceRoot,
+        sandbox: "workspace-write",
+        approvalPolicy: "on-request"
+      }
     },
     ({ responses }) => {
       const response = responses.find((item) => item.id === 2);
@@ -8099,7 +8105,7 @@ Options:
   --target <path>
   --from <lane-id>
   --message <text>
-  --timeout <ms>
+  --timeout <ms>  默认最多等待 300000ms，未完成时返回 started_unverified
   --json
   --dry-run
   --yes, -y

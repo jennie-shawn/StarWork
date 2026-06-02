@@ -16,16 +16,16 @@
 
 | 文件 | 职责 | 属性 |
 | --- | --- | --- |
-| `product/planning/issues/index.md` | Issue 跟踪唯一入口，记录状态、优先级、负责人、来源、下一步和关联文档。 | 持续更新 / issue 事实源 |
+| `product/planning/issues/index.md` | Issue 跟踪唯一入口和轻量看板，只记录状态、优先级、负责人、来源、详情链接和下一步。 | 持续更新 / 看板入口 |
 | `product/planning/issues/template.md` | 新 issue 的记录模板。 | 模板 |
-| `product/planning/issues/ISSUE-XXX-*.md` | 信息量较大的 issue 详情文件。 | 可选 |
+| `product/planning/issues/ISSUE-XXX.md` | 单个 issue 的完整事实、证据、处理记录和验收方式。 | issue 详情事实源 |
 
 ## Issue 单填写要求
 
 每个 issue 必须同时有两层记录：
 
 1. `index.md` 上方表格里有一行摘要，方便扫描状态和下一步。
-2. 同一个文件里有对应的 `## ISSUE-XXX：标题` 详情段；信息量很大时拆成独立 Markdown 文件，并从 index 链接过去。
+2. `ISSUE-XXX.md` 里有完整详情；不要把完整详情写进 `index.md`。
 
 新 issue 必须至少写清：
 
@@ -82,7 +82,7 @@
 
 1. 收到反馈后，先分配下一个 `ISSUE-*` 编号。
 2. 在 `index.md` 的表格里新增摘要行，至少填标题、类型、优先级、状态、来源和下一步。
-3. 按 `template.md` 补完整 issue 单；信息量很大时拆成独立文件，并从 index 摘要行链接过去。
+3. 复制 `template.md` 到 `ISSUE-XXX.md`，补完整 issue 单，并从 index 摘要行链接过去。
 4. 先记录事实：来源、复现方式、影响范围、证据文件、用户可见表现。
 5. 分流判断：
    - 如果是实现缺陷，交给 optimization / development lane。
@@ -90,12 +90,13 @@
    - 如果需要公开协作，创建或关联 GitHub Issue。
    - 如果是文档问题，关联 `product/docs/` 或对应功能档案。
 6. 解决后更新 issue 状态、处理结果和验证方式。
-7. 已转成 SPEC 的 issue，不要在 issue 表里继续扩写完整方案；方案沉淀到对应事实源，issue 只保留链接和状态。
+7. 已转成 SPEC 的 issue，不要在 index 里继续扩写完整方案；方案沉淀到对应事实源，issue 详情文件只保留链接、状态和必要事实。
 
 ## 记录原则
 
 - 不把 issue 表写成第二个需求池。
 - 不把 issue 表写成开发日志。
+- 不把 `index.md` 写成 issue 详情合集；它必须保持轻量，便于 Agent 低成本扫描。
 - 不把同一个问题散落在聊天、验收报告、SPEC 和 GitHub 里而没有互链。
 - 用户真实反馈优先于 dry-run 结论。
 - 涉及发布、升级、工作区结构和 Agent 规则污染的问题，必须进入 issue 跟踪，不能只留在聊天里。
