@@ -8,6 +8,13 @@
 
 | ID | 标题 | 类型 | 优先级 | 状态 | 负责人 | 来源 | 详情 | 下一步 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ISSUE-011 | StarWork Skill 不应内置宿主适配百科，运行时宿主能力应由 CLI 判断 | skill / cli / adapter / workflow | P1 | closed | development lane | 用户反馈 / 产品架构判断 | [ISSUE-011.md](ISSUE-011.md) | 已关闭：Skill 已收敛为 CLI 调用与状态解释；运行时宿主能力由 CLI 判断。 |
+| ISSUE-010 | MultiAgent 创建 Agent 时应强制使用可读会话命名格式 | cli / skill / workflow | P2 | closed | development lane | 用户反馈 / 产品补充要求 | [ISSUE-010.md](ISSUE-010.md) | 已关闭：默认会话名已改为 `<职责名> Agent`，不含项目名和内部词。 |
+| ISSUE-009 | 非 StarWork 目录的 MultiAgent 引导应转入 starworkInit Skill，而不是直接提示运行 CLI | skill / cli / workflow | P2 | closed | development lane | 用户反馈 / 产品验收 | [ISSUE-009.md](ISSUE-009.md) | 已关闭：CLI / Skill / A 测文档均指向 `starworkInit` Skill 接入流程。 |
+| ISSUE-008 | MultiAgent `instruct` 默认等待目标会话完成导致发送方阻塞且目标 turn 可能 interrupted | cli / workflow | P1 | closed | development lane | 用户反馈 / 真实跨会话通知 | [ISSUE-008.md](ISSUE-008.md) | 已关闭：v0.4 路由已禁止低层 turn 模拟，标准投递不可用时返回 `manual_handoff_required`。 |
+| ISSUE-007 | MultiAgent 创建会话后没有自动改成对应 Agent 名称 | cli / skill / workflow | P2 | closed | development lane | 用户反馈 | [ISSUE-007.md](ISSUE-007.md) | 已关闭：批量 launch 已支持自动命名；后续命名格式由 `ISSUE-010` 校准为 `<职责名> Agent`。 |
+| ISSUE-006 | MultiAgent 创建团队只生成 lane，没有创建和绑定独立会话 | cli / skill / workflow | P1 | closed | development lane | 用户反馈 / 真实项目 | [ISSUE-006.md](ISSUE-006.md) | 已关闭：团队创建不再停留在 lane-only；launch v0.3 暴露逐 lane 绑定状态，未完成不误报完成。 |
+| ISSUE-005 | MultiAgent 在非 StarWork 项目初始化时生成 AGENTS 副本而非合并入口 | cli / skill / workflow | P1 | closed | development lane | 用户反馈 / 真实项目 | [ISSUE-005.md](ISSUE-005.md) | 已关闭：非 StarWork 目标拒绝 multiagent launch，并由 `starworkInit` Skill 接管标准接入流程；不生成 `AGENTS.starwork-new.md`。 |
 | ISSUE-004 | Host Adapter 覆盖用户规则文件且 sidecar 状态不一致 | cli / skill | P0 | closed | development lane | Host Adapter v0.1 产品验收 | [ISSUE-004.md](ISSUE-004.md) | 已关闭：产品复验通过，用户规则不被覆盖，sidecar state/doctor 一致，upgrade/repair Skill 承接方式明确。 |
 | ISSUE-003 | MultiAgent `instruct` 返回 `sent` 后目标 turn 可能 interrupted | cli | P1 | closed | development lane | MultiAgent v0.2 产品验收 | [ISSUE-003.md](ISSUE-003.md) | 已关闭：默认 instruct 真实复验返回 completed，目标 turn 为 completed。 |
 | ISSUE-002 | MultiAgent v0.2 `launch` 失败后仍写入 lane binding | cli | P0 | closed | development lane | MultiAgent v0.2 产品验收 | [ISSUE-002.md](ISSUE-002.md) | 已关闭：真实 launch 可完成并绑定，失败场景已有回归测试保护。 |

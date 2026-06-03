@@ -731,6 +731,8 @@ function parseArgs(argv) {
       options.turns = readValue(argv, ++i, arg);
     } else if (arg === "--timeout") {
       options.timeout = readValue(argv, ++i, arg);
+    } else if (arg === "--wait" || arg === "--wait-completion") {
+      options.waitCompletion = true;
     } else if (arg === "--title") {
       options.title = readValue(argv, ++i, arg);
     } else if (arg === "--path") {
@@ -1232,7 +1234,8 @@ async function lanesInstruct(argv) {
   });
   const targetSession = lanesState.lanes?.[toLane]?.current_session || targetLane.current_session;
   const parsedSession = parseAdapterSession(targetSession);
-  const canAutoSend = !options.manualHandoff && parsedSession.host === "codex" && parsedSession.id;
+  const route = resolveHostRuntimeCapability({ workspaceRoot, parsedSession, command: "instruct" });
+  const canAutoSend = !options.manualHandoff && route.action === "auto_send";
   const dryRunRequest = buildSharedRequestRow({
     id: requestId,
     from: fromLane,
@@ -1249,24 +1252,35 @@ async function lanesInstruct(argv) {
     agreements: shared.agreements
   });
   if (options.json && options.dryRun) {
-    console.log(JSON.stringify({ schema: "starwork.agent_lanes.instruct.v0.2", dry_run: true, request: dryRunRequest, formatted_message: message }, null, 2));
+    console.log(JSON.stringify({ schema: "starwork.agent_lanes.instruct.v0.4", dry_run: true, request: dryRunRequest, host: renderHostRoute(route), formatted_message: message }, null, 2));
     return;
   }
   if (!options.json) {
     printGenericPlan(options.dryRun ? "跨会话指令预览（dry run）：" : "跨会话指令计划：", dryPlan.actions);
-    if (canAutoSend) console.log(`将发送到 Codex thread：${parsedSession.id}`);
-    else console.log(`目标 lane 绑定的是 ${parsedSession.host}，当前不能后台自动发送；将生成人工交付消息并记录为 ${MANUAL_HANDOFF_STATUS}。`);
+    if (canAutoSend) console.log(`将通过宿主标准能力发送到 ${parsedSession.host}:${parsedSession.id}`);
+    else console.log(`目标 lane 路由结果：${route.status}；将按 CLI 返回状态记录。`);
     console.log("");
   }
   if (options.dryRun) return;
   await confirmOrThrow(options, `是否向 Lane ${toLane} 发送指令？`);
-  const delivery = canAutoSend
-    ? await sendCodexInstruction({ threadId: parsedSession.id, message, timeout: parsePositiveInt(options.timeout, 300000) })
-    : createManualHandoffDelivery({
-        parsedSession,
+  let delivery;
+  if (options.manualHandoff) {
+    delivery = createManualHandoffDelivery({
+      parsedSession,
+      message,
+      reason: "Manual handoff requested"
+    });
+  } else if (canAutoSend) {
+    delivery = await sendCodexInstruction({
+        threadId: parsedSession.id,
         message,
-        reason: "Target host does not support StarWork background message delivery in v0.1"
+        timeout: parsePositiveInt(options.timeout, 300000),
+        waitCompletion: Boolean(options.waitCompletion)
       });
+    delivery.mode = "host_standard_api";
+  } else {
+    delivery = createDeliveryFromRoute({ route, parsedSession, message, workspaceRoot });
+  }
   const finalRequest = buildSharedRequestRow({
     id: requestId,
     from: fromLane,
@@ -1299,7 +1313,7 @@ async function lanesInstruct(argv) {
     ]
   });
   if (options.json) {
-    console.log(JSON.stringify({ schema: "starwork.agent_lanes.instruct.v0.2", request: finalRequest, host_delivery: delivery }, null, 2));
+    console.log(JSON.stringify({ schema: "starwork.agent_lanes.instruct.v0.4", request: finalRequest, host: renderHostRoute(route), host_delivery: delivery }, null, 2));
     return;
   }
   console.log("");
@@ -1364,33 +1378,53 @@ async function lanesLaunch(argv) {
   const launchResults = [];
   if (options.dryRun) {
     for (const lane of lanes) {
-      launchResults.push({ lane: lane.lane, dry_run: true, message: renderMultiagentLaunchMessage({ lane, fromLane: options.from || "user", workspaceRoot, collaboration }) });
+      const sessionName = buildLaneLaunchSessionName({ lane, workspaceRoot, explicitName: options.sessionName });
+      launchResults.push({
+        lane: lane.lane,
+        dry_run: true,
+        session_name: sessionName,
+        launch_status: "dry_run",
+        rename_status: sessionName ? "dry_run" : "not_requested",
+        binding_status: "dry_run",
+        message: renderMultiagentLaunchMessage({ lane, fromLane: options.from || "user", workspaceRoot, collaboration })
+      });
     }
     if (options.json) {
-      console.log(JSON.stringify({ schema: "starwork.agent_lanes.launch.v0.2", dry_run: true, launches: launchResults }, null, 2));
+      console.log(JSON.stringify({ schema: "starwork.agent_lanes.launch.v0.3", dry_run: true, launches: launchResults }, null, 2));
       return;
     }
     console.log("");
     console.log("Codex lane launch 预览（dry run）：");
-    lanes.forEach((lane) => console.log(`- ${lane.lane}`));
+    launchResults.forEach((result) => console.log(`- ${result.lane}${result.session_name ? ` -> ${result.session_name}` : ""}`));
     return;
   }
   await confirmOrThrow(options, `是否 launch ${lanes.length} 个 Codex lane thread？`);
   let nextRegistryLanes = registry.lanes;
   let lanesState = readAgentLanesState(workspaceRoot);
   for (const lane of lanes) {
+    const sessionName = buildLaneLaunchSessionName({ lane, workspaceRoot, explicitName: options.sessionName });
     const launchMessage = renderMultiagentLaunchMessage({ lane, fromLane: options.from || "user", workspaceRoot, collaboration });
     const launch = await launchCodexLane({ message: launchMessage, workspaceRoot, timeout: parsePositiveInt(options.timeout, 90000) });
-    const session = launch.thread_id ? `codex:${launch.thread_id}` : "unbound";
+    const launchedThreadId = launch.thread_id || launch.created_thread_id || "";
+    const session = launchedThreadId ? `codex:${launchedThreadId}` : "unbound";
+    const sessionNameSync = launchedThreadId
+      ? await renameHostSessionBestEffort({ session, sessionName })
+      : createSessionNameSyncResult({
+        requested: Boolean(sessionName),
+        supported: false,
+        status: sessionName ? "skipped" : "not_requested",
+        name: sessionName,
+        warning: sessionName ? "No host thread was created to rename." : null
+      });
+    const bindingStatus = launch.thread_id && launch.status === "completed" ? "bound" : "unbound";
     if (launch.thread_id && launch.status === "completed") {
-      const sessionNameSync = await renameHostSessionBestEffort({ session, sessionName: normalizeMarkdownCell(options.sessionName || "") });
       const pinSync = pinHostThreadBestEffort({ session, requested: Boolean(options.pin) });
       nextRegistryLanes = nextRegistryLanes.map((item) => item.lane === lane.lane ? { ...item, current_session: session } : item);
       lanesState = updateAgentLaneHostState(lanesState, lane.lane, {
         host: "codex",
         current_session: session,
         thread_id: launch.thread_id,
-        session_name: normalizeMarkdownCell(options.sessionName || ""),
+        session_name: sessionName,
         pinned: pinSync.status === "ok",
         pin_status: pinSync.status,
         created_by: "starwork multiagent launch",
@@ -1403,17 +1437,32 @@ async function lanesLaunch(argv) {
       launch.session_name_sync = sessionNameSync;
       launch.pin_sync = pinSync;
     }
-    launchResults.push({ lane: lane.lane, ...launch });
+    launchResults.push({
+      lane: lane.lane,
+      ...launch,
+      session,
+      session_id: launchedThreadId || undefined,
+      session_name: sessionName,
+      launch_status: launch.status,
+      rename_status: sessionNameSync.status,
+      rename_warning: sessionNameSync.warning || undefined,
+      binding_status: bindingStatus,
+      session_name_sync: sessionNameSync
+    });
   }
   actions.push(...buildLanesRegistryPlan(workspaceRoot, nextRegistryLanes).actions);
   actions.push(stateFileAction(workspaceRoot, lanesState));
   applyPlan({ targetDir: workspaceRoot, actions: dedupeActions(actions) });
   if (options.json) {
-    console.log(JSON.stringify({ schema: "starwork.agent_lanes.launch.v0.2", launches: launchResults }, null, 2));
+    console.log(JSON.stringify({ schema: "starwork.agent_lanes.launch.v0.3", launches: launchResults }, null, 2));
     return;
   }
   console.log("");
-  launchResults.forEach((result) => console.log(`Lane ${result.lane}: ${result.status}${result.thread_id ? ` (${result.thread_id})` : ""}${result.warning ? ` - ${result.warning}` : ""}`));
+  launchResults.forEach((result) => {
+    console.log(`Lane ${result.lane}: ${result.status}${result.thread_id ? ` (${result.thread_id})` : ""}${result.session_name ? ` -> ${result.session_name}` : ""}${result.warning ? ` - ${result.warning}` : ""}`);
+    if (result.rename_warning) console.log(`  Warning: host session rename skipped: ${result.rename_warning}`);
+    if (result.binding_status !== "bound") console.log("  Warning: lane was not bound because launch did not complete.");
+  });
 }
 
 async function lanesShare(argv) {
@@ -1582,7 +1631,7 @@ function collectDoctorResult(targetDir, options = {}) {
       if (trace) {
         addCheck(result, "workspace.state.exists", "fail", "疑似 StarWork 工作台，但缺少 .starwork/workspace.json。", trace);
       } else {
-        addCheck(result, "workspace.state.exists", "fail", "当前目录不是 StarWork 工作台。请先运行 starwork init。");
+        addCheck(result, "workspace.state.exists", "fail", "当前目录不是 StarWork 工作台。请让 Agent 使用 starworkInit Skill 完成接入；CLI 只作为确认方案后的执行工具。");
       }
     }
     return result;
@@ -1656,7 +1705,7 @@ function requireWorkspaceRoot(targetDir) {
   }
   const workspaceRoot = findWorkspaceRoot(targetDir);
   if (!workspaceRoot) {
-    throw new Error("当前目录不是 StarWork 工作台。请先运行 starwork init。");
+    throw new Error("当前目录不是 StarWork 工作台。请让 Agent 使用 starworkInit Skill 完成接入；CLI 只作为确认方案后的执行工具。");
   }
   return workspaceRoot;
 }
@@ -7043,6 +7092,13 @@ function parseLaneList(value) {
     .map((item) => normalizeLaneId(item, "lanes"));
 }
 
+function buildLaneLaunchSessionName({ lane, workspaceRoot, explicitName }) {
+  const requestedName = normalizeMarkdownCell(explicitName || "");
+  if (requestedName) return requestedName;
+  const roleName = normalizeMarkdownCell(lane?.purpose || lane?.lane || "");
+  return normalizeMarkdownCell(`${roleName || "Agent"} Agent`);
+}
+
 function normalizeLaneId(value, label) {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`${label} 必须是非空 lane ID。`);
@@ -7289,10 +7345,132 @@ function createManualHandoffDelivery({ parsedSession, message, reason }) {
   return {
     adapter: parsedSession.host,
     status: MANUAL_HANDOFF_STATUS,
+    mode: "manual_handoff",
     session: parsedSession.session,
     session_id: parsedSession.id,
     formatted_message: message,
     warning: reason || "Manual handoff required"
+  };
+}
+
+function resolveHostRuntimeCapability({ workspaceRoot, parsedSession, command }) {
+  if (!parsedSession?.id || parsedSession.host === "none") {
+    return {
+      host: parsedSession?.host || "none",
+      session: parsedSession?.session || "unbound",
+      command,
+      status: "unbound",
+      action: "none",
+      warning: "Target lane is not bound to a host session."
+    };
+  }
+  let profile = null;
+  try {
+    profile = loadAdapterProfile(parsedSession.host);
+  } catch (error) {
+    return {
+      host: parsedSession.host,
+      session: parsedSession.session,
+      command,
+      status: "unsupported",
+      action: "none",
+      warning: error.message
+    };
+  }
+  const adaptersState = readAdaptersState(workspaceRoot);
+  const adapterRecord = adaptersState.adapters?.[profile.host] || null;
+  const adapterEnabled = Boolean(adapterRecord?.enabled);
+  if (profile.host !== "codex" && !adapterEnabled) {
+    return {
+      host: profile.host,
+      session: parsedSession.session,
+      command,
+      profile_level: profile.sessions?.send_message || "unknown",
+      adapter_enabled: false,
+      status: "needs_adapt",
+      action: "none",
+      warning: `Target host is not adapted. Run starwork adapt ${profile.host} --target <path> --dry-run before automatic routing.`
+    };
+  }
+  const profileLevel = profile.sessions?.send_message || "unknown";
+  if (profileLevel === "unsupported") {
+    return {
+      host: profile.host,
+      session: parsedSession.session,
+      command,
+      profile_level: profileLevel,
+      adapter_enabled: adapterEnabled,
+      status: "unsupported",
+      action: "none",
+      warning: `${profile.label} does not support background message delivery.`
+    };
+  }
+  const runtime = probeHostStandardSendCapability(profile.host);
+  if (runtime.available) {
+    return {
+      host: profile.host,
+      session: parsedSession.session,
+      command,
+      profile_level: profileLevel,
+      adapter_enabled: adapterEnabled,
+      runtime_available: true,
+      status: "delivered",
+      action: "auto_send",
+      mode: runtime.mode
+    };
+  }
+  return {
+    host: profile.host,
+    session: parsedSession.session,
+    command,
+    profile_level: profileLevel,
+    adapter_enabled: adapterEnabled,
+    runtime_available: false,
+    status: MANUAL_HANDOFF_STATUS,
+    action: "manual_handoff",
+    warning: runtime.warning || `${profile.label} standard background delivery capability is not available in this CLI runtime.`
+  };
+}
+
+function probeHostStandardSendCapability(host) {
+  return {
+    host,
+    available: false,
+    mode: null,
+    warning: `${host} standard background delivery capability is not available in this CLI runtime; low-level turn APIs are not used for multiagent instruct.`
+  };
+}
+
+function renderHostRoute(route) {
+  return {
+    id: route.host,
+    session: route.session,
+    command: route.command,
+    profile_level: route.profile_level,
+    adapter_enabled: route.adapter_enabled,
+    runtime_available: route.runtime_available,
+    action: route.action,
+    status: route.status,
+    warning: route.warning || null
+  };
+}
+
+function createDeliveryFromRoute({ route, parsedSession, message, workspaceRoot }) {
+  if (route.status === MANUAL_HANDOFF_STATUS) {
+    return createManualHandoffDelivery({
+      parsedSession,
+      message,
+      reason: route.warning || "Target host requires manual handoff."
+    });
+  }
+  return {
+    adapter: route.host || parsedSession.host,
+    status: route.status,
+    mode: route.action || "none",
+    session: parsedSession.session,
+    session_id: parsedSession.id,
+    message_path: path.relative(workspaceRoot, path.join(workspaceRoot, "_系统", "协作", "shared.md")) || "_系统/协作/shared.md",
+    warning: route.warning || null
   };
 }
 
@@ -7555,7 +7733,12 @@ async function resumeCodexThread(threadId) {
 }
 
 async function startCodexTurn(threadId, formattedMessage, options = {}) {
-  return sendCodexInstruction({ threadId, message: formattedMessage, timeout: options.timeout || 300000 });
+  return sendCodexInstruction({
+    threadId,
+    message: formattedMessage,
+    timeout: options.timeout || 300000,
+    waitCompletion: Boolean(options.waitCompletion)
+  });
 }
 
 async function listCodexThreads(options = {}) {
@@ -7569,7 +7752,7 @@ async function listCodexThreads(options = {}) {
   return { ok: true, threads: response.result?.data || response.result?.threads || response.result || [] };
 }
 
-async function sendCodexInstruction({ threadId, message, timeout }) {
+async function sendCodexInstruction({ threadId, message, timeout, waitCompletion = false }) {
   const messages = [
     codexInitializeMessage(1),
     {
@@ -7592,23 +7775,26 @@ async function sendCodexInstruction({ threadId, message, timeout }) {
         threadId,
         input: [codexTextInput(message)]
       }
-    },
-    {
+    }
+  ];
+  if (waitCompletion) {
+    messages.push({
       jsonrpc: "2.0",
       id: 5,
       method: "thread/read",
       optional: true,
       params: { threadId, includeTurns: true }
-    }
-  ];
-  const result = await runCodexAppServer(messages, {
+    });
+  }
+  const runOptions = waitCompletion ? {
     timeout,
     waitAfter: {
       id: 4,
       method: "turn/completed",
       timeout: Math.max(1000, parsePositiveInt(timeout, 300000))
     }
-  });
+  } : { timeout };
+  const result = await runCodexAppServer(messages, runOptions);
   if (!result.ok) {
     return { adapter: "codex", status: "failed", thread_id: threadId, warning: result.warning };
   }
@@ -7620,8 +7806,21 @@ async function sendCodexInstruction({ threadId, message, timeout }) {
   if (!start || start.error) {
     return { adapter: "codex", status: "failed", thread_id: threadId, warning: start?.error?.message || "Codex turn/start failed" };
   }
-  const completed = result.events.find((item) => item.method === "turn/completed");
   const started = result.events.find((item) => item.method === "turn/started");
+  if (!waitCompletion) {
+    return {
+      adapter: "codex",
+      status: "delivered",
+      thread_id: threadId,
+      turn_id: started?.params?.turnId || started?.params?.turn?.id || start.result?.turnId || null,
+      completion_status: "not_waited",
+      completed_at: null,
+      verified_by_thread_read: false,
+      warning: "Delivery only; target task completion must be verified by multiagent read, worklog, or a return instruction.",
+      ui_visibility: "not_guaranteed"
+    };
+  }
+  const completed = result.events.find((item) => item.method === "turn/completed");
   const finalRead = result.responses.find((item) => item.id === 5);
   return {
     adapter: "codex",
@@ -8764,7 +8963,7 @@ Subcommands:
   instruct   向另一个 lane 发送格式化跨会话指令。
   handoff    生成并记录人工交付消息，不后台发送。
   continue   输出继续某个 lane 宿主会话的人工命令或步骤。
-  launch     为已有 lane 创建并绑定 Codex thread。
+  launch     为已有 lane 创建并绑定独立宿主会话。
   share      登记一个跨 lane 可读输出。
 
 示例：
@@ -8826,8 +9025,8 @@ Options:
 
 说明：
   --session-name 会在绑定成功后 best-effort 同步宿主工具的会话名称。
-  --pin 会尝试置顶 Codex thread；当前无稳定接口时只输出 warning，不回滚绑定。
-  Codex 支持自动观察和派发；Claude Code 支持 CLAUDE_CODE_SESSION_ID 自动识别和 resume 命令；Cursor / Trae v0.1 走人工交付。
+  --pin 会请求宿主置顶；不支持时只输出 warning，不回滚绑定。
+  instruct 的自动投递由 CLI 运行时判断；没有标准后台投递能力时返回 manual_handoff_required。
 `);
 }
 
@@ -8884,7 +9083,8 @@ Options:
   --target <path>
   --from <lane-id>
   --message <text>
-  --timeout <ms>  默认最多等待 300000ms，未完成时返回 started_unverified
+  --timeout <ms>
+  --wait, --wait-completion  显式等待目标 turn completed；默认只确认投递
   --json
   --dry-run
   --yes, -y
@@ -8935,7 +9135,7 @@ Usage:
 Options:
   --target <path>
   --lanes <lane1,lane2>
-  --session-name <name>
+  --session-name <name>  覆盖默认 "<职责名> Agent" 会话名
   --pin
   --timeout <ms>
   --json

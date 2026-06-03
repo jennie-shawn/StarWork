@@ -46,6 +46,18 @@ _system/collaboration/shared.md
 
 如果用户指定了目标目录，所有命令都加 `--target <path>`。如果没有指定，默认目标是当前工作区。
 
+## 前置边界：只在 StarWork 工作台内创建团队
+
+`starworkInit` 负责把普通项目变成 StarWork 工作台；`starworkMultiagent` 只负责已有 StarWork 工作台里的团队协作。
+
+开始任何 `multiagent init/add/bind/launch` 写入前，先确认目标目录是 StarWork 工作台：
+
+```bash
+starwork doctor --target <path> --json
+```
+
+如果目标不是 StarWork 工作台，立即停止 multiagent 写入，不要尝试局部初始化，不要新建 `AGENTS.starwork-new.md` 或只补 `_系统/协作/`。下一步是切换到 `starworkInit` Skill，由它采访用户、选择工作台类型和 Pack、处理已有规则入口，并在用户确认后调用 CLI。`starworkInit` 完成且 `starwork doctor --target <path>` 通过后，才继续 multiagent 流程。
+
 ## 判断用户意图
 
 优先把用户话语归到一个入口，不要一开始讲 CLI 子命令。
@@ -55,16 +67,34 @@ _system/collaboration/shared.md
 | “把当前会话创建为常用智能体，负责 X” | 登记当前会话为一个稳定职责位 | 必要时 `init`，再 `add`，再 `bind` |
 | “初始化多 Agent 协作层” | 创建 Agent Lanes 协议文件 | `multiagent init` |
 | “增加一个负责 X 的 Agent / lane” | 新增职责位，暂不一定绑定会话 | `multiagent add` |
-| “把当前 Codex / Claude Code 绑定到 X” | 将具体 session 绑定到已有 lane | `multiagent bind` |
+| “把当前工具会话绑定到 X” | 将具体 session 绑定到已有 lane | `multiagent bind` |
 | “这个会话不再负责 X” | 释放 lane 当前绑定 | `multiagent release` |
 | “看看现在有哪些 Agent 分工” | 读取协作状态 | `multiagent status --json` |
 | “这个输出给其他 Agent 看” | 登记共享输出索引 | `multiagent share` |
 | “让开发 lane 开始开发” | 向目标 lane 发送格式化跨会话指令 | `multiagent instruct <lane>` |
 | “看看开发 lane 做到哪了” | 读取目标 lane 可用的宿主观察结果 | `multiagent read <lane>` 或 `multiagent status --host` |
 | “把这条消息交给另一个工具里的会话” | 生成并记录人工交付消息 | `multiagent handoff <lane>` |
-| “继续 Claude Code 里的这个 lane” | 输出 resume 命令或人工继续步骤 | `multiagent continue <lane>` |
-| “帮我创建产品、开发、验收三个智能体” | 为已有 lanes 创建并绑定 Codex threads | `multiagent launch --lanes ...` |
-| “把这个 lane 固定起来” | 绑定 lane 后 best-effort 置顶 Codex thread | `multiagent bind --pin` |
+| “继续这个 lane” | 输出 resume 命令或人工继续步骤 | `multiagent continue <lane>` |
+| “帮我创建产品、开发、验收三个智能体” | 设计 lanes 后创建并绑定可工作的独立会话 | `multiagent add ...` + `multiagent launch --lanes ...` |
+| “把这个 lane 固定起来” | 绑定 lane 后请求宿主置顶；是否支持由 CLI 返回 | `multiagent bind --pin` |
+
+## 常用流程：创建 Agent 团队
+
+“创建 Agent 团队 / 创建多个智能体 / 产品、开发、验收三个智能体”不是只创建 lane。完整成功标准是：每个目标职责都有 lane、每个 lane 已绑定可工作的独立 session，或者输出中明确说明哪些 lane 未完成以及阻塞原因。
+
+1. 先按“前置边界”确认目标是 StarWork 工作台；非 StarWork 目标转 `starworkInit`，不要运行 `multiagent init` 做局部初始化。
+2. 读取 `agent-lanes.md` 和 `state.json`，判断哪些 lane 已存在，哪些需要新增。
+3. 对缺失 lane 先 dry-run `multiagent add`，确认 `lane-id`、职责和写入范围；用户确认后执行 `--yes`。
+4. 对需要独立 session 的 lanes，执行：
+
+```bash
+starwork multiagent launch --lanes <lane1,lane2,lane3> --target <path> --json --yes
+```
+
+5. 检查 JSON 中每个 lane 的 `launch_status`、`rename_status` 和 `binding_status`。只有 `binding_status: "bound"` 才能告诉用户该 Agent 已创建并可工作；`unbound` 必须带 warning 和下一步。
+6. 默认会话名由 CLI 自动生成：`<职责名> Agent`。如果 `rename_status` 是 `warning`，说明宿主命名失败但 StarWork 绑定结果仍以 `binding_status` 为准。
+
+只有用户明确说“先只初始化协作层 / 先只建职责位 / lane-only”时，才可以停在 `multiagent init/add`。
 
 ## 常用流程：登记当前会话为常用智能体
 
@@ -83,7 +113,7 @@ starwork multiagent init --target <path> --dry-run
    - 可主动修改的路径范围。
    - 该 lane 的过程工作区，中文项目默认是 `_系统/协作/lanes/<lane-id>/workspace/`，英文项目默认是 `_system/collaboration/lanes/<lane-id>/workspace/`。
    - 当前 session ID；无法自动识别时，请用户提供 `agent:session-id`。
-   - 宿主会话显示名称；仅当用户希望在 Codex 等宿主会话列表中同步改名时使用。
+   - 宿主会话显示名称；仅当用户希望在宿主会话列表中同步改名时使用。
 4. 生成 dry-run 命令：
 
 ```bash
@@ -99,32 +129,20 @@ starwork multiagent bind <lane> --session <agent:session-id> --session-name "<di
 
 ## 子命令使用规则
 
-## 宿主能力分支
+## 宿主能力路由
 
-开始跨会话操作前，先看当前工作台是否已有 adapter state：
+Skill 不维护宿主能力矩阵，不根据工具名称自行判断能否自动发送、读取、创建或改名。凡是依赖宿主能力的动作，都调用 StarWork CLI，并根据 CLI 返回的结构化状态解释下一步。
 
-```bash
-starwork doctor --target <path> --host all --json
-```
+常见 CLI 返回：
 
-不同宿主能力不同，不能把 Codex 的能力当成所有工具都支持：
+- `delivered`：消息已通过宿主标准能力投递；不代表目标任务完成。
+- `manual_handoff_required`：CLI 已生成可复制交付消息，需要用户手动发给目标会话。
+- `needs_adapt`：目标宿主还没准备好；引导用户先运行 `starwork adapt <host> --target <path> --dry-run`，确认后再执行。
+- `unbound`：目标 lane 尚未绑定 session；先 `bind` 或 `launch`。
+- `unsupported`：当前宿主明确不支持该能力。
+- `failed`：CLI 尝试执行失败；保留项目记录，提示用户可重试或走 handoff。
 
-| Host | 使用方式 |
-|---|---|
-| Codex | 可以自动读取、创建和发送跨会话指令，但仍以 StarWork worklog 和 shared context 为准。 |
-| Claude Code | 可以绑定当前会话、读取 transcript 候选摘要、resume；不能后台发消息给非当前会话。 |
-| Cursor | 先按 partial 能力处理；自动化不可确认时生成可复制交付消息。 |
-| Trae | 默认是人工交付宿主；读取 StarWork worklog / handoff，不读加密数据库，不说自动送达。 |
-
-如果用户要给 Claude Code、Cursor 或 Trae 做多会话协作，先确认对应宿主已经适配：
-
-```bash
-starwork adapt <host> --target <path> --dry-run
-starwork adapt <host> --target <path> --yes
-starwork doctor --target <path> --host <host>
-```
-
-不要把 `adapter profile`、`host_native_dirs`、`capabilities` 等内部词直接讲给用户；说“这个工具能自动做什么、哪些需要你手动复制”。
+解释时只说用户下一步，不展开宿主私有路径、数据库、transcript 或底层 API 细节。
 
 ### init
 
@@ -191,7 +209,7 @@ starwork multiagent bind <lane> --session <agent:session-id> --session-name "<di
 <项目或产品名> <职责> Agent
 ```
 
-例如 `StarWork CLI 维护 Agent`。当前只有 Codex session 支持同步宿主会话名；Claude Code、Cursor、Trae 绑定时不要承诺能改宿主会话标题。失败只作为 warning，不影响绑定。
+例如 `StarWork CLI 维护 Agent`。是否能同步宿主标题由 CLI 返回；失败只作为 warning，不影响 StarWork binding。
 
 如果用户要求置顶这个 lane，可加入：
 
@@ -241,7 +259,7 @@ starwork multiagent status --host --target <path> --json
 starwork multiagent read <lane> --turns 5 --target <path> --json
 ```
 
-解释时必须提醒：这是 Codex host observation，正式交接仍以 lane worklog 和 shared outputs 为准。Codex 前端不刷新不等于发送失败。
+解释时必须提醒：这是宿主观察结果，正式交接仍以 lane worklog 和 shared outputs 为准。宿主前端不刷新不等于发送失败。
 
 ### share
 
@@ -281,15 +299,15 @@ starwork multiagent share <from-lane> --title "<title>" --path "<relative-path>"
 starwork multiagent instruct <to-lane> --from <from-lane> --message "<text>" --target <path> --dry-run
 ```
 
-用户确认后再执行 `--yes`。CLI 会先把请求写入 shared context，再通过 Codex app-server 发送格式化消息；发送失败时，项目内记录仍保留。
+用户确认后再执行 `--yes`。CLI 会先把请求写入 shared context，再判断宿主运行时能力：可标准投递则发送；不可标准投递则返回 handoff、needs_adapt、unbound、unsupported 或 failed 等状态。发送失败时，项目内记录仍保留。
 
-默认情况下，`instruct` 会等待目标 Codex turn 完成，避免过早关闭连接导致目标 turn 被打断。若返回 `started_unverified`，说明消息已经启动但 CLI 没有观察到完成；此时不要告诉用户“已经完成交付”，应立即运行：
+默认情况下，`instruct` 只确认消息已投递到目标 lane，返回 `delivered`。`delivered` 不等于目标任务完成，不要告诉用户“对方已经完成”。后续用 `read`、目标 lane worklog 或回传指令追踪：
 
 ```bash
 starwork multiagent read <to-lane> --turns 3 --target <path> --json
 ```
 
-只有看到目标 turn 为 `completed`，或目标 lane 后续明确回报，才把这次跨会话指令视为完成。
+只有看到目标 turn 为 `completed`，或目标 lane 后续明确回报，才把这次跨会话指令视为完成。如果用户明确要求同步等待，再加 `--wait-completion`；若返回 `started_unverified`，只能说明已启动但未观察到完成。
 
 对非 Codex 宿主：
 
@@ -311,7 +329,7 @@ starwork multiagent continue <lane> --target <path> --json
 
 ### launch
 
-为已有 lane 创建 Codex thread，并发送 StarWork 格式化 Launch Message。
+为已有 lane 创建独立宿主会话，并发送 StarWork 格式化 Launch Message。
 
 命令：
 
@@ -321,6 +339,12 @@ starwork multiagent launch --lanes product-planning,development,review --target 
 ```
 
 不要自动创建 lane。lane 不存在时，先用 `multiagent add` 设计职责和写入范围。
+
+正式执行时优先使用 `--json`，并按结果判断：
+
+- `launch_status` 表示宿主会话和 Launch Message 是否完成。
+- `rename_status` 表示宿主会话命名是否完成；warning 需要告诉用户。
+- `binding_status` 表示 StarWork lane 是否已绑定可工作的 session；不是 `bound` 时不能说团队创建完成。
 
 ## Lane Workspace 与正式输出
 

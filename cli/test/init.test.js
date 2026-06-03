@@ -56,7 +56,7 @@ function listFiles(dir) {
   return result;
 }
 
-function fakeCodexBin({ exitCode = 0, stderr = "", inputPath, failTurnStart = false, omitFinalRead = false, omitTurnCompleted = false } = {}) {
+function fakeCodexBin({ exitCode = 0, stderr = "", inputPath, failTurnStart = false, failThreadNameSet = false, omitFinalRead = false, omitTurnCompleted = false } = {}) {
   const dir = tempDir();
   const binDir = path.join(dir, "bin");
   fs.mkdirSync(binDir, { recursive: true });
@@ -77,6 +77,12 @@ rl.on("line", (line) => {
   if (request.method === "thread/read") {
     if (${Boolean(omitFinalRead)} && request.id >= 4) return;
     console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { thread: { id: request.params.threadId, name: "Fake Codex Thread", cwd: "/fake/project", status: "idle", turns: [{ id: "turn-1", status: "completed" }, { id: "turn-2", status: "completed" }] } } }));
+  } else if (request.method === "thread/name/set") {
+    if (${Boolean(failThreadNameSet)}) {
+      console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, error: { message: "rename failed" } }));
+      return;
+    }
+    console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: {} }));
   } else if (request.method === "thread/start") {
     console.log(JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { threadId: "launched-thread-1" } }));
   } else if (request.method === "thread/list") {
@@ -115,6 +121,17 @@ test("prints version and product-oriented help", () => {
   assert.match(help.stdout, new RegExp(`StarWork CLI ${packageJson.version}`));
   assert.match(help.stdout, /常用开始/);
   assert.match(help.stdout, /starwork init --help/);
+});
+
+test("starworkMultiagent skill delegates host routing to CLI", () => {
+  const skill = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "SKILL.md"), "utf8");
+
+  assert.doesNotMatch(skill, /\| Host \|/);
+  assert.doesNotMatch(skill, /Codex app-server/);
+  assert.doesNotMatch(skill, /Claude Code \|/);
+  assert.match(skill, /CLI 返回/);
+  assert.match(skill, /manual_handoff_required/);
+  assert.match(skill, /needs_adapt/);
 });
 
 test("dry-run does not write files", () => {
@@ -844,7 +861,7 @@ test("multiagent status --host and read expose Codex observations", () => {
   assert.match(input, /"method":"thread\/resume"/);
 });
 
-test("multiagent instruct records shared request and sends formatted Codex instruction", () => {
+test("multiagent instruct returns manual handoff for Codex when standard send is unavailable", () => {
   const dir = tempDir();
   const inputPath = path.join(tempDir(), "codex-input.jsonl");
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
@@ -865,27 +882,28 @@ test("multiagent instruct records shared request and sends formatted Codex instr
   const result = JSON.parse(instruct.stdout);
   const shared = fs.readFileSync(path.join(dir, "_系统", "协作", "shared.md"), "utf8");
   const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
-  const input = fs.readFileSync(inputPath, "utf8");
 
   assert.equal(instruct.status, 0);
-  assert.equal(result.host_delivery.status, "completed");
+  assert.equal(result.schema, "starwork.agent_lanes.instruct.v0.4");
+  assert.equal(result.host_delivery.status, "manual_handoff_required");
+  assert.equal(result.host_delivery.mode, "manual_handoff");
+  assert.match(result.host_delivery.warning, /standard background delivery capability is not available/);
   assert.match(shared, /Cross-Lane Requests/);
-  assert.match(shared, /product-planning \| development \| 请开始实现 v0\.2。 \| completed \| completed/);
-  assert.equal(state.requests[0].host_delivery.thread_id, "dev-thread-3");
-  assert.match(input, /"method":"thread\/resume"/);
-  assert.match(input, /"method":"turn\/start"/);
-  assert.match(input, /STARWORK:MULTIAGENT_MESSAGE v1/);
+  assert.match(shared, /product-planning \| development \| 请开始实现 v0\.2。 \| manual_handoff_required \| manual_handoff_required/);
+  assert.equal(state.requests[0].host_delivery.status, "manual_handoff_required");
+  assert.equal(fs.existsSync(inputPath), false);
 });
 
-test("multiagent instruct marks incomplete delivery as started_unverified", () => {
+test("multiagent instruct does not use low-level Codex turn APIs even with wait requested", () => {
   const dir = tempDir();
+  const inputPath = path.join(tempDir(), "codex-input.jsonl");
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
   runCommand(["multiagent", "init", "--target", dir, "--yes"]);
   runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
   runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
   runCommand(["multiagent", "bind", "development", "--session", "codex:dev-thread-4", "--target", dir, "--yes"], { env: fakeCodexBin().env });
 
-  const fakeCodex = fakeCodexBin({ omitTurnCompleted: true });
+  const fakeCodex = fakeCodexBin({ inputPath, omitTurnCompleted: true });
   const instruct = runCommand([
     "multiagent", "instruct", "development",
     "--from", "product-planning",
@@ -893,6 +911,7 @@ test("multiagent instruct marks incomplete delivery as started_unverified", () =
     "--target", dir,
     "--json",
     "--yes",
+    "--wait-completion",
     "--timeout", "1000"
   ], { env: fakeCodex.env });
   const result = JSON.parse(instruct.stdout);
@@ -900,10 +919,84 @@ test("multiagent instruct marks incomplete delivery as started_unverified", () =
   const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
 
   assert.equal(instruct.status, 0);
-  assert.equal(result.host_delivery.status, "started_unverified");
-  assert.match(result.host_delivery.verification_warning, /turn\/completed was not observed/);
-  assert.match(shared, /product-planning \| development \| 请开始实现 v0\.3。 \| started_unverified \| started_unverified/);
-  assert.equal(state.requests[0].host_delivery.status, "started_unverified");
+  assert.equal(result.host_delivery.status, "manual_handoff_required");
+  assert.match(shared, /product-planning \| development \| 请开始实现 v0\.3。 \| manual_handoff_required \| manual_handoff_required/);
+  assert.equal(state.requests[0].host_delivery.status, "manual_handoff_required");
+  assert.equal(fs.existsSync(inputPath), false);
+});
+
+test("multiagent instruct returns unbound when target lane has no session", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+
+  const instruct = runCommand([
+    "multiagent", "instruct", "development",
+    "--from", "product-planning",
+    "--message", "请开始实现 v0.4。",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ]);
+  const result = JSON.parse(instruct.stdout);
+  const shared = fs.readFileSync(path.join(dir, "_系统", "协作", "shared.md"), "utf8");
+  const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
+
+  assert.equal(instruct.status, 0);
+  assert.equal(result.host_delivery.status, "unbound");
+  assert.match(result.host_delivery.warning, /Target lane is not bound/);
+  assert.match(shared, /product-planning \| development \| 请开始实现 v0\.4。 \| unbound \| unbound/);
+  assert.equal(state.requests[0].host_delivery.status, "unbound");
+});
+
+test("multiagent instruct returns needs_adapt when a non-Codex host is not adapted", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "bind", "development", "--session", "cursor:cursor-thread-1", "--target", dir, "--yes"]);
+
+  const instruct = runCommand([
+    "multiagent", "instruct", "development",
+    "--from", "product-planning",
+    "--message", "请继续处理运行时路由。",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ]);
+  const result = JSON.parse(instruct.stdout);
+
+  assert.equal(instruct.status, 0);
+  assert.equal(result.host_delivery.status, "needs_adapt");
+  assert.equal(result.host.id, "cursor");
+  assert.match(result.host_delivery.warning, /starwork adapt cursor/);
+});
+
+test("multiagent instruct returns manual handoff when adapted host lacks standard send", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--adapter", "cursor", "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "bind", "development", "--session", "cursor:cursor-thread-2", "--target", dir, "--yes"]);
+
+  const instruct = runCommand([
+    "multiagent", "instruct", "development",
+    "--from", "product-planning",
+    "--message", "请继续处理运行时路由。",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ]);
+  const result = JSON.parse(instruct.stdout);
+
+  assert.equal(instruct.status, 0);
+  assert.equal(result.host_delivery.status, "manual_handoff_required");
+  assert.equal(result.host_delivery.mode, "manual_handoff");
+  assert.match(result.host_delivery.formatted_message, /STARWORK:MULTIAGENT_MESSAGE v1/);
 });
 
 test("multiagent bind detects Claude Code session from environment and outputs resume command", () => {
@@ -964,7 +1057,7 @@ test("multiagent read summarizes Claude Code transcript without dumping full tra
 
 test("multiagent instruct returns manual handoff for Trae lane instead of fake delivery", () => {
   const dir = tempDir();
-  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--adapter", "trae", "--yes"]);
   runCommand(["multiagent", "init", "--target", dir, "--yes"]);
   runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
   runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
@@ -1027,6 +1120,59 @@ test("multiagent launch creates and binds Codex threads with launch message", ()
   assert.match(input, /StarWork MultiAgent Launch/);
 });
 
+test("multiagent launch names each batch-created Codex thread by lane role", () => {
+  const dir = tempDir();
+  const inputPath = path.join(tempDir(), "codex-input.jsonl");
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+
+  const fakeCodex = fakeCodexBin({ inputPath });
+  const launch = runCommand([
+    "multiagent", "launch",
+    "--lanes", "product-planning,development",
+    "--target", dir,
+    "--json",
+    "--yes",
+    "--timeout", "1000"
+  ], { env: fakeCodex.env });
+  const result = JSON.parse(launch.stdout);
+  const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
+  const input = fs.readFileSync(inputPath, "utf8");
+
+  assert.equal(launch.status, 0);
+  assert.equal(result.launches[0].session_name, "产品规划 Agent");
+  assert.equal(result.launches[0].rename_status, "ok");
+  assert.equal(result.launches[0].binding_status, "bound");
+  assert.equal(result.launches[1].session_name, "功能开发 Agent");
+  assert.equal(result.launches[1].rename_status, "ok");
+  assert.equal(result.launches[1].binding_status, "bound");
+  assert.equal(state.lanes["product-planning"].session_name, "产品规划 Agent");
+  assert.equal(state.lanes.development.session_name, "功能开发 Agent");
+  assert.match(input, /"name":"产品规划 Agent"/);
+  assert.match(input, /"name":"功能开发 Agent"/);
+  assert.doesNotMatch(result.launches[0].session_name, new RegExp(path.basename(dir)));
+});
+
+test("multiagent launch warns when host session rename fails after creation", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+
+  const fakeCodex = fakeCodexBin({ failThreadNameSet: true });
+  const launch = runCommand(["multiagent", "launch", "development", "--target", dir, "--json", "--yes", "--timeout", "1000"], { env: fakeCodex.env });
+  const result = JSON.parse(launch.stdout);
+  const registry = fs.readFileSync(path.join(dir, "_系统", "协作", "agent-lanes.md"), "utf8");
+
+  assert.equal(launch.status, 0);
+  assert.equal(result.launches[0].binding_status, "bound");
+  assert.equal(result.launches[0].rename_status, "warning");
+  assert.match(result.launches[0].rename_warning, /rename failed/);
+  assert.match(registry, /codex:launched-thread-1/);
+});
+
 test("multiagent launch does not bind when launch message delivery fails", () => {
   const dir = tempDir();
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
@@ -1043,8 +1189,22 @@ test("multiagent launch does not bind when launch message delivery fails", () =>
   assert.equal(result.launches[0].status, "failed");
   assert.equal(result.launches[0].created_thread_id, "launched-thread-1");
   assert.equal(result.launches[0].thread_id, undefined);
+  assert.equal(result.launches[0].binding_status, "unbound");
   assert.match(registry, /\| development \| 功能开发 \| unbound \|/);
   assert.equal(state.lanes.development?.thread_id, undefined);
+});
+
+test("multiagent launch refuses non-StarWork targets without sidecar initialization", () => {
+  const dir = tempDir();
+  fs.writeFileSync(path.join(dir, "AGENTS.md"), "# Existing project rules\n", "utf8");
+
+  const launch = runCommand(["multiagent", "launch", "development", "--target", dir, "--json", "--yes"]);
+
+  assert.notEqual(launch.status, 0);
+  assert.match(launch.stderr, /starworkInit/);
+  assert.doesNotMatch(launch.stderr, /请先运行 starwork init/);
+  assert.equal(fs.existsSync(path.join(dir, "AGENTS.starwork-new.md")), false);
+  assert.equal(fs.readFileSync(path.join(dir, "AGENTS.md"), "utf8"), "# Existing project rules\n");
 });
 
 test("multiagent launch binds when final verification read times out after completion", () => {

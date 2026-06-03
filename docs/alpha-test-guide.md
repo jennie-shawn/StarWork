@@ -120,9 +120,9 @@ starwork spawn \
 starwork doctor --target ~/Desktop/starwork-alpha-project
 ```
 
-### 4. 可选：验证 Codex 多会话协作
+### 4. 可选：验证 MultiAgent 会话创建与跨会话交付
 
-这一步只适合正在使用 Codex，并且希望测试多个 Codex 会话协作的用户。
+这一步适合希望测试多个 Agent 职责位、独立会话创建和跨会话交付降级的用户。
 
 先初始化项目内的职责位：
 
@@ -133,14 +133,17 @@ starwork multiagent init \
   --yes
 ```
 
-为 development 职责位创建 Codex 会话并发送启动消息：
+为 product-planning 和 development 职责位批量创建独立会话并发送启动消息：
 
 ```bash
-starwork multiagent launch development \
+starwork multiagent launch \
+  --lanes product-planning,development \
   --target ~/Desktop/starwork-alpha-project \
   --json \
   --yes
 ```
+
+检查 JSON 中每个 lane 的 `binding_status`。只有 `bound` 表示该 Agent 已创建并绑定可工作的独立会话；`rename_status` 为 `warning` 时，说明宿主会话自动命名失败，需要按返回信息处理。
 
 向 development 职责位发送一条跨会话指令：
 
@@ -153,6 +156,8 @@ starwork multiagent instruct development \
   --yes
 ```
 
+当前 CLI 只有在运行时发现宿主标准后台投递能力时才会返回 `delivered`。如果返回 `manual_handoff_required`，表示已生成可复制交付消息，需要用户手动发给目标会话；这不是失败。
+
 读取目标职责位当前可观察状态：
 
 ```bash
@@ -162,7 +167,7 @@ starwork multiagent read development \
   --json
 ```
 
-预期：`launch` 和简单 `instruct` 应返回 `completed`。如果返回 `started_unverified`，说明 CLI 没观察到目标会话完成，应继续用 `read` 复核，不要把它当作已完成交付。
+预期：`launch` 成功时返回 `completed`；`instruct` 会根据 CLI 运行时宿主路由返回 `delivered`、`manual_handoff_required`、`needs_adapt`、`unbound` 等状态。`delivered` 只表示消息已投递，不表示目标任务完成；`manual_handoff_required` 表示需要手动复制交付消息。
 
 ### 5. 可选：验证 Host Adapter
 
@@ -195,6 +200,10 @@ starwork doctor \
 ```bash
 starwork multiagent init \
   --lanes product-planning,development \
+  --target ~/Desktop/starwork-alpha-project \
+  --yes
+
+starwork adapt trae \
   --target ~/Desktop/starwork-alpha-project \
   --yes
 
@@ -243,11 +252,11 @@ Cursor / Trae 写入 Skill 目录后，宿主 UI 是否立即发现需要继续�
 - 系统 skills 是否能被 Codex 识别和调用：`starworkInit`、`starworkDoctor`、`starworkMultiagent`、`starworkKnowledge`。
 - `starworkMultiagent` 是否能把“登记当前会话为常用智能体”正确转换成 `starwork multiagent init/add/bind` 建议。
 - `starwork multiagent bind --session-name` 是否能正确同步 Codex 宿主会话名；失败时是否能看懂 warning。
-- `starwork multiagent launch/instruct/read` 在 Codex 中是否能完成多会话读取和指令交付；如果未完成，`started_unverified` 是否容易理解。
+- `starwork multiagent launch/instruct/read` 是否能清楚区分会话创建、宿主观察、标准投递和人工交付；`manual_handoff_required` / `needs_adapt` / `unbound` 是否容易理解。
 - `starwork adapt --capabilities` 是否能帮助 Agent 判断不同宿主能力，而不是把内部字段甩给用户。
 - `starwork doctor --host <host>` 是否能区分“工作台结构问题”和“宿主入口 / Skill 目录问题”。
 - Cursor / Trae 在写入 `.cursor/skills/` / `.trae/skills/` 后是否需要重启、刷新窗口或重新打开项目。
-- 非 Codex 宿主返回 `manual_handoff_required` 时，用户是否能理解“已生成交付消息，不等于已自动送达”。
+- 返回 `manual_handoff_required` 时，用户是否能理解“已生成交付消息，不等于已自动送达”。
 - 项目中心自带的 `starworkSpawn`、`starworkAudit` 与项目工作台自带的 `neat-freak` 是否能在对应工作台内被发现。
 
 ## 发布前检查

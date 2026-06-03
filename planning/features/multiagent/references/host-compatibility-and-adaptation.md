@@ -49,6 +49,46 @@ Cursor、Trae、Claude Code 都能兼容 StarWork MultiAgent 的“项目内协�
 
 Cursor / Trae / Claude Code 适配应优先保证 L0，然后按宿主能力逐层增强。
 
+## 跨会话投递硬边界
+
+`instruct <lane>` 的产品语义是“通过宿主标准能力，把一条消息投递给另一个已绑定会话”。它不是“恢复目标会话后在里面模拟输入一个新 turn”。
+
+因此：
+
+- Codex 只能使用 Codex 标准线程投递能力，例如 `send_message_to_thread` 或明确等价的稳定宿主 API。
+- 不再把 `thread/resume` + `turn/start` 作为 StarWork 跨会话指令的标准实现。
+- `resume`、`continue`、`--resume <id>` 只能映射到 StarWork `continue <lane>`，表示让用户或当前进程恢复某个会话继续工作；不能包装成自动 `instruct`。
+- Cursor、Trae、Claude Code 若没有标准后台投递 API，就不支持自动 `instruct`，只能走 `handoff`：生成格式化消息，等待用户手动粘贴或切换会话发送。
+- 宿主内部数据库、transcript、低层 turn API、非公开调试接口都不能作为自动派活的正式依据。
+
+## Skill / CLI / adapt 边界
+
+StarWork Skill 不负责维护宿主工具能力百科。Skill 的职责是把用户意图转成 StarWork CLI 调用，并用人话解释 CLI 输出。
+
+边界如下：
+
+| 层级 | 职责 |
+| --- | --- |
+| Skill | 采访用户、选择 StarWork CLI 命令、优先 dry-run、解释 JSON 输出和下一步。 |
+| CLI | 在运行时封装 StarWork 协议、宿主能力判断、执行、降级状态和错误处理。 |
+| adapt | 准备宿主环境：生成规则入口、创建宿主 Skill 目录、写入 adapter state，并让 `doctor --host` 可检查。 |
+| adapter profile | 记录某个宿主的能力基线、Skill 目录、规则入口和安全降级要求。 |
+
+因此，`starworkMultiagent` Skill 不应直接写入 Codex / Claude Code / Cursor / Trae 的完整能力矩阵，也不应硬编码某个宿主的私有路径、数据库或 transcript 细节。
+
+当工具能力不同，Skill 应依赖 CLI 输出，例如：
+
+```text
+delivered
+manual_handoff_required
+needs_adapt
+unbound
+unsupported
+failed
+```
+
+然后只解释“这个工具现在能自动做什么、哪些需要你手动处理”。某次业务命令能不能自动执行，由 CLI 在运行时判断；`adapt` 只提供准备好的宿主入口和 adapter state。
+
 ## 能力兼容矩阵
 
 | StarWork 能力 | Cursor 兼容性 | Trae 兼容性 | Claude Code 兼容性 | 适配判断 |
@@ -62,7 +102,7 @@ Cursor / Trae / Claude Code 适配应优先保证 L0，然后按宿主能力逐�
 | `status` | 可兼容 | 可兼容 | 可兼容 | StarWork 项目状态可读，不依赖宿主。 |
 | `status --host` | 部分兼容 | 部分兼容 | 可兼容 | Cursor 可报告 transcript / CLI / 认证状态；Trae 可报告 session 元数据；Claude Code 可读取 session id、transcript cwd、git branch、permissionMode 等元数据。 |
 | `read <lane>` | 部分兼容 | 不兼容 | 可兼容 | Cursor 可尝试读取本地 transcript；Trae 完整消息在加密数据库中，不应读取；Claude Code transcript JSONL 可安全只读解析。 |
-| `instruct <lane>` | 部分兼容 | 仅人工兼容 | 仅人工兼容 | Cursor 可在有 chatId 且 CLI 可用时尝试 `cursor agent --resume` 发送；Trae 无程序化发送入口；Claude Code 无向非当前会话发送 follow-up 的 API，应生成可复制消息或提示用户 `claude --resume <id>` 后发送。 |
+| `instruct <lane>` | 仅人工兼容 | 仅人工兼容 | 仅人工兼容 | 三者当前均未确认有标准后台投递 API。不得用 `resume` / `continue` 冒充自动发送；应生成可复制 handoff 消息，或提示用户恢复对应会话后手动发送。 |
 | `launch <lane>` | 部分兼容 | 仅人工兼容 | 部分兼容 | Cursor 有 `create-chat` 入口但需验证；Trae 无创建会话 API；Claude Code 可生成 `claude -n ... --session-id ...` 启动命令，但不能在当前进程后台启动并完成交付。 |
 | `continue <lane>` | 部分兼容 | 仅人工兼容 | 可兼容 | Cursor CLI 有 `--resume` / `--continue`；Trae 只能通过 UI；Claude Code 可映射到 `claude --resume <session-id>`。 |
 | `release` | 可兼容 | 可兼容 | 可兼容 | StarWork 侧解除 binding、提醒更新 worklog，三个宿主都支持。 |
@@ -88,7 +128,7 @@ starwork multiagent bind research --session cursor:<id> --target . --yes
   - 是否可用 `cursor agent create-chat`。
   - 是否找到本地 transcript。
   - 是否疑似未登录或认证不可用。
-- 在有可靠 chatId 时，探索 `multiagent instruct` 的 Cursor 版本：通过 `cursor agent --resume <chatId>` 发送 StarWork 格式化消息。
+- 在有可靠 chatId 时，只能探索 `continue <lane>` 的 Cursor 版本：通过 `cursor agent --resume <chatId>` 帮用户恢复会话。除非 Cursor 明确提供标准后台消息投递 API，否则不实现自动 `instruct`。
 
 ### 谨慎做
 
@@ -296,7 +336,7 @@ Cursor / Trae / Claude Code 如果不能自动发送跨会话指令，`starworkM
 目标：
 
 - 支持 Cursor session 手动绑定和 capability probe。
-- 在可用 chatId 下实验 `instruct` / `continue`。
+- 在可用 chatId 下实验 `continue`；只有 Cursor 明确提供标准后台投递 API 时，才重新评估自动 `instruct`。
 - `bind --session-name` 只做 best-effort 或 skill 内操作建议，不影响 StarWork binding。
 
 验收：
@@ -334,7 +374,7 @@ Cursor / Trae / Claude Code 如果不能自动发送跨会话指令，`starworkM
 
 1. Cursor `rename_chat` MCP 是否能被 StarWork CLI 独立调用，还是只能由运行在 Cursor 内的 Agent 使用。
 2. Cursor `cursor agent create-chat` 创建的 chat，是否能稳定出现在用户当前 Cursor UI 历史中。
-3. Cursor `cursor agent --resume <chatId>` 是否能稳定发送 StarWork 格式化消息，并返回可验证状态。
+3. Cursor 是否存在明确的标准后台消息投递 API；仅有 `cursor agent --resume <chatId>` 不足以支持自动 `instruct`。
 4. Trae 是否存在未发现的公开 IPC / CLI session API。
 5. Trae `state.vscdb` 的读取是否在不同版本、不同账号、不同语言包下保持一致。
 6. Claude Code transcript JSONL 在不同版本和旧版目录格式下的解析兼容范围。

@@ -1,6 +1,6 @@
 {
   "name": "@jennie-shawn/starwork",
-  "version": "0.1.0-alpha.18",
+  "version": "0.1.0-alpha.19",
   "description": "StarWork Core、CLI、Packs 和 Agent skills，用于构建 AI 工作台。",
   "type": "commonjs",
   "bin": {

@@ -9,7 +9,7 @@ StarWork 是一套面向 AI 的工作台协议和工具集，用来帮助用户�
 - **Packs**：场景模板包。当前 A 测阶段默认使用通用工作能力。
 - **Skills**：给 Codex 等 AI 工具使用的工作流说明，让 AI 能更可靠地帮用户设计和生成 StarWork 工作台。
 
-当前版本处于 A 测阶段。npm `latest` 为 `@jennie-shawn/starwork@0.1.0-alpha.17`，适合测试安装流程、基础命令、工作台结构、AI Skill 使用体验和 Codex 多会话协作链路。
+当前版本处于 A 测阶段。npm `latest` 为 `@jennie-shawn/starwork@0.1.0-alpha.18`，适合测试安装流程、基础命令、工作台结构、AI Skill 使用体验和 MultiAgent 会话协作链路。
 
 ## 安装 CLI
 
@@ -173,7 +173,7 @@ product/planning/features/<feature>/
 - `upgrade`：按 `starworkDoctor` skill 生成的升级蓝图，把历史模板或类似项目中心的旧工作区安全接入 StarWork 工作台。
 - `adapt`：生成 Claude Code、Cursor 等 AI 工具的适配文件。
 - `pack install`：向兼容工作台安装支持的场景能力。
-- `multiagent`：为同一项目建立自定义 AI 职责位、绑定会话、登记跨 lane 共享输出，并支持 Codex 多会话读取、launch 和格式化指令发送；未观察到目标 turn 完成时会返回 `started_unverified`，避免把未完成交付误说成已完成。
+- `multiagent`：为同一项目建立自定义 AI 职责位、绑定会话、登记跨 lane 共享输出，并支持会话观察、launch 和格式化跨会话指令；`instruct` 由 CLI 运行时判断宿主能力，不能标准投递时返回 `manual_handoff_required`。
 
 ## 仓库结构
 
