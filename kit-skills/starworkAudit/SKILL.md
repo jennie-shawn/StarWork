@@ -9,6 +9,8 @@ description: 'Diagnose `starwork audit --json` Project Center and managed projec
 
 `starworkAudit` 不是 `starwork audit` 命令本身，也不是 `starwork repair` 执行器。
 
+当前没有独立 `starworkRepair` Skill；项目中心巡检后的修复判断、Host Adapter repair 计划和 `repair-blueprint.json` 设计都由 `starworkAudit` 承接，再交给 `starwork repair` CLI 执行。
+
 ```text
 starwork audit = 项目中心巡检器，只列事实
 starworkAudit = 巡检诊断师 + repair blueprint 设计师
@@ -53,6 +55,33 @@ starwork audit --hub <hub-path> --json --inventory-depth all
 - 旧 `_系统/跨项目/` 是否要迁移内容。
 
 5. 只有用户明确要求“生成修复蓝图 / 执行 dry-run / 帮我修”时，才生成 `repair-blueprint.json`。
+
+## 宿主适配巡检
+
+项目中心巡检时，如果用户关心某个 AI 工具是否能正确使用项目工作台，或项目里存在宿主痕迹，要把 Host Adapter 作为独立健康维度。
+
+对每个登记项目，可以在基础巡检后运行：
+
+```bash
+starwork doctor --target <project-path> --host all --json
+```
+
+汇总时分开说明：
+
+- 哪些项目适配了 Codex、Claude Code、Cursor 或 Trae。
+- 哪些项目只有通用 `AGENTS.md` 入口。
+- 哪些项目缺宿主规则入口。
+- 哪些项目存在同名 Skill 冲突。
+- Trae 是否禁用了 `.starwork/skills.json` 里声明启用的 Skill。
+
+修复蓝图只能修 StarWork 可控文件：
+
+- 宿主规则入口
+- `.starwork/adapters.json`
+- `.starwork/skills.json`
+- 项目内 Skill mount dirs
+
+禁止通过 Hub audit / repair 读取或改写宿主私有 transcript、私有数据库、加密 history 或全局配置。
 
 ## 中间产物路径规则
 

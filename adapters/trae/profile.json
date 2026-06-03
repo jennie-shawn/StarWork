@@ -1,0 +1,61 @@
+{
+  "schema": "starwork.adapter.profile.v0.1",
+  "host": "trae",
+  "label": "Trae",
+  "version": "0.1",
+  "rules": {
+    "entry_file": ".trae/rules/starwork.md",
+    "can_generate_entry": "supported",
+    "can_update_entry": "partial",
+    "supports_project_scope": "supported",
+    "supports_nested_rules": "unknown"
+  },
+  "skills": {
+    "system_install": "manual",
+    "project_mount": "supported",
+    "primary_project_dir": ".trae/skills/",
+    "project_mount_dirs": [".trae/skills/", ".agents/skills/"],
+    "host_native_dirs": [".trae/skills/", ".agents/skills/"],
+    "global_dirs": ["~/.trae-cn/skills", "%userprofile%/.trae-cn/skills"],
+    "conflict_priority": [".trae/skills/", ".agents/skills/"],
+    "discovery": "supported",
+    "trigger_style": "native-skill-discovery",
+    "adapter_rule_required": true,
+    "frontmatter": {
+      "required": ["name", "description"],
+      "name_pattern": "^[a-z0-9-]+$",
+      "name_matches_parent": true
+    },
+    "disabled_config": ".trae/skill-config.json"
+  },
+  "sessions": {
+    "detect_current": "partial",
+    "rename": "unsupported",
+    "list": "partial",
+    "read": "unsupported",
+    "continue": "manual",
+    "send_message": "manual",
+    "create": "manual",
+    "pin": "unsupported",
+    "archive": "unsupported"
+  },
+  "memory": {
+    "transcript_read": "unsupported",
+    "transcript_write": "unsupported",
+    "summary_visible": "unsupported",
+    "project_memory": "supported",
+    "export": "unsupported"
+  },
+  "commands": {
+    "cli_available": "partial",
+    "api_available": "unsupported",
+    "requires_auth": "partial",
+    "can_probe": "partial"
+  },
+  "safety": {
+    "private_paths_readonly": ["~/Library/Application Support/Trae/**", "~/Library/Application Support/Trae CN/**"],
+    "never_write_paths": ["**/database.db", "**/*.vscdb", "**/*.sqlite"],
+    "destructive_commands": [],
+    "degradation_required": ["sessions.read", "sessions.send_message", "sessions.create", "sessions.continue", "sessions.pin", "sessions.archive"]
+  }
+}

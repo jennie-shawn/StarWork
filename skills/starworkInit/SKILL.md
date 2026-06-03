@@ -181,6 +181,51 @@ v0.1 不采访用户选择场景 Pack。
 
 项目中心不使用项目知识库；项目中心共享知识库后续单独设计。
 
+## 宿主适配
+
+Host Adapter 是初始化完成后的“让具体 AI 工具正确进入工作台”的步骤。普通用户不需要理解 adapter profile；你只需要问清楚用户主要准备用哪个 AI 工具打开这个工作台。
+
+在 Step 2 之后、正式执行前，可以轻量询问：
+
+```text
+你主要会用哪个 AI 工具打开这个工作台？Codex、Claude Code、Cursor、Trae，还是暂时不确定？
+```
+
+规则：
+
+- 用户已经明确说了 Codex / Claude Code / Cursor / Trae：直接采用。
+- 用户不确定：跳过宿主适配，先生成通用 StarWork 工作台。
+- 不默认给所有宿主都生成入口。
+- 宿主选择不是工作台类型，也不是 Pack。
+
+初始化主体结构完成后，如果用户选择了宿主，先运行：
+
+```bash
+starwork adapt <host> --target <path> --dry-run
+```
+
+用人话解释会补哪些入口：
+
+- Codex：确认 `AGENTS.md` 和 `.agents/skills/`
+- Claude Code：`CLAUDE.md` 和 `.claude/skills/`
+- Cursor：`.cursor/rules/starwork.mdc` 和 `.cursor/skills/`
+- Trae：`.trae/rules/starwork.md` 和 `.trae/skills/`
+
+用户确认后再执行：
+
+```bash
+starwork adapt <host> --target <path> --yes
+starwork doctor --target <path> --host <host>
+```
+
+完成后告诉用户三件事：
+
+1. 已为哪个 AI 工具适配。
+2. 改动了哪些 StarWork 可控文件。
+3. 用户接下来应该用哪个工具打开，以及如何验证它是否生效。
+
+不要把 `adapter profile`、`host_native_dirs`、`capabilities` 这些内部词直接讲给普通用户。
+
 ## Step 5：判断是否定制
 
 在问正式成果、当前工作区、额外目录之前，先问：

@@ -647,14 +647,17 @@
             <h3><code>adapt</code></h3>
             <span class="badge">适配</span>
           </div>
-          <p>为具体 AI 工具生成轻量适配入口。它不复制一整套规则，只告诉 AI 去读 StarWork 的统一规则源。</p>
+          <p>为具体 AI 工具生成适配入口。它不复制一整套规则，只告诉 AI 去读 StarWork 的统一规则源，并记录宿主能力和适配状态。</p>
           <ul>
             <li>支持 <code>codex</code>、<code>claude</code>、<code>cursor</code>、<code>trae</code>、<code>all</code>。</li>
             <li>Claude 生成 <code>CLAUDE.md</code>。</li>
             <li>Cursor 生成 <code>.cursor/rules/starwork.mdc</code>。</li>
-            <li>适配结果记录到工作台身份证。</li>
+            <li><code>--capabilities</code> 只读输出宿主能力，不写文件。</li>
+            <li><code>--check</code> 调用 <code>doctor --host</code> 检查宿主适配状态。</li>
+            <li>适配结果记录到 <code>.starwork/adapters.json</code>，工作台身份证只保留摘要。</li>
           </ul>
-          <pre>node cli/bin/starwork.js adapt claude --target ./workspace --yes</pre>
+          <pre>node cli/bin/starwork.js adapt all --capabilities --json
+node cli/bin/starwork.js adapt claude --target ./workspace --yes</pre>
         </article>
 
         <article class="command">
@@ -662,18 +665,21 @@
             <h3><code>multiagent</code></h3>
             <span class="badge">协作</span>
           </div>
-          <p>为同一项目建立自定义 AI 职责位，绑定具体会话，登记跨 lane 可读输出，并编排 Codex lane thread。</p>
+          <p>为同一项目建立自定义 AI 职责位，绑定具体会话，登记跨 lane 可读输出，并按宿主能力自动交付或降级为人工交付。</p>
           <ul>
             <li>不内置固定职责，lane 由项目场景定义。</li>
             <li>使用 <code>_系统/协作/agent-lanes.md</code> 作为分工索引。</li>
             <li>使用 <code>_系统/协作/shared.md</code> 登记跨 lane 共享输出。</li>
-            <li>使用 <code>.starwork/agent-lanes/state.json</code> 记录 Codex host metadata 和 delivery state。</li>
-            <li>支持 <code>status --host</code>、<code>read</code>、<code>instruct</code>、<code>launch</code> 和 <code>bind --pin</code>。</li>
-            <li>不写入任务系统或锁机制，不依赖 Codex 前端是否即时刷新。</li>
+            <li>使用 <code>.starwork/agent-lanes/state.json</code> 记录宿主 metadata 和 delivery state。</li>
+            <li>Codex 支持自动读取、发送和 launch；Claude Code 支持 resume 命令和 transcript 摘要。</li>
+            <li>Cursor / Trae 默认返回 <code>manual_handoff_required</code>，不伪装自动送达。</li>
+            <li>支持 <code>status --host</code>、<code>read</code>、<code>instruct</code>、<code>handoff</code>、<code>continue</code>、<code>launch</code> 和 <code>bind --pin</code>。</li>
+            <li>不写入任务系统或锁机制，不依赖宿主前端是否即时刷新。</li>
           </ul>
           <pre>node cli/bin/starwork.js multiagent init --lanes research,writing,review --target ./workspace --yes
 node cli/bin/starwork.js multiagent status --host --target ./workspace --json
-node cli/bin/starwork.js multiagent instruct development --from product-planning --message "请根据 SPEC 开始实现。" --target ./workspace --dry-run</pre>
+node cli/bin/starwork.js multiagent instruct development --from product-planning --message "请根据 SPEC 开始实现。" --target ./workspace --dry-run
+node cli/bin/starwork.js multiagent handoff review --from research --message "请手动验收。" --target ./workspace --dry-run</pre>
         </article>
 
         <article class="command">
@@ -825,10 +831,12 @@ node cli/bin/starwork.js doctor \
           <div>
             <span class="mini-label">04 / 适配 AI 工具</span>
             <h3><code>starwork adapt</code></h3>
-            <p>给不同 AI 工具生成轻量入口。它不另起一套规则，而是把 AI 引回 StarWork 统一规则源。</p>
+            <p>给不同 AI 工具生成入口、Skill 目录和 adapter state。它不另起一套规则，而是把 AI 引回 StarWork 统一规则源。</p>
             <pre>node cli/bin/starwork.js adapt claude \
   --target ./workspace \
   --yes
+
+node cli/bin/starwork.js adapt all --capabilities --json
 
 node cli/bin/starwork.js adapt --agent cursor \
   --target ./workspace \
@@ -844,7 +852,9 @@ node cli/bin/starwork.js adapt --agent cursor \
                 <li>Cursor 生成 <code>.cursor/rules/starwork.mdc</code>。</li>
                 <li>Trae 生成 <code>.trae/rules/starwork.md</code>。</li>
                 <li>适配前检查工作台是否健康。</li>
-                <li>适配结果写入工作台身份证的 <code>adapters</code> 字段。</li>
+                <li><code>--capabilities</code> 只读输出宿主能力。</li>
+                <li><code>--check</code> 复用 <code>doctor --host</code> 做检查。</li>
+                <li>适配结果写入 <code>.starwork/adapters.json</code>，工作台身份证保留摘要。</li>
               </ul>
             </div>
             <div class="detail-box">
@@ -857,7 +867,7 @@ node cli/bin/starwork.js adapt --agent cursor \
                 <li>生成对应适配入口内容。</li>
                 <li>生成写入计划。</li>
                 <li>确认后写入适配文件。</li>
-                <li>更新工作台身份证。</li>
+                <li>更新 adapter state 和工作台身份证摘要。</li>
               </ol>
             </div>
           </div>
@@ -884,10 +894,12 @@ node cli/bin/starwork.js multiagent bind research \
               <ul>
                 <li>初始化 <code>_系统/协作/agent-lanes.md</code> 和 <code>shared.md</code>。</li>
                 <li>按项目实际职责新增 lane，不预设后端、前端或测试。</li>
-                <li>将当前或手动指定的 session 绑定到 lane。</li>
+                <li>将当前或手动指定的 session 绑定到 lane，支持 <code>codex:</code>、<code>claude-code:</code>、<code>cursor:</code>、<code>trae:</code>。</li>
                 <li>释放 lane 绑定，保留历史工作记录。</li>
                 <li>用 <code>status --json</code> 输出可被 AI 读取的分工状态。</li>
                 <li>用 <code>share</code> 登记其他 lane 需要读取的输出。</li>
+                <li>用 <code>handoff</code> 生成人工交付消息。</li>
+                <li>用 <code>continue</code> 输出 Claude Code resume 命令或人工继续步骤。</li>
               </ul>
             </div>
             <div class="detail-box">
@@ -1002,10 +1014,10 @@ node cli/bin/starwork.js pack install content-creator \
       <div class="test-grid">
         <div class="test-card">
           <h3>方式一：跑自动测试</h3>
-          <p>这是最快确认 CLI 没坏的方法。当前测试覆盖 init、spawn、doctor、adapt、pack install 的核心路径。</p>
+          <p>这是最快确认 CLI 没坏的方法。当前测试覆盖 init、spawn、doctor、adapt、multiagent、knowledge、audit、repair、pack install 的核心路径。</p>
           <pre>cd /path/to/starwork
 npm test</pre>
-          <p>预期结果：50 个测试全部通过。</p>
+          <p>预期结果：81 个测试全部通过。</p>
         </div>
 
         <div class="test-card">

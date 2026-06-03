@@ -26,5 +26,6 @@ Codex 多会话编排 v0.2 已通过产品验收，可进入 `0.1.0-alpha.17` �
 
 - [v0.2 Codex 多会话编排 SPEC](specs/v0.2-codex-orchestration.md)
 - [v0.2 验收报告](acceptance/2026-06-01-v0.2-acceptance-report.md)
+- [Cursor / Trae / Claude Code 兼容性与适配计划](references/host-compatibility-and-adaptation.md)
 - [CLI 设计](cli.md)
 - [Skill 设计](skill.md)

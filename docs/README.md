@@ -21,10 +21,10 @@
 - [roadmap.md](roadmap.md)：StarWork 从当前状态到 v0.1 发布、v0.2 扩展和 v1.0 稳定产品的里程碑
 - [roadmap.html](roadmap.html)：里程碑 HTML 阅读版，包含 SVG 总路线图和当前焦点图
 - [v0.1-plan.md](v0.1-plan.md)：StarWork v0.1 三条并行工作线与首轮工作安排
-- [multiagent/](multiagent/)：StarWork multiagent 课程交付前的 Codex 调研，以及 Cursor / Trae 原生客户端会话管理调研指令
+- [multiagent/](multiagent/)：StarWork multiagent 课程交付前的 Codex 调研，以及 Cursor / Trae / Trae Solo / Claude Code 原生客户端会话管理调研指令
 
 相关事实源：
 
 - CLI 命令规格在 `product/cli/`，包括 `spawn-blueprint-spec.md`。
 - StarWork 系统级 Agent skill 在 `product/skills/`；Kit 自带 skill 在 `product/kit-skills/`，避免被全局安装命令误装。具体分发口径见 `product/core/skill-management-spec.md`。
-- 功能规划和版本 SPEC 在 `product/planning/features/`，例如 `knowledge-base/` 和 `project-structure/`。
+- 功能规划和版本 SPEC 在 `product/planning/features/`，例如 `knowledge-base/`、`project-structure/` 和 `host-adapters/`。

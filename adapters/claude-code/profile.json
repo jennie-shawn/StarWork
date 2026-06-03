@@ -1,0 +1,55 @@
+{
+  "schema": "starwork.adapter.profile.v0.1",
+  "host": "claude-code",
+  "label": "Claude Code",
+  "version": "0.1",
+  "rules": {
+    "entry_file": "CLAUDE.md",
+    "can_generate_entry": "supported",
+    "can_update_entry": "partial",
+    "supports_project_scope": "supported",
+    "supports_nested_rules": "unknown"
+  },
+  "skills": {
+    "system_install": "manual",
+    "project_mount": "manual",
+    "primary_project_dir": ".claude/skills/",
+    "project_mount_dirs": [".claude/skills/", ".agents/skills/"],
+    "host_native_dirs": [".claude/skills/"],
+    "global_dirs": ["~/.claude/skills/"],
+    "conflict_priority": [".claude/skills/", ".agents/skills/"],
+    "discovery": "manual",
+    "trigger_style": "rules-guided",
+    "adapter_rule_required": true
+  },
+  "sessions": {
+    "detect_current": "supported",
+    "rename": "partial",
+    "list": "partial",
+    "read": "supported",
+    "continue": "supported",
+    "send_message": "manual",
+    "create": "partial",
+    "pin": "unsupported",
+    "archive": "unsupported"
+  },
+  "memory": {
+    "transcript_read": "supported",
+    "transcript_write": "unsupported",
+    "summary_visible": "unsupported",
+    "project_memory": "supported",
+    "export": "partial"
+  },
+  "commands": {
+    "cli_available": "partial",
+    "api_available": "unsupported",
+    "requires_auth": "partial",
+    "can_probe": "supported"
+  },
+  "safety": {
+    "private_paths_readonly": ["~/.claude/projects/**", "~/.claude/sessions/**"],
+    "never_write_paths": ["~/.claude/projects/**/*.jsonl", "~/.claude.json"],
+    "destructive_commands": ["claude project purge"],
+    "degradation_required": ["sessions.send_message", "sessions.pin", "sessions.archive"]
+  }
+}

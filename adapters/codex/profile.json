@@ -1,0 +1,55 @@
+{
+  "schema": "starwork.adapter.profile.v0.1",
+  "host": "codex",
+  "label": "Codex",
+  "version": "0.1",
+  "rules": {
+    "entry_file": "AGENTS.md",
+    "can_generate_entry": "supported",
+    "can_update_entry": "partial",
+    "supports_project_scope": "supported",
+    "supports_nested_rules": "partial"
+  },
+  "skills": {
+    "system_install": "supported",
+    "project_mount": "supported",
+    "primary_project_dir": ".agents/skills/",
+    "project_mount_dirs": [".agents/skills/"],
+    "host_native_dirs": [".agents/skills/"],
+    "global_dirs": ["~/.agents/skills/"],
+    "conflict_priority": [".agents/skills/"],
+    "discovery": "partial",
+    "trigger_style": "rules-guided",
+    "adapter_rule_required": true
+  },
+  "sessions": {
+    "detect_current": "partial",
+    "rename": "supported",
+    "list": "supported",
+    "read": "supported",
+    "continue": "supported",
+    "send_message": "supported",
+    "create": "supported",
+    "pin": "partial",
+    "archive": "unsupported"
+  },
+  "memory": {
+    "transcript_read": "partial",
+    "transcript_write": "unsupported",
+    "summary_visible": "partial",
+    "project_memory": "supported",
+    "export": "partial"
+  },
+  "commands": {
+    "cli_available": "supported",
+    "api_available": "partial",
+    "requires_auth": "partial",
+    "can_probe": "supported"
+  },
+  "safety": {
+    "private_paths_readonly": [],
+    "never_write_paths": [],
+    "destructive_commands": [],
+    "degradation_required": ["sessions.archive"]
+  }
+}

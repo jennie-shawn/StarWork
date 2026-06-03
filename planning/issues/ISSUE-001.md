@@ -11,7 +11,7 @@
 | 发现日期 | 2026-06-01 |
 | 关联 SPEC | `product/planning/features/knowledge-base/specs/v0.1.md` |
 | 关联验收 | `_系统/协作/lanes/product-planning/workspace/m2.11-knowledge-acceptance-report.md` |
-| 负责人 | optimization lane |
+| 负责人 | development lane |
 
 ## 现象
 

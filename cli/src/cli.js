@@ -115,22 +115,31 @@ const PACK_LABELS = {
 
 const ADAPTERS = {
   codex: {
-    label: "Codex",
-    path: null
+    profile: path.join("adapters", "codex", "profile.json")
   },
-  claude: {
-    label: "Claude Code",
-    path: "CLAUDE.md"
+  "claude-code": {
+    profile: path.join("adapters", "claude-code", "profile.json")
   },
   cursor: {
-    label: "Cursor",
-    path: path.join(".cursor", "rules", "starwork.mdc")
+    profile: path.join("adapters", "cursor", "profile.json")
   },
   trae: {
-    label: "Trae",
-    path: path.join(".trae", "rules", "starwork.md")
+    profile: path.join("adapters", "trae", "profile.json")
   }
 };
+
+const ADAPTER_ALIASES = {
+  codex: "codex",
+  claude: "claude-code",
+  "claude-code": "claude-code",
+  cursor: "cursor",
+  trae: "trae"
+};
+
+const ADAPTER_CAPABILITY_LEVELS = new Set(["supported", "partial", "manual", "unsupported", "unknown"]);
+const ADAPTER_STATE_SCHEMA = "starwork.adapters.state.v0.1";
+const ADAPTER_ENTRY_MARKER = "STARWORK:ADAPTER_ENTRY v0.1";
+const MANUAL_HANDOFF_STATUS = "manual_handoff_required";
 
 const KIT_BUNDLED_SKILLS = {
   hub: [
@@ -296,6 +305,11 @@ async function init(argv) {
   });
 
   printPlan(plan, options.dryRun);
+  const adapterHosts = options.adapter ? resolveAdapterHosts(options.adapter) : [];
+  if (adapterHosts.length && options.dryRun) {
+    console.log("");
+    console.log(`初始化完成后将继续适配 AI 工具：${adapterHosts.join(", ")}。`);
+  }
 
   if (options.dryRun) {
     return;
@@ -312,6 +326,11 @@ async function init(argv) {
   }
 
   applyPlan(plan);
+  if (adapterHosts.length) {
+    const createdState = readWorkspaceState(targetDir);
+    const adapterPlan = buildAdaptPlan({ workspaceRoot: targetDir, state: createdState, hosts: adapterHosts });
+    applyPlan(adapterPlan);
+  }
   console.log("");
   console.log("StarWork 工作台已创建。");
   console.log("");
@@ -323,7 +342,11 @@ async function init(argv) {
     console.log("4. 创建项目后，运行 starwork audit 巡检项目中心里的项目登记。");
   } else {
     console.log("2. 打开 AGENTS.md，确认 AI 入口规则。");
-    console.log("3. 如需生成特定 AI 工具适配文件，运行 starwork adapt。");
+    if (adapterHosts.length) {
+      console.log(`3. 已生成 ${adapterHosts.join(", ")} 适配入口；运行 starwork doctor --target ${plan.targetDir} --host ${adapterHosts.length === 1 ? adapterHosts[0] : "all"} 再检查一次。`);
+    } else {
+      console.log("3. 如需生成特定 AI 工具适配文件，运行 starwork adapt。");
+    }
   }
 }
 
@@ -646,7 +669,12 @@ function parseArgs(argv) {
     } else if (arg === "--verbose") {
       options.verbose = true;
     } else if (arg === "--host") {
-      options.host = true;
+      const next = argv[i + 1];
+      if (next && !next.startsWith("-")) {
+        options.host = readValue(argv, ++i, arg);
+      } else {
+        options.host = true;
+      }
     } else if (arg === "--load") {
       options.load = true;
     } else if (arg === "--pin") {
@@ -657,6 +685,16 @@ function parseArgs(argv) {
       options.noSkills = true;
     } else if (arg === "--knowledge") {
       options.knowledge = true;
+    } else if (arg === "--capabilities") {
+      options.capabilities = true;
+    } else if (arg === "--manual-handoff") {
+      options.manualHandoff = true;
+    } else if (arg === "--check") {
+      options.check = true;
+    } else if (arg === "--adapter") {
+      options.adapter = readValue(argv, ++i, arg);
+    } else if (arg === "--transcript") {
+      options.transcript = readValue(argv, ++i, arg);
     } else if (arg === "--inventory-depth") {
       options.inventoryDepth = readValue(argv, ++i, arg);
     } else if (arg === "--inventory-limit") {
@@ -730,24 +768,37 @@ async function adapt(argv) {
     return;
   }
 
+  const hostInput = options.agent || options._?.[0] || "codex";
+  const hosts = resolveAdapterHosts(hostInput);
+
+  if (options.capabilities) {
+    const capabilities = collectAdapterCapabilities(hosts);
+    if (options.json) {
+      console.log(JSON.stringify(capabilities, null, 2));
+    } else {
+      printAdapterCapabilities(capabilities);
+    }
+    return;
+  }
+  if (options.check) {
+    const targetDir = path.resolve(options.target || process.cwd());
+    const host = hosts.length === 1 ? hosts[0] : "all";
+    const result = collectDoctorResult(targetDir, { ...options, host });
+    const finished = finishDoctor(result, options);
+    process.exitCode = finished.exitCode;
+    return;
+  }
+
   const targetDir = path.resolve(options.target || process.cwd());
   const workspaceRoot = requireWorkspaceRoot(targetDir);
   const state = readWorkspaceState(workspaceRoot);
-  const agent = options.agent || options._?.[0] || "codex";
-  const agents = agent === "all" ? Object.keys(ADAPTERS) : [agent];
-
-  for (const id of agents) {
-    if (!ADAPTERS[id]) {
-      throw new Error(`不支持的 Agent 适配目标：${id}`);
-    }
-  }
 
   const health = doctorCollect(workspaceRoot);
   if (health.summary.fail > 0) {
     throw new Error("当前工作台未通过 doctor 检查，请先修复阻塞问题。");
   }
 
-  const plan = buildAdaptPlan({ workspaceRoot, state, agents });
+  const plan = buildAdaptPlan({ workspaceRoot, state, hosts });
   printGenericPlan(options.dryRun ? "适配预览（dry run）：" : "适配计划：", plan.actions);
 
   if (options.dryRun) return;
@@ -755,7 +806,7 @@ async function adapt(argv) {
   applyPlan(plan);
   console.log("");
   console.log("StarWork Agent 适配已完成。");
-  console.log("下一步建议：运行 starwork doctor 再检查一次工作台。");
+  console.log(`下一步建议：运行 starwork doctor --host ${hosts.length === 1 ? hosts[0] : "all"} 再检查一次宿主适配。`);
 }
 
 async function packCommand(argv) {
@@ -803,6 +854,14 @@ async function lanesCommand(argv) {
   }
   if (subcommand === "instruct") {
     await lanesInstruct(argv.slice(1));
+    return;
+  }
+  if (subcommand === "handoff") {
+    await lanesHandoff(argv.slice(1));
+    return;
+  }
+  if (subcommand === "continue") {
+    await lanesContinue(argv.slice(1));
     return;
   }
   if (subcommand === "launch") {
@@ -891,15 +950,17 @@ async function lanesBind(argv) {
   const registry = readLanesRegistry(workspaceRoot);
   const lane = findLaneOrThrow(registry.lanes, laneId);
   const session = resolveLaneSession(options);
+  const parsedSession = parseAdapterSession(session, options.agent);
   if (lane.current_session && lane.current_session !== "unbound" && lane.current_session !== session && !options.yes) {
     throw new Error(`Lane ${laneId} 已绑定 ${lane.current_session}。如需覆盖，请传入 --yes。`);
   }
   const nextLanes = registry.lanes.map((item) => item.lane === laneId ? { ...item, current_session: session } : item);
   const lanesState = readAgentLanesState(workspaceRoot);
   const nextLanesState = updateAgentLaneHostState(lanesState, laneId, {
-    host: extractCodexThreadId(session) ? "codex" : (options.agent || "manual"),
+    host: parsedSession.host,
     current_session: session,
-    thread_id: extractCodexThreadId(session),
+    thread_id: parsedSession.host === "codex" ? parsedSession.id : null,
+    session_id: parsedSession.id,
     session_name: normalizeMarkdownCell(options.sessionName || ""),
     pinned: false,
     created_by: "starwork multiagent bind",
@@ -995,7 +1056,7 @@ async function lanesStatus(argv) {
   const registry = readLanesRegistry(workspaceRoot);
   const shared = readSharedContext(workspaceRoot);
   if (options.host) {
-    const report = await collectLanesHostStatus(workspaceRoot, registry, { load: Boolean(options.load) });
+    const report = await collectLanesHostStatus(workspaceRoot, registry, { load: Boolean(options.load), transcript: options.transcript });
     if (options.json) {
       console.log(JSON.stringify(report, null, 2));
       return;
@@ -1042,16 +1103,11 @@ async function collectLanesHostStatus(workspaceRoot, registry, options = {}) {
   const lanesState = readAgentLanesState(workspaceRoot);
   const lanes = await Promise.all(registry.lanes.map(async (lane) => {
     const hostState = lanesState.lanes?.[lane.lane] || {};
-    const threadId = hostState.thread_id || extractCodexThreadId(hostState.current_session || lane.current_session);
-    const host = threadId
-      ? await observeCodexThread({ threadId, includeTurns: false, load: Boolean(options.load) })
-      : {
-          adapter: "none",
-          readable: false,
-          status: "unbound",
-          warning: "Lane has no Codex thread binding",
-          ui_visibility: "not_guaranteed"
-        };
+    const host = await observeHostSession(hostState.current_session || lane.current_session, {
+      includeTurns: false,
+      load: Boolean(options.load),
+      transcriptPath: options.transcript
+    });
     return {
       lane: lane.lane,
       starwork: {
@@ -1075,20 +1131,21 @@ async function collectLanesHostStatus(workspaceRoot, registry, options = {}) {
 
 function printLanesHostStatus(report) {
   console.log("");
-  console.log("StarWork 多 AI 协作状态（含 Codex host observation）");
+  console.log("StarWork 多 AI 协作状态（含宿主观察）");
   console.log("");
   for (const item of report.lanes) {
     console.log(`- ${item.lane}`);
     console.log(`  StarWork state: ${item.starwork.bound ? item.starwork.session : "unbound"}；worklog=${item.starwork.worklog}；write_scope=${item.starwork.write_scope}`);
     if (item.starwork.warning) console.log(`  Warning: ${item.starwork.warning}`);
-    console.log(`  Codex host observation: ${item.host.status}${item.host.name ? `；name=${item.host.name}` : ""}${item.host.cwd ? `；cwd=${item.host.cwd}` : ""}${Number.isInteger(item.host.turn_count) ? `；turns=${item.host.turn_count}` : ""}`);
+    console.log(`  ${item.host.adapter || "host"} observation: ${item.host.status}${item.host.name ? `；name=${item.host.name}` : ""}${item.host.cwd ? `；cwd=${item.host.cwd}` : ""}${Number.isInteger(item.host.turn_count) ? `；turns=${item.host.turn_count}` : ""}`);
+    if (item.host.continue_command) console.log(`  Continue: ${item.host.continue_command}`);
     if (item.host.status === "notLoaded") {
       console.log("  说明：notLoaded 表示 thread 可能存在于历史中，但当前 app-server 尚未加载；可显式使用 --load。");
     }
     if (item.host.warning) console.log(`  Warning: ${item.host.warning}`);
   }
   console.log("");
-  console.log("提示：这是 Codex host observation；正式交接仍以 lane worklog 和 shared outputs 为准。");
+  console.log("提示：宿主观察只做辅助判断；正式交接仍以 lane worklog 和 shared outputs 为准。");
 }
 
 async function lanesRead(argv) {
@@ -1102,13 +1159,18 @@ async function lanesRead(argv) {
   const registry = readLanesRegistry(workspaceRoot);
   const lane = findLaneOrThrow(registry.lanes, laneId);
   const lanesState = readAgentLanesState(workspaceRoot);
-  const threadId = lanesState.lanes?.[laneId]?.thread_id || extractCodexThreadId(lanesState.lanes?.[laneId]?.current_session || lane.current_session);
-  if (!threadId) throw new Error(`Lane ${laneId} 没有绑定 Codex thread。`);
+  const session = lanesState.lanes?.[laneId]?.current_session || lane.current_session;
+  const parsedSession = parseAdapterSession(session);
   const turnLimit = options.turns ? Number.parseInt(options.turns, 10) : 0;
   if (options.turns && (!Number.isInteger(turnLimit) || turnLimit < 1)) {
     throw new Error("--turns 必须是正整数。");
   }
-  const observation = await observeCodexThread({ threadId, includeTurns: Boolean(options.includeTurns || turnLimit), load: false, turnLimit });
+  const observation = await observeHostSession(session, {
+    includeTurns: Boolean(options.includeTurns || turnLimit),
+    load: false,
+    turnLimit,
+    transcriptPath: options.transcript
+  });
   const report = {
     schema: "starwork.agent_lanes.read.v0.2",
     lane: laneId,
@@ -1124,7 +1186,7 @@ async function lanesRead(argv) {
     return;
   }
   console.log("");
-  console.log(`Lane ${laneId} 的 Codex host observation`);
+  console.log(`Lane ${laneId} 的 ${parsedSession.host} host observation`);
   console.log("");
   console.log(`状态：${observation.status}`);
   if (observation.name) console.log(`标题：${observation.name}`);
@@ -1132,14 +1194,14 @@ async function lanesRead(argv) {
   if (Number.isInteger(observation.turn_count)) console.log(`turn 数：${observation.turn_count}`);
   if (observation.turns?.length) {
     console.log("");
-    console.log(`最近 ${observation.turns.length} 个 turns：`);
+    console.log(`最近 ${observation.turns.length} 条摘要：`);
     for (const turn of observation.turns) {
-      console.log(`- ${turn.id || "(unknown turn)"} ${turn.status || ""}`.trim());
+      console.log(`- ${turn.id || "(unknown)"} ${turn.role || turn.status || ""}${turn.summary ? `：${turn.summary}` : ""}`.trim());
     }
   }
   if (observation.warning) console.log(`Warning: ${observation.warning}`);
   console.log("");
-  console.log("这是 Codex host observation。正式交接仍以 lane worklog 和 shared outputs 为准。");
+  console.log("这是宿主观察。正式交接仍以 lane worklog 和 shared outputs 为准。");
 }
 
 async function lanesInstruct(argv) {
@@ -1168,14 +1230,16 @@ async function lanesInstruct(argv) {
     targetLane,
     workspaceRoot
   });
-  const threadId = lanesState.lanes?.[toLane]?.thread_id || extractCodexThreadId(lanesState.lanes?.[toLane]?.current_session || targetLane.current_session);
+  const targetSession = lanesState.lanes?.[toLane]?.current_session || targetLane.current_session;
+  const parsedSession = parseAdapterSession(targetSession);
+  const canAutoSend = !options.manualHandoff && parsedSession.host === "codex" && parsedSession.id;
   const dryRunRequest = buildSharedRequestRow({
     id: requestId,
     from: fromLane,
     to: toLane,
     request: options.message,
-    status: threadId ? "recorded" : "needs_manual_delivery",
-    hostDelivery: threadId ? "pending" : "none",
+    status: canAutoSend ? "recorded" : MANUAL_HANDOFF_STATUS,
+    hostDelivery: canAutoSend ? "pending" : MANUAL_HANDOFF_STATUS,
     link: collaboration.shared
   });
   const shared = readSharedContext(workspaceRoot);
@@ -1190,15 +1254,19 @@ async function lanesInstruct(argv) {
   }
   if (!options.json) {
     printGenericPlan(options.dryRun ? "跨会话指令预览（dry run）：" : "跨会话指令计划：", dryPlan.actions);
-    if (threadId) console.log(`将发送到 Codex thread：${threadId}`);
-    else console.log("目标 lane 没有 Codex thread，将只记录为 needs_manual_delivery。");
+    if (canAutoSend) console.log(`将发送到 Codex thread：${parsedSession.id}`);
+    else console.log(`目标 lane 绑定的是 ${parsedSession.host}，当前不能后台自动发送；将生成人工交付消息并记录为 ${MANUAL_HANDOFF_STATUS}。`);
     console.log("");
   }
   if (options.dryRun) return;
   await confirmOrThrow(options, `是否向 Lane ${toLane} 发送指令？`);
-  const delivery = threadId
-    ? await sendCodexInstruction({ threadId, message, timeout: parsePositiveInt(options.timeout, 300000) })
-    : { adapter: "codex", status: "needs_manual_delivery", thread_id: null, warning: "Target lane has no Codex thread" };
+  const delivery = canAutoSend
+    ? await sendCodexInstruction({ threadId: parsedSession.id, message, timeout: parsePositiveInt(options.timeout, 300000) })
+    : createManualHandoffDelivery({
+        parsedSession,
+        message,
+        reason: "Target host does not support StarWork background message delivery in v0.1"
+      });
   const finalRequest = buildSharedRequestRow({
     id: requestId,
     from: fromLane,
@@ -1237,6 +1305,47 @@ async function lanesInstruct(argv) {
   console.log("");
   console.log(`已记录跨 lane 指令：${requestId}`);
   console.log(`Host delivery：${delivery.status}${delivery.warning ? ` (${delivery.warning})` : ""}`);
+}
+
+async function lanesHandoff(argv) {
+  const options = parseArgs(argv);
+  if (options.help) {
+    printLanesHandoffHelp();
+    return;
+  }
+  await lanesInstruct([...argv, "--manual-handoff"]);
+}
+
+async function lanesContinue(argv) {
+  const options = parseArgs(argv);
+  if (options.help) {
+    printLanesContinueHelp();
+    return;
+  }
+  const laneId = normalizeLaneId(options._?.[0], "lane");
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  const registry = readLanesRegistry(workspaceRoot);
+  const lane = findLaneOrThrow(registry.lanes, laneId);
+  const lanesState = readAgentLanesState(workspaceRoot);
+  const session = lanesState.lanes?.[laneId]?.current_session || lane.current_session;
+  const parsedSession = parseAdapterSession(session);
+  const result = buildHostContinueResult(parsedSession);
+  if (options.json) {
+    console.log(JSON.stringify({
+      schema: "starwork.agent_lanes.continue.v0.1",
+      lane: laneId,
+      session,
+      ...result
+    }, null, 2));
+    return;
+  }
+  console.log("");
+  console.log(`Lane ${laneId} 继续会话`);
+  console.log("");
+  console.log(`宿主：${parsedSession.host}`);
+  console.log(`状态：${result.status}`);
+  if (result.command) console.log(`命令：${result.command}`);
+  if (result.instructions) console.log(`说明：${result.instructions}`);
 }
 
 async function lanesLaunch(argv) {
@@ -1506,6 +1615,7 @@ function collectDoctorResult(targetDir, options = {}) {
   checkUpgradeRoleMappings(result, workspaceRoot, state);
   checkSkillInstallations(result, workspaceRoot, state);
   checkAgentRuleReferences(result, workspaceRoot);
+  checkHostAdapters(result, workspaceRoot, state, options);
   result.ok = result.summary.fail === 0;
   result.strict_ok = result.ok;
   result.exitCode = result.ok ? 0 : 1;
@@ -2007,19 +2117,126 @@ function loadKnowledgeNamedTemplate(template, language) {
   return loadKnowledgeTemplate(language, file);
 }
 
-function buildAdaptPlan({ workspaceRoot, state, agents }) {
+function resolveAdapterHosts(input) {
+  const raw = input || "codex";
+  if (raw === "all") return Object.keys(ADAPTERS);
+  const normalized = ADAPTER_ALIASES[raw];
+  if (!normalized || !ADAPTERS[normalized]) {
+    throw new Error(`不支持的宿主适配目标：${raw}`);
+  }
+  return [normalized];
+}
+
+function loadAdapterProfile(host) {
+  const normalized = ADAPTER_ALIASES[host] || host;
+  const config = ADAPTERS[normalized];
+  if (!config) throw new Error(`不支持的宿主适配目标：${host}`);
+  const profilePath = path.join(PRODUCT_ROOT, config.profile);
+  let profile;
+  try {
+    profile = JSON.parse(fs.readFileSync(profilePath, "utf8"));
+  } catch (error) {
+    throw new Error(`无法读取 adapter profile：${config.profile}：${error.message}`);
+  }
+  validateAdapterProfile(profile, config.profile);
+  return profile;
+}
+
+function validateAdapterProfile(profile, sourceLabel = "profile") {
+  if (profile.schema !== "starwork.adapter.profile.v0.1") {
+    throw new Error(`${sourceLabel} schema 不正确。`);
+  }
+  if (!profile.host || !ADAPTERS[profile.host]) {
+    throw new Error(`${sourceLabel} host 不正确。`);
+  }
+  validateAdapterCapabilityField(profile.rules, ["can_generate_entry", "can_update_entry", "supports_project_scope", "supports_nested_rules"], `${sourceLabel}.rules`);
+  validateAdapterCapabilityField(profile.skills, ["system_install", "project_mount", "discovery"], `${sourceLabel}.skills`);
+  validateAdapterCapabilityField(profile.sessions, Object.keys(profile.sessions || {}), `${sourceLabel}.sessions`);
+  validateAdapterCapabilityField(profile.memory, Object.keys(profile.memory || {}), `${sourceLabel}.memory`);
+  validateAdapterCapabilityField(profile.commands, Object.keys(profile.commands || {}), `${sourceLabel}.commands`);
+  const skills = profile.skills || {};
+  for (const field of ["project_mount_dirs", "host_native_dirs", "conflict_priority"]) {
+    if (!Array.isArray(skills[field])) {
+      throw new Error(`${sourceLabel}.skills.${field} 必须是数组。`);
+    }
+  }
+  if (!skills.primary_project_dir || typeof skills.discovery !== "string") {
+    throw new Error(`${sourceLabel}.skills 缺少 primary_project_dir 或 discovery。`);
+  }
+  if (typeof skills.adapter_rule_required !== "boolean") {
+    throw new Error(`${sourceLabel}.skills.adapter_rule_required 必须是布尔值。`);
+  }
+}
+
+function validateAdapterCapabilityField(object, keys, label) {
+  for (const key of keys) {
+    const value = object?.[key];
+    if (!ADAPTER_CAPABILITY_LEVELS.has(value)) {
+      throw new Error(`${label}.${key} 使用了非标准能力等级：${value}`);
+    }
+  }
+}
+
+function collectAdapterCapabilities(hosts) {
+  return {
+    schema: "starwork.adapter.capabilities.v0.1",
+    generated_at: new Date().toISOString(),
+    hosts: hosts.map(loadAdapterProfile)
+  };
+}
+
+function printAdapterCapabilities(capabilities) {
+  console.log("StarWork Host Adapter 能力");
+  console.log("");
+  for (const profile of capabilities.hosts) {
+    console.log(`${profile.label}（${profile.host}）`);
+    console.log(`- 规则入口：${profile.rules.entry_file || "无"}`);
+    console.log(`- 项目 Skill 目录：${profile.skills.project_mount_dirs.join("、")}`);
+    console.log(`- Skill 发现：${friendlyCapabilityLevel(profile.skills.discovery)}`);
+    console.log(`- 会话读取：${friendlyCapabilityLevel(profile.sessions.read)}`);
+    console.log(`- 跨会话发送：${friendlyCapabilityLevel(profile.sessions.send_message)}`);
+    console.log(`- 创建会话：${friendlyCapabilityLevel(profile.sessions.create)}`);
+    if (profile.safety.degradation_required?.length) {
+      console.log(`- 必须降级处理：${profile.safety.degradation_required.join("、")}`);
+    }
+    console.log("");
+  }
+}
+
+function friendlyCapabilityLevel(level) {
+  const labels = {
+    supported: "支持自动执行",
+    partial: "部分支持，需要复核",
+    manual: "需要人工操作",
+    unsupported: "不支持",
+    unknown: "尚未确认"
+  };
+  return labels[level] || level;
+}
+
+function buildAdaptPlan({ workspaceRoot, state, hosts }) {
   const actions = [];
-  for (const agent of agents) {
-    const config = ADAPTERS[agent];
-    if (!config.path) continue;
-    actions.push(overwriteFileAction(workspaceRoot, config.path, renderAdapterContent(agent, state)));
+  const profiles = hosts.map(loadAdapterProfile);
+  const installations = [];
+  for (const profile of profiles) {
+    let rulesEntry = profile.rules.entry_file || null;
+    let generatedEntries = [];
+    if (profile.rules.entry_file) {
+      const entryAction = adapterEntryAction(workspaceRoot, profile.rules.entry_file, renderAdapterContent(profile, state));
+      actions.push(entryAction);
+      rulesEntry = normalizeRelativePath(entryAction.relativePath);
+      generatedEntries = [rulesEntry];
+    }
+    for (const dir of profile.skills.project_mount_dirs) {
+      actions.push(directoryAction(workspaceRoot, dir));
+    }
+    installations.push({ profile, rulesEntry, generatedEntries });
   }
 
-  const nextState = {
-    ...state,
-    adapters: mergeInstalledRecords(state.adapters, agents)
-  };
-  actions.push(overwriteFileAction(workspaceRoot, path.join(".starwork", "workspace.json"), `${JSON.stringify(nextState, null, 2)}\n`));
+  const nextAdaptersState = mergeAdaptersState(readAdaptersState(workspaceRoot), installations);
+  const nextWorkspaceState = renderWorkspaceAdaptersSummary(state, installations);
+  actions.push(overwriteFileAction(workspaceRoot, path.join(".starwork", "adapters.json"), `${JSON.stringify(nextAdaptersState, null, 2)}\n`));
+  actions.push(overwriteFileAction(workspaceRoot, path.join(".starwork", "workspace.json"), `${JSON.stringify(nextWorkspaceState, null, 2)}\n`));
 
   return {
     targetDir: workspaceRoot,
@@ -2027,13 +2244,111 @@ function buildAdaptPlan({ workspaceRoot, state, agents }) {
   };
 }
 
-function renderAdapterContent(agent, state) {
-  const rolePaths = getCoreRolePaths(state);
-  const adapterName = ADAPTERS[agent].label;
-  if (agent === "cursor") {
-    return `---\ndescription: StarWork workspace rules\nalwaysApply: true\n---\n\n# StarWork Adapter for ${adapterName}\n\nThis workspace follows StarWork Core ${state.core || "0.1"}.\n\nRead first:\n\n1. AGENTS.md\n2. ${rolePaths.projectStatus}\n3. ${rolePaths.currentWork}\n\nFollow AGENTS.md as the source of truth. Do not overwrite user content silently.\n`;
+function adapterEntryAction(workspaceRoot, relativePath, content) {
+  const absolute = path.join(workspaceRoot, relativePath);
+  if (!fs.existsSync(absolute)) {
+    return overwriteFileAction(workspaceRoot, relativePath, content);
   }
-  return `# StarWork Adapter for ${adapterName}\n\nThis workspace follows StarWork Core ${state.core || "0.1"}.\n\n## Read First\n\n1. AGENTS.md\n2. ${rolePaths.projectStatus}\n3. ${rolePaths.currentWork}\n\n## Rule\n\nAGENTS.md is the source of truth. This file is only an adapter entrypoint for ${adapterName}.\n\nDo not overwrite user content silently. When unsure, ask before changing identity, lessons, shared knowledge, formal outputs, or synced repository content.\n`;
+  const existing = fs.readFileSync(absolute, "utf8");
+  if (!existing.trim() || existing.includes(ADAPTER_ENTRY_MARKER)) {
+    return overwriteFileAction(workspaceRoot, relativePath, content);
+  }
+  const parsed = path.parse(relativePath);
+  const sidecar = path.join(parsed.dir, `${parsed.name}.starwork${parsed.ext || ".md"}`);
+  return fileAction(workspaceRoot, sidecar, content);
+}
+
+function readAdaptersState(workspaceRoot) {
+  const statePath = path.join(workspaceRoot, ".starwork", "adapters.json");
+  if (!fs.existsSync(statePath)) {
+    return { schema: ADAPTER_STATE_SCHEMA, updated_at: null, adapters: {} };
+  }
+  try {
+    const state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    if (!state.adapters || typeof state.adapters !== "object" || Array.isArray(state.adapters)) {
+      state.adapters = {};
+    }
+    return state;
+  } catch {
+    return { schema: ADAPTER_STATE_SCHEMA, updated_at: null, adapters: {} };
+  }
+}
+
+function mergeAdaptersState(existingState, installations) {
+  const now = new Date().toISOString();
+  const next = {
+    schema: ADAPTER_STATE_SCHEMA,
+    updated_at: now,
+    adapters: { ...(existingState.adapters || {}) }
+  };
+  for (const installation of installations) {
+    const { profile, rulesEntry, generatedEntries } = installation;
+    next.adapters[profile.host] = {
+      enabled: true,
+      rules_entry: rulesEntry,
+      profile_version: profile.version || "0.1",
+      installed_by: `starwork adapt ${profile.host}`,
+      installed_at: next.adapters[profile.host]?.installed_at || now,
+      updated_at: now,
+      capabilities: selectAdapterCapabilitySummary(profile),
+      skill_mount_dirs: profile.skills.project_mount_dirs,
+      last_probe: {
+        status: "not_run",
+        observed_at: now,
+        facts: [],
+        warnings: []
+      },
+      generated_entries: generatedEntries
+    };
+  }
+  return next;
+}
+
+function selectAdapterCapabilitySummary(profile) {
+  return {
+    "rules.entry_file": profile.rules.entry_file,
+    "skills.discovery": profile.skills.discovery,
+    "sessions.detect_current": profile.sessions.detect_current,
+    "sessions.read": profile.sessions.read,
+    "sessions.continue": profile.sessions.continue,
+    "sessions.send_message": profile.sessions.send_message,
+    "sessions.create": profile.sessions.create,
+    "memory.transcript_read": profile.memory.transcript_read
+  };
+}
+
+function renderWorkspaceAdaptersSummary(state, installations) {
+  const existing = state.adapters;
+  const summary = Array.isArray(existing)
+    ? Object.fromEntries(existing.filter((item) => item && item.id).map((item) => [ADAPTER_ALIASES[item.id] || item.id, {
+      installed_at: item.installed_at,
+      entry: item.entry
+    }]))
+    : { ...(existing || {}) };
+  const now = new Date().toISOString();
+  for (const installation of installations) {
+    const { profile, rulesEntry } = installation;
+    summary[profile.host] = {
+      installed_at: summary[profile.host]?.installed_at || now,
+      updated_at: now,
+      rules_entry: rulesEntry,
+      profile_version: profile.version || "0.1"
+    };
+  }
+  return { ...state, adapters: summary };
+}
+
+function renderAdapterContent(profile, state) {
+  const rolePaths = getCoreRolePaths(state);
+  const adapterName = profile.label;
+  const skillDirs = profile.skills.project_mount_dirs.map((dir) => `- ${dir}`).join("\n");
+  if (profile.host === "cursor") {
+    return `---\ndescription: StarWork workspace rules\nalwaysApply: true\n---\n\n# StarWork Adapter for ${adapterName}\n\n<!-- ${ADAPTER_ENTRY_MARKER} host=${profile.host} -->\n\nThis workspace follows StarWork Core ${state.core || "0.1"}.\n\nRead first:\n\n1. AGENTS.md\n2. ${rolePaths.projectStatus}\n3. ${rolePaths.currentWork}\n4. .starwork/workspace.json\n5. .starwork/skills.json\n\nProject Skill directories for Cursor:\n\n${skillDirs}\n\nFollow AGENTS.md as the source of truth. Cursor can discover project Skills, but .starwork/skills.json remains the StarWork Skill fact source.\n`;
+  }
+  if (profile.host === "trae") {
+    return `# StarWork Adapter for ${adapterName}\n\n<!-- ${ADAPTER_ENTRY_MARKER} host=${profile.host} -->\n\nThis workspace follows StarWork Core ${state.core || "0.1"}.\n\n## Read First\n\n1. AGENTS.md\n2. ${rolePaths.projectStatus}\n3. ${rolePaths.currentWork}\n4. .starwork/workspace.json\n5. .starwork/skills.json\n\n## Project Skill Directories\n\n${skillDirs}\n\n## Host Boundary\n\nTrae can discover project Skills, but .starwork/skills.json remains the StarWork Skill fact source. Trae does not support automatic StarWork background cross-session instruction delivery in v0.1; use manual handoff when needed.\n`;
+  }
+  return `# StarWork Adapter for ${adapterName}\n\n<!-- ${ADAPTER_ENTRY_MARKER} host=${profile.host} -->\n\nThis workspace follows StarWork Core ${state.core || "0.1"}.\n\n## Read First\n\n1. AGENTS.md\n2. ${rolePaths.projectStatus}\n3. ${rolePaths.currentWork}\n4. .starwork/workspace.json\n5. .starwork/skills.json\n\n## Project Skill Directories\n\n${skillDirs}\n\n## Rule\n\nAGENTS.md is the source of truth. This file is only an adapter entrypoint for ${adapterName}.\n\nDo not overwrite user content silently. When unsure, ask before changing identity, lessons, shared knowledge, formal outputs, or synced repository content.\n`;
 }
 
 function buildPackInstallPlan({ workspaceRoot, state, pack }) {
@@ -2938,6 +3253,193 @@ function checkAgentRuleReferences(result, workspaceRoot) {
     `Agent 规则提到了当前工作台里不存在的路径：${sample}${missing.length > 5 ? `；另有 ${missing.length - 5} 项` : ""}。`,
     missing[0].file
   );
+}
+
+function checkHostAdapters(result, workspaceRoot, state, options = {}) {
+  if (!options.host) return;
+  const hostOption = options.host === true ? "all" : options.host;
+  const hosts = resolveAdapterHosts(hostOption);
+  const adaptersState = readAdaptersState(workspaceRoot);
+  const adaptersFileExists = fs.existsSync(path.join(workspaceRoot, ".starwork", "adapters.json"));
+  const workspaceAdapters = state.adapters || {};
+  result.adapters = {
+    schema: "starwork.doctor.host_adapters.v0.1",
+    state_path: ".starwork/adapters.json",
+    state_exists: adaptersFileExists,
+    checked_hosts: []
+  };
+
+  for (const host of hosts) {
+    const profile = loadAdapterProfile(host);
+    const record = adaptersState.adapters?.[profile.host] || null;
+    const workspaceSummary = Array.isArray(workspaceAdapters)
+      ? workspaceAdapters.find((item) => ADAPTER_ALIASES[item?.id] === profile.host)
+      : workspaceAdapters[profile.host] || null;
+    const hostReport = {
+      host: profile.host,
+      label: profile.label,
+      enabled: Boolean(record?.enabled),
+      rules_entry: record?.rules_entry || profile.rules.entry_file,
+      skill_mount_dirs: profile.skills.project_mount_dirs
+    };
+    result.adapters.checked_hosts.push(hostReport);
+
+    if (!record?.enabled) {
+      if (workspaceSummary && !adaptersFileExists) {
+        addCheck(result, `adapter.${profile.host}.state.legacy`, "info", `${profile.label} 只有旧 workspace.json adapter 摘要。可运行 starwork adapt ${profile.host} --yes 刷新。`, ".starwork/workspace.json");
+      } else {
+        addCheck(result, `adapter.${profile.host}.enabled`, "info", `${profile.label} 尚未启用 Host Adapter；这不是 Core 结构问题。`);
+      }
+      continue;
+    }
+
+    addCheck(result, `adapter.${profile.host}.enabled`, "pass", `${profile.label} Host Adapter enabled`, ".starwork/adapters.json");
+    const entry = record?.rules_entry || profile.rules.entry_file;
+    if (entry) {
+      const entryPath = path.join(workspaceRoot, entry);
+      if (!fs.existsSync(entryPath)) {
+        addCheck(result, `adapter.${profile.host}.rules.entry.exists`, "warn", `${profile.label} 规则入口缺失：${entry}`, entry);
+      } else {
+        addCheck(result, `adapter.${profile.host}.rules.entry.exists`, "pass", `${profile.label} rules entry exists`, entry);
+        const content = fs.readFileSync(entryPath, "utf8");
+        if (content.includes("AGENTS.md")) {
+          addCheck(result, `adapter.${profile.host}.rules.agents_reference`, "pass", `${profile.label} rules entry references AGENTS.md`, entry);
+        } else {
+          addCheck(result, `adapter.${profile.host}.rules.agents_reference`, "warn", `${profile.label} 规则入口没有明确引导读取 AGENTS.md。`, entry);
+        }
+        if (content.includes(".starwork/skills.json")) {
+          addCheck(result, `adapter.${profile.host}.rules.skills_manifest`, "pass", `${profile.label} rules entry references .starwork/skills.json`, entry);
+        } else {
+          addCheck(result, `adapter.${profile.host}.rules.skills_manifest`, "warn", `${profile.label} 规则入口没有明确引导读取 .starwork/skills.json。`, entry);
+        }
+      }
+    }
+
+    for (const dir of profile.skills.project_mount_dirs) {
+      const exists = fs.existsSync(path.join(workspaceRoot, dir));
+      addCheck(result, `adapter.${profile.host}.skills.mount_dir.${slugifyCheckId(dir)}`, exists ? "pass" : "warn", exists ? `${profile.label} Skill mount dir exists: ${dir}` : `${profile.label} 缺少项目 Skill 挂载目录：${dir}`, dir);
+    }
+
+    checkHostSkillConflicts(result, workspaceRoot, profile);
+    checkHostSkillFrontmatter(result, workspaceRoot, profile);
+    checkHostDisabledSkills(result, workspaceRoot, profile);
+    checkHostCapabilitySafety(result, profile, record);
+  }
+}
+
+function checkHostSkillConflicts(result, workspaceRoot, profile) {
+  const dirs = profile.skills.conflict_priority || [];
+  const locations = new Map();
+  for (const dir of dirs) {
+    const absoluteDir = path.join(workspaceRoot, dir);
+    if (!fs.existsSync(absoluteDir) || !fs.statSync(absoluteDir).isDirectory()) continue;
+    for (const entry of fs.readdirSync(absoluteDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const list = locations.get(entry.name) || [];
+      list.push(path.join(dir, entry.name));
+      locations.set(entry.name, list);
+    }
+  }
+  for (const [skillId, paths] of locations.entries()) {
+    if (paths.length > 1) {
+      addCheck(result, `adapter.${profile.host}.skills.conflict.${slugifyCheckId(skillId)}`, "warn", `${profile.label} 存在同名 Skill：${skillId}。优先级为 ${profile.skills.conflict_priority.join(" > ")}。`, paths[0]);
+    }
+  }
+}
+
+function checkHostSkillFrontmatter(result, workspaceRoot, profile) {
+  const rule = profile.skills.frontmatter;
+  if (!rule) return;
+  for (const dir of profile.skills.host_native_dirs || []) {
+    const absoluteDir = path.join(workspaceRoot, dir);
+    if (!fs.existsSync(absoluteDir) || !fs.statSync(absoluteDir).isDirectory()) continue;
+    for (const entry of fs.readdirSync(absoluteDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const skillPath = path.join(dir, entry.name, "SKILL.md");
+      const absoluteSkillPath = path.join(workspaceRoot, skillPath);
+      if (!fs.existsSync(absoluteSkillPath)) {
+        addCheck(result, `adapter.${profile.host}.skills.frontmatter.${slugifyCheckId(entry.name)}.exists`, "warn", `${profile.label} Skill 缺少 SKILL.md：${skillPath}`, skillPath);
+        continue;
+      }
+      const parsed = parseSkillFrontmatter(fs.readFileSync(absoluteSkillPath, "utf8"));
+      if (!parsed.name || !parsed.description) {
+        addCheck(result, `adapter.${profile.host}.skills.frontmatter.${slugifyCheckId(entry.name)}.required`, "warn", `${profile.label} Skill frontmatter 缺少 name 或 description：${skillPath}`, skillPath);
+      }
+      if (parsed.name && rule.name_matches_parent && parsed.name !== entry.name) {
+        addCheck(result, `adapter.${profile.host}.skills.frontmatter.${slugifyCheckId(entry.name)}.name_match`, "warn", `${profile.label} Skill name 必须与父文件夹名一致：${skillPath}`, skillPath);
+      }
+      if (parsed.name && rule.name_pattern && !(new RegExp(rule.name_pattern).test(parsed.name))) {
+        addCheck(result, `adapter.${profile.host}.skills.frontmatter.${slugifyCheckId(entry.name)}.name_pattern`, "warn", `${profile.label} Skill name 只能使用小写字母、数字和连字符：${skillPath}`, skillPath);
+      }
+    }
+  }
+}
+
+function parseSkillFrontmatter(content) {
+  const match = String(content || "").match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const result = {};
+  if (!match) return result;
+  for (const line of match[1].split(/\r?\n/)) {
+    const parts = line.match(/^([A-Za-z0-9_-]+):\s*(.*)$/);
+    if (!parts) continue;
+    result[parts[1]] = parts[2].replace(/^["']|["']$/g, "").trim();
+  }
+  return result;
+}
+
+function checkHostDisabledSkills(result, workspaceRoot, profile) {
+  if (profile.host !== "trae") return;
+  const configPath = path.join(workspaceRoot, ".trae", "skill-config.json");
+  if (!fs.existsSync(configPath)) return;
+  let config;
+  try {
+    config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  } catch (error) {
+    addCheck(result, "adapter.trae.skills.disabled_config.parse", "warn", `无法解析 Trae Skill 配置：${error.message}`, ".trae/skill-config.json");
+    return;
+  }
+  const disabled = new Set(extractDisabledSkillIds(config));
+  if (!disabled.size) return;
+  const manifest = readProjectSkillsManifest(workspaceRoot);
+  for (const skill of manifest.skills || []) {
+    if (disabled.has(skill.id)) {
+      addCheck(result, `adapter.trae.skills.disabled.${slugifyCheckId(skill.id)}`, "warn", `Trae 可能禁用了 StarWork 声明启用的 Skill：${skill.id}`, ".trae/skill-config.json");
+    }
+  }
+}
+
+function extractDisabledSkillIds(value, keyHint = "") {
+  const result = [];
+  if (Array.isArray(value)) {
+    for (const item of value) result.push(...extractDisabledSkillIds(item, keyHint));
+    return result;
+  }
+  if (!value || typeof value !== "object") return result;
+  for (const [key, nested] of Object.entries(value)) {
+    if ((key === "disabled" || key === "disabledSkills" || key === "disabled_skills") && Array.isArray(nested)) {
+      result.push(...nested.filter((item) => typeof item === "string"));
+      continue;
+    }
+    if (nested && typeof nested === "object") {
+      const id = nested.id || nested.name || key;
+      if ((nested.enabled === false || nested.disabled === true) && typeof id === "string") result.push(id);
+      result.push(...extractDisabledSkillIds(nested, key));
+    } else if ((nested === false || nested === "disabled") && keyHint) {
+      result.push(keyHint);
+    }
+  }
+  return result;
+}
+
+function checkHostCapabilitySafety(result, profile, record) {
+  const sendMessage = record?.capabilities?.["sessions.send_message"];
+  if (profile.host === "trae" && sendMessage === "supported") {
+    addCheck(result, "adapter.trae.capabilities.send_message", "fail", "Trae 被记录为支持自动跨会话发送，这会误导用户；v0.1 必须降级为 manual。", ".starwork/adapters.json");
+  }
+}
+
+function slugifyCheckId(value) {
+  return String(value || "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "unknown";
 }
 
 function extractWorkspacePathReferences(content) {
@@ -6562,13 +7064,273 @@ function findLaneOrThrow(lanes, laneId) {
 
 function resolveLaneSession(options) {
   if (options.session) {
-    return normalizeMarkdownCell(options.session);
+    return normalizeHostSession(options.session, options.agent);
   }
   const agent = options.agent || "codex";
-  if (agent === "codex" && process.env.CODEX_THREAD_ID) {
+  const normalizedAgent = normalizeAdapterHost(agent);
+  if (normalizedAgent === "codex" && process.env.CODEX_THREAD_ID) {
     return `codex:${process.env.CODEX_THREAD_ID}`;
   }
+  if (normalizedAgent === "claude-code" && process.env.CLAUDE_CODE_SESSION_ID) {
+    return `claude-code:${process.env.CLAUDE_CODE_SESSION_ID}`;
+  }
   throw new Error("无法自动识别当前会话。请传入 --session <agent:session-id>。");
+}
+
+function normalizeAdapterHost(value) {
+  const raw = normalizeMarkdownCell(value || "manual").toLowerCase();
+  if (raw === "manual" || raw === "none" || raw === "unbound") return raw;
+  return ADAPTER_ALIASES[raw] || raw;
+}
+
+function normalizeHostSession(session, fallbackHost) {
+  const normalized = normalizeMarkdownCell(session);
+  if (!normalized || normalized === "unbound") return "unbound";
+  if (normalized.includes(":")) {
+    const [hostRaw, ...rest] = normalized.split(":");
+    const host = normalizeAdapterHost(hostRaw);
+    const id = rest.join(":").trim();
+    if (!id) throw new Error(`session id 不能为空：${session}`);
+    return `${host}:${id}`;
+  }
+  const host = normalizeAdapterHost(fallbackHost || "manual");
+  if (host === "manual") return normalized;
+  return `${host}:${normalized}`;
+}
+
+function parseAdapterSession(session, fallbackHost) {
+  const normalized = normalizeHostSession(session || "unbound", fallbackHost);
+  if (!normalized || normalized === "unbound") {
+    return { host: "none", id: null, session: "unbound" };
+  }
+  if (!normalized.includes(":")) {
+    return { host: normalizeAdapterHost(fallbackHost || "manual"), id: normalized, session: normalized };
+  }
+  const [hostRaw, ...rest] = normalized.split(":");
+  const host = normalizeAdapterHost(hostRaw);
+  const id = rest.join(":").trim();
+  return { host, id: id || null, session: normalized };
+}
+
+async function observeHostSession(session, options = {}) {
+  const parsed = parseAdapterSession(session);
+  if (parsed.host === "none") {
+    return {
+      adapter: "none",
+      readable: false,
+      status: "unbound",
+      warning: "Lane has no host session binding",
+      ui_visibility: "not_guaranteed"
+    };
+  }
+  if (parsed.host === "codex") {
+    return observeCodexThread({ threadId: parsed.id, includeTurns: Boolean(options.includeTurns), load: Boolean(options.load), turnLimit: options.turnLimit || 0 });
+  }
+  if (parsed.host === "claude-code") {
+    return observeClaudeCodeSession(parsed, options);
+  }
+  if (parsed.host === "cursor") {
+    return observeManualHostSession(parsed, {
+      status: "partial",
+      warning: commandExistsOnPath("cursor")
+        ? "Cursor v0.1 只做轻量 probe；不能承诺读取完整聊天内容或后台派活。"
+        : "未在 PATH 中发现 cursor CLI；Cursor v0.1 只做轻量 probe，不能承诺读取完整聊天内容或后台派活。"
+    });
+  }
+  if (parsed.host === "trae") {
+    return observeManualHostSession(parsed, {
+      status: "manual",
+      warning: commandExistsOnPath("trae")
+        ? "Trae v0.1 不读取加密数据库，不承诺自动 launch / instruct；请以 worklog 和 handoff 为准。"
+        : "未在 PATH 中发现 trae CLI；Trae v0.1 不读取加密数据库，不承诺自动 launch / instruct；请以 worklog 和 handoff 为准。"
+    });
+  }
+  return observeManualHostSession(parsed, {
+    status: "manual",
+    warning: "当前宿主不支持自动观察，请以 lane worklog 和 shared context 为准。"
+  });
+}
+
+function observeManualHostSession(parsed, details = {}) {
+  return {
+    adapter: parsed.host,
+    session_id: parsed.id,
+    readable: false,
+    status: details.status || "manual",
+    warning: details.warning || "Manual handoff required",
+    ui_visibility: "not_guaranteed"
+  };
+}
+
+function observeClaudeCodeSession(parsed, options = {}) {
+  const transcriptPath = resolveClaudeTranscriptPath(parsed.id, options.transcriptPath);
+  const base = {
+    adapter: "claude-code",
+    session_id: parsed.id,
+    readable: false,
+    status: "manual",
+    continue_command: `claude --resume ${parsed.id}`,
+    ui_visibility: "not_guaranteed"
+  };
+  if (!transcriptPath) {
+    return {
+      ...base,
+      warning: "未提供 Claude Code transcript 路径；可用 --transcript <jsonl-or-dir> 做只读摘要。"
+    };
+  }
+  try {
+    const summary = readClaudeTranscriptSummary(transcriptPath, { turnLimit: options.turnLimit || 0 });
+    return {
+      ...base,
+      readable: true,
+      status: "observed",
+      transcript_path: transcriptPath,
+      turn_count: summary.turn_count,
+      turns: summary.turns,
+      warning: summary.warning
+    };
+  } catch (error) {
+    return {
+      ...base,
+      transcript_path: transcriptPath,
+      warning: `无法读取 Claude Code transcript：${error.message}`
+    };
+  }
+}
+
+function resolveClaudeTranscriptPath(sessionId, explicitPath) {
+  if (explicitPath) return path.resolve(explicitPath);
+  if (process.env.STARWORK_CLAUDE_TRANSCRIPT_PATH) return path.resolve(process.env.STARWORK_CLAUDE_TRANSCRIPT_PATH);
+  if (process.env.STARWORK_CLAUDE_TRANSCRIPT_DIR) {
+    const dir = path.resolve(process.env.STARWORK_CLAUDE_TRANSCRIPT_DIR);
+    const candidates = [
+      path.join(dir, `${sessionId}.jsonl`),
+      path.join(dir, sessionId, "transcript.jsonl"),
+      path.join(dir, sessionId)
+    ];
+    return candidates.find((candidate) => fs.existsSync(candidate)) || path.join(dir, `${sessionId}.jsonl`);
+  }
+  return null;
+}
+
+function readClaudeTranscriptSummary(transcriptPath, options = {}) {
+  const files = collectClaudeTranscriptFiles(transcriptPath);
+  const entries = [];
+  for (const file of files) {
+    const lines = fs.readFileSync(file, "utf8").split(/\r?\n/).filter((line) => line.trim());
+    for (let index = 0; index < lines.length; index += 1) {
+      const entry = summarizeClaudeTranscriptLine(lines[index], `${path.basename(file)}:${index + 1}`);
+      if (entry) entries.push(entry);
+    }
+  }
+  const turnLimit = Number(options.turnLimit || 0);
+  const turns = turnLimit > 0 ? entries.slice(-turnLimit) : entries.slice(-5);
+  return {
+    turn_count: entries.length,
+    turns,
+    warning: entries.length ? null : "transcript 中没有可摘要的 JSONL 记录"
+  };
+}
+
+function collectClaudeTranscriptFiles(transcriptPath) {
+  if (!fs.existsSync(transcriptPath)) {
+    throw new Error(`路径不存在：${transcriptPath}`);
+  }
+  const stat = fs.statSync(transcriptPath);
+  if (stat.isFile()) return [transcriptPath];
+  if (!stat.isDirectory()) throw new Error(`不是文件或目录：${transcriptPath}`);
+  const files = fs.readdirSync(transcriptPath)
+    .filter((name) => name.endsWith(".jsonl"))
+    .sort()
+    .map((name) => path.join(transcriptPath, name));
+  if (!files.length) throw new Error(`目录中没有 .jsonl transcript：${transcriptPath}`);
+  return files;
+}
+
+function summarizeClaudeTranscriptLine(line, id) {
+  let payload;
+  try {
+    payload = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  const role = payload.role || payload.type || payload.message?.role || payload.event?.role || "unknown";
+  const content = extractTranscriptText(payload.content || payload.message?.content || payload.text || payload.summary || payload.event?.content);
+  return {
+    id: payload.uuid || payload.id || id,
+    role,
+    summary: content ? content.slice(0, 180) : ""
+  };
+}
+
+function extractTranscriptText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value.replace(/\s+/g, " ").trim();
+  if (Array.isArray(value)) return value.map((item) => extractTranscriptText(item?.text || item?.content || item)).filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+  if (typeof value === "object") return extractTranscriptText(value.text || value.content || value.value);
+  return "";
+}
+
+function commandExistsOnPath(command) {
+  const pathEnv = process.env.PATH || "";
+  const extensions = process.platform === "win32" ? ["", ".cmd", ".exe", ".bat"] : [""];
+  return pathEnv.split(path.delimiter).filter(Boolean).some((dir) => extensions.some((extension) => {
+    const candidate = path.join(dir, `${command}${extension}`);
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }));
+}
+
+function createManualHandoffDelivery({ parsedSession, message, reason }) {
+  return {
+    adapter: parsedSession.host,
+    status: MANUAL_HANDOFF_STATUS,
+    session: parsedSession.session,
+    session_id: parsedSession.id,
+    formatted_message: message,
+    warning: reason || "Manual handoff required"
+  };
+}
+
+function buildHostContinueResult(parsedSession) {
+  if (parsedSession.host === "claude-code" && parsedSession.id) {
+    return {
+      adapter: parsedSession.host,
+      status: "manual_command",
+      command: `claude --resume ${parsedSession.id}`,
+      instructions: "在 Claude Code 里执行该命令继续这个 lane；StarWork 不会写 Claude 私有 transcript。"
+    };
+  }
+  if (parsedSession.host === "codex" && parsedSession.id) {
+    return {
+      adapter: parsedSession.host,
+      status: "use_multiagent_read_or_instruct",
+      instructions: "Codex lane 继续由 read / instruct / launch 管理，v0.1 不新增 continue 命令。"
+    };
+  }
+  if (parsedSession.host === "cursor") {
+    return {
+      adapter: parsedSession.host,
+      status: "manual_steps",
+      instructions: "在 Cursor 中打开当前项目，并把 handoff message 复制给目标会话。"
+    };
+  }
+  if (parsedSession.host === "trae") {
+    return {
+      adapter: parsedSession.host,
+      status: "manual_steps",
+      instructions: "在 Trae 中打开当前项目，并按 lane worklog / shared context 手动继续。"
+    };
+  }
+  return {
+    adapter: parsedSession.host,
+    status: "unbound",
+    instructions: "该 lane 尚未绑定可继续的宿主会话。"
+  };
 }
 
 function updateAgentLaneHostState(state, laneId, hostPatch) {
@@ -7768,6 +8530,8 @@ Options:
   --formal-source <path>
   --knowledge
       初始化时同时开启项目知识库。默认不开启。
+  --adapter <codex|claude-code|cursor|trae|all>
+      初始化完成后继续生成对应 AI 工具适配入口。
   --target <path>
   --dry-run
   --no-skills
@@ -7778,6 +8542,7 @@ Options:
   starwork init --target ./custom-workspace --blueprint ./init-blueprint.json --dry-run
   starwork init --type hub --language zh --target ./my-hub --yes
   starwork init --type project --language zh --target ./my-workspace --knowledge --yes
+  starwork init --type project --language zh --target ./cursor-workspace --adapter cursor --yes
   starwork init --type project --pack general --target ./preview-workspace --dry-run
 `);
 }
@@ -7892,6 +8657,7 @@ Usage:
 
 Options:
   --target <path>
+  --host <codex|claude-code|cursor|trae|all>
   --json
   --strict
   --verbose
@@ -7900,6 +8666,8 @@ Options:
 
 示例：
   starwork doctor --target ./my-workspace
+  starwork doctor --target ./my-workspace --host cursor
+  starwork doctor --target ./my-workspace --host all --json
   starwork doctor --target ./old-workspace --json --inventory-depth all
 `);
 }
@@ -7928,16 +8696,23 @@ function printAdaptHelp() {
   console.log(`StarWork Adapt
 
 Usage:
-  starwork adapt [codex|claude|cursor|trae|all] [options]
+  starwork adapt [codex|claude-code|cursor|trae|all] [options]
+  starwork adapt [codex|claude-code|cursor|trae|all] --capabilities [options]
+  starwork adapt [codex|claude-code|cursor|trae|all] --check [options]
 
 Options:
-  --agent <codex|claude|cursor|trae|all>
+  --agent <codex|claude|claude-code|cursor|trae|all>
   --target <path>
+  --capabilities
+  --check
   --dry-run
+  --json
   --yes, -y
 
 示例：
-  starwork adapt claude --target ./my-workspace --yes
+  starwork adapt claude-code --target ./my-workspace --yes
+  starwork adapt cursor --capabilities
+  starwork adapt cursor --check --target ./my-workspace --json
   starwork adapt all --target ./my-workspace --dry-run
 `);
 }
@@ -7975,7 +8750,7 @@ function printLanesHelp() {
   console.log(`StarWork Multiagent
 
 Usage:
-  starwork multiagent <init|add|bind|release|status|read|instruct|launch|share> [options]
+  starwork multiagent <init|add|bind|release|status|read|instruct|handoff|continue|launch|share> [options]
 
 Agent Lanes 用于同一项目内多个 Agent 会话按项目自定义职责位协作。
 
@@ -7984,9 +8759,11 @@ Subcommands:
   add        新增一个 lane。
   bind       将当前会话绑定到 lane。
   release    释放 lane 的当前会话绑定。
-  status     查看 lane 分工和共享请求，可加 --host 观察 Codex thread。
-  read       读取某个 lane 绑定的 Codex thread 近况。
+  status     查看 lane 分工和共享请求，可加 --host 观察宿主会话。
+  read       读取某个 lane 绑定宿主的可用近况；Claude Code 只输出 transcript 摘要。
   instruct   向另一个 lane 发送格式化跨会话指令。
+  handoff    生成并记录人工交付消息，不后台发送。
+  continue   输出继续某个 lane 宿主会话的人工命令或步骤。
   launch     为已有 lane 创建并绑定 Codex thread。
   share      登记一个跨 lane 可读输出。
 
@@ -8050,7 +8827,7 @@ Options:
 说明：
   --session-name 会在绑定成功后 best-effort 同步宿主工具的会话名称。
   --pin 会尝试置顶 Codex thread；当前无稳定接口时只输出 warning，不回滚绑定。
-  当前仅 Codex session 支持；失败不会回滚 lane binding。
+  Codex 支持自动观察和派发；Claude Code 支持 CLAUDE_CODE_SESSION_ID 自动识别和 resume 命令；Cursor / Trae v0.1 走人工交付。
 `);
 }
 
@@ -8078,6 +8855,7 @@ Options:
   --json
   --host
   --load
+  --transcript <path>  Claude Code transcript JSONL 文件或目录，只读摘要
 `);
 }
 
@@ -8091,6 +8869,7 @@ Options:
   --target <path>
   --turns <n>
   --include-turns
+  --transcript <path>  Claude Code transcript JSONL 文件或目录，只读摘要
   --json
 `);
 }
@@ -8109,6 +8888,40 @@ Options:
   --json
   --dry-run
   --yes, -y
+`);
+}
+
+function printLanesHandoffHelp() {
+  console.log(`StarWork Multiagent Handoff
+
+Usage:
+  starwork multiagent handoff <to-lane> --from <from-lane> --message <text> [options]
+
+Options:
+  --target <path>
+  --from <lane-id>
+  --message <text>
+  --json
+  --dry-run
+  --yes, -y
+
+说明：
+  handoff 只生成并记录可复制交付消息，不后台发送给任何宿主会话。
+`);
+}
+
+function printLanesContinueHelp() {
+  console.log(`StarWork Multiagent Continue
+
+Usage:
+  starwork multiagent continue <lane-id> [options]
+
+Options:
+  --target <path>
+  --json
+
+说明：
+  Claude Code 会输出 claude --resume <session-id>；Cursor / Trae 输出人工继续步骤。
 `);
 }
 

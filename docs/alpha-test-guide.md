@@ -153,7 +153,7 @@ starwork multiagent instruct development \
   --yes
 ```
 
-读取目标职责位最近状态：
+读取目标职责位当前可观察状态：
 
 ```bash
 starwork multiagent read development \
@@ -163,6 +163,72 @@ starwork multiagent read development \
 ```
 
 预期：`launch` 和简单 `instruct` 应返回 `completed`。如果返回 `started_unverified`，说明 CLI 没观察到目标会话完成，应继续用 `read` 复核，不要把它当作已完成交付。
+
+### 5. 可选：验证 Host Adapter
+
+这一步用于测试 Codex、Claude Code、Cursor、Trae 的宿主差异。Adapter 是增强层，不是 Core 必需层；用户不选宿主时，普通工作台仍然可用。
+
+查看宿主能力，不写文件：
+
+```bash
+starwork adapt all --capabilities --json
+starwork adapt cursor --check --target ~/Desktop/starwork-alpha-project --json
+```
+
+初始化时直接适配 Cursor：
+
+```bash
+starwork init \
+  --type project \
+  --language zh \
+  --target ~/Desktop/starwork-cursor-a-test \
+  --adapter cursor \
+  --yes
+
+starwork doctor \
+  --target ~/Desktop/starwork-cursor-a-test \
+  --host cursor
+```
+
+测试 Trae 人工交付降级：
+
+```bash
+starwork multiagent init \
+  --lanes product-planning,development \
+  --target ~/Desktop/starwork-alpha-project \
+  --yes
+
+starwork multiagent bind development \
+  --session trae:manual-dev-session \
+  --target ~/Desktop/starwork-alpha-project \
+  --yes
+
+starwork multiagent instruct development \
+  --from product-planning \
+  --message "请读取当前项目入口，并用一句话汇报你看到的工作台状态。" \
+  --target ~/Desktop/starwork-alpha-project \
+  --json \
+  --yes
+```
+
+预期：Trae 目标应返回 `manual_handoff_required`，表示已经生成可复制交付消息，但没有自动送达。
+
+测试 Claude Code 继续命令：
+
+```bash
+CLAUDE_CODE_SESSION_ID=your-session-id \
+starwork multiagent bind development \
+  --agent claude-code \
+  --target ~/Desktop/starwork-alpha-project \
+  --yes
+
+starwork multiagent continue development \
+  --target ~/Desktop/starwork-alpha-project
+```
+
+预期：输出 `claude --resume your-session-id`。如果要测试 transcript 摘要，可额外传 `--transcript <jsonl-or-dir>`；StarWork 只读摘要，不写 Claude 私有 transcript。
+
+Cursor / Trae 写入 Skill 目录后，宿主 UI 是否立即发现需要继续实测。如果看不到 Skill，先记录是否需要重启窗口、重新打开项目或触发一次新聊天。
 
 ## 反馈重点
 
@@ -178,6 +244,10 @@ starwork multiagent read development \
 - `starworkMultiagent` 是否能把“登记当前会话为常用智能体”正确转换成 `starwork multiagent init/add/bind` 建议。
 - `starwork multiagent bind --session-name` 是否能正确同步 Codex 宿主会话名；失败时是否能看懂 warning。
 - `starwork multiagent launch/instruct/read` 在 Codex 中是否能完成多会话读取和指令交付；如果未完成，`started_unverified` 是否容易理解。
+- `starwork adapt --capabilities` 是否能帮助 Agent 判断不同宿主能力，而不是把内部字段甩给用户。
+- `starwork doctor --host <host>` 是否能区分“工作台结构问题”和“宿主入口 / Skill 目录问题”。
+- Cursor / Trae 在写入 `.cursor/skills/` / `.trae/skills/` 后是否需要重启、刷新窗口或重新打开项目。
+- 非 Codex 宿主返回 `manual_handoff_required` 时，用户是否能理解“已生成交付消息，不等于已自动送达”。
 - 项目中心自带的 `starworkSpawn`、`starworkAudit` 与项目工作台自带的 `neat-freak` 是否能在对应工作台内被发现。
 
 ## 发布前检查

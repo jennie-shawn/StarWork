@@ -26,5 +26,7 @@ Skill 的安装、项目中心管理、Pack 推荐和项目分发规则见 `prod
 - `starworkMultiagent/`：帮助 Agent 把“常用智能体 / 当前会话职责 / 多 Agent 分工 / 共享输出 / 跨会话指令 / Codex lane thread 编排”翻译成安全的 `starwork multiagent` 命令组合。详细 SPEC 见 `starworkMultiagent-spec.md` 和 `product/planning/features/multiagent/specs/v0.2-codex-orchestration.md`。
 - `starworkKnowledge/`：帮助 Agent 通过 `starwork knowledge` 开启、检查和维护项目本地知识库；负责判断哪些内容值得长期沉淀，区分 `pages/` 和 `synthesis/`，不默认提交项目中心。
 
+Host Adapter v0.1 已进入系统级 Skill：`starworkInit`、`starworkDoctor`、`starworkMultiagent`、`starworkKnowledge` 会引用 `starwork adapt` / `doctor --host` 的宿主能力结果，避免把 Codex 的自动会话能力误当成 Claude Code、Cursor 或 Trae 都支持。`starworkMultiagent` 对 Claude Code 可生成 resume 命令和 transcript 摘要，对 Cursor / Trae 默认生成人工交付消息。
+
 `starworkAudit` 是项目中心工作台模板自带 skill，源码在 `product/kit-skills/starworkAudit/`；规格仍保留在 `starworkAudit-spec.md`。
 `starworkKnowledgeProject` 是知识库能力的项目内业务 skill，源码在 `product/core/capabilities/knowledge/skills/starworkKnowledgeProject/`；它不参与全局安装。

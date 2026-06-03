@@ -34,9 +34,9 @@ v0.1 只覆盖最小可用安装和适配能力：
 - `starwork doctor` 第一版：可以检查 workspace state、Core 必需角色、Kit 文件、正式事实源、业务工作区和 Pack 落地结果，并支持 `--json` 输出；alpha.4 开始可识别历史模板候选；alpha.5 开始输出目录 `inventory` 与语义 `signals`；alpha.9 开始补齐类似项目中心的旧主库识别，供 `starworkDoctor` skill 判断。
 - `starwork knowledge` 第一版：可以为项目工作台开启本地知识库，支持 `init`、`status --json`、`check` 和 `apply --blueprint`；成功开启后把项目内业务 Skill `starworkKnowledgeProject` 安装到当前项目；默认不创建知识库，不迁移或删除旧 `知识/knowledge`。
 - `starwork upgrade` 第一版：可以读取 `starworkDoctor` skill 生成的升级蓝图，把历史模板、非标准目录或类似项目中心的旧主库安全升级为 StarWork 工作台；alpha.9 支持 `hub + preserve-names + pack:null`，旧主库接入时不会创建重复标准目录；v0.1 只支持 `--blueprint`，不自动判断升级方案。
-- `starwork adapt` 第一版：可以为 Codex、Claude Code、Cursor、Trae 生成或登记轻量适配入口。
+- `starwork adapt` Host Adapter v0.1：可以读取 Codex、Claude Code、Cursor、Trae 的宿主能力 profile；`--capabilities` 只输出能力不写文件；正式适配会写入 `.starwork/adapters.json`，并保留 `.starwork/workspace.json.adapters` 摘要。
 - `starwork pack install` 第一版：可以在健康工作台上补装 Pack，并更新路径、规则、模板和 workspace state。
-- `starwork multiagent` v0.2：在原有 Agent Lanes 基础上增加 Codex 多会话编排；支持 `status --host`、`read`、`instruct`、`launch` 和 `bind --pin`，并把跨会话指令写入项目内 shared context 与 `.starwork/agent-lanes/state.json`。
+- `starwork multiagent` v0.2+Host Adapter：在原有 Agent Lanes 基础上增加宿主分支；Codex 支持自动读取、发送和 launch；Claude Code 支持 `CLAUDE_CODE_SESSION_ID` 绑定、`claude --resume` 继续命令和 transcript 摘要；Cursor / Trae 默认返回人工交付消息，不伪装自动送达。
 - `starwork audit` 第一版：可以从项目中心读取语言映射后的项目注册表，批量巡检中心管理的项目工作台，并复用 `doctor` 聚合健康事实。
 - `starwork repair` 第一版：可以执行 `starworkAudit` 生成的保守 repair blueprint，支持补目录、补缺失文件、重写 sync、更新 registry 和更新 workspace state。
 - Skill 管理与分发第一版：工作台模板可以自带 Skill，项目中心可以托管用户常用 Skill；`init` 写入 `.starwork/skills.json`，`spawn` 按项目中心 registry 选择性分发 Skill，`doctor` 暴露 Skill manifest / registry / mount 事实。
@@ -54,6 +54,7 @@ CLI 不在 v0.1 阶段处理账号、授权、消息平台 gateway 或复杂商�
 - [`starwork doctor` SPEC](./doctor-spec.md)
 - [`Knowledge Base Capability SPEC`](../planning/features/knowledge-base/specs/v0.1.md)
 - [`starwork adapt` SPEC](./adapt-spec.md)
+- [`Host Adapter v0.1 Implementation SPEC`](../planning/features/host-adapters/specs/v0.1-implementation.md)
 - [`starwork pack install` SPEC](./pack-install-spec.md)
 - [`starwork spawn` SPEC](./spawn-spec.md)
 - [`starwork spawn --blueprint` SPEC](./spawn-blueprint-spec.md)
@@ -76,11 +77,17 @@ node cli/bin/starwork.js audit --hub ./my-hub --json
 node cli/bin/starwork.js repair --blueprint ./repair-blueprint.json --dry-run
 node cli/bin/starwork.js upgrade --target ./old-workspace --blueprint ./upgrade-blueprint.json --dry-run
 node cli/bin/starwork.js doctor --target ./my-workspace
+node cli/bin/starwork.js init --type project --language zh --target ./cursor-workspace --adapter cursor --yes
 node cli/bin/starwork.js knowledge init --target ./my-workspace --dry-run
 node cli/bin/starwork.js multiagent init --lanes research,writing,review --target ./my-workspace --yes
 node cli/bin/starwork.js multiagent bind research --session codex:manual-research-1 --session-name "Research Agent" --target ./my-workspace --yes
 node cli/bin/starwork.js multiagent status --host --target ./my-workspace --json
 node cli/bin/starwork.js multiagent instruct development --from product-planning --message "请根据 SPEC 开始实现。" --target ./my-workspace --dry-run
+node cli/bin/starwork.js multiagent handoff development --from product-planning --message "请手动处理这条指令。" --target ./my-workspace --dry-run
+node cli/bin/starwork.js multiagent continue research --target ./my-workspace --json
+node cli/bin/starwork.js adapt all --capabilities --json
+node cli/bin/starwork.js adapt cursor --check --target ./my-workspace --json
 node cli/bin/starwork.js adapt claude --target ./my-workspace --yes
+node cli/bin/starwork.js doctor --target ./my-workspace --host all --json
 node cli/bin/starwork.js pack install content-creator --target ./my-workspace --yes
 ```

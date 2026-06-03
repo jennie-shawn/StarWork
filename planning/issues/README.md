@@ -85,7 +85,7 @@
 3. 复制 `template.md` 到 `ISSUE-XXX.md`，补完整 issue 单，并从 index 摘要行链接过去。
 4. 先记录事实：来源、复现方式、影响范围、证据文件、用户可见表现。
 5. 分流判断：
-   - 如果是实现缺陷，交给 optimization / development lane。
+   - 如果是实现缺陷，交给 development lane。
    - 如果是产品边界问题，沉淀到对应 feature 的 SPEC 或 decisions。
    - 如果需要公开协作，创建或关联 GitHub Issue。
    - 如果是文档问题，关联 `product/docs/` 或对应功能档案。

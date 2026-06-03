@@ -1,0 +1,60 @@
+{
+  "schema": "starwork.adapter.profile.v0.1",
+  "host": "cursor",
+  "label": "Cursor",
+  "version": "0.1",
+  "rules": {
+    "entry_file": ".cursor/rules/starwork.mdc",
+    "can_generate_entry": "supported",
+    "can_update_entry": "partial",
+    "supports_project_scope": "supported",
+    "supports_nested_rules": "supported"
+  },
+  "skills": {
+    "system_install": "manual",
+    "project_mount": "supported",
+    "primary_project_dir": ".cursor/skills/",
+    "project_mount_dirs": [".cursor/skills/", ".agents/skills/"],
+    "host_native_dirs": [".cursor/skills/", ".agents/skills/", ".claude/skills/", ".codex/skills/"],
+    "global_dirs": ["~/.cursor/skills/", "~/.agents/skills/", "~/.claude/skills/", "~/.codex/skills/"],
+    "conflict_priority": [".cursor/skills/", ".agents/skills/", ".claude/skills/", ".codex/skills/"],
+    "discovery": "supported",
+    "trigger_style": "native-skill-discovery",
+    "adapter_rule_required": true,
+    "frontmatter": {
+      "required": ["name", "description"],
+      "name_pattern": "^[a-z0-9-]+$",
+      "name_matches_parent": true
+    }
+  },
+  "sessions": {
+    "detect_current": "partial",
+    "rename": "partial",
+    "list": "partial",
+    "read": "partial",
+    "continue": "partial",
+    "send_message": "partial",
+    "create": "partial",
+    "pin": "unsupported",
+    "archive": "unsupported"
+  },
+  "memory": {
+    "transcript_read": "partial",
+    "transcript_write": "unsupported",
+    "summary_visible": "unknown",
+    "project_memory": "supported",
+    "export": "partial"
+  },
+  "commands": {
+    "cli_available": "partial",
+    "api_available": "unsupported",
+    "requires_auth": "partial",
+    "can_probe": "partial"
+  },
+  "safety": {
+    "private_paths_readonly": ["~/Library/Application Support/Cursor/**"],
+    "never_write_paths": ["~/Library/Application Support/Cursor/**/*.vscdb", "~/Library/Application Support/Cursor/**/*.sqlite"],
+    "destructive_commands": [],
+    "degradation_required": ["sessions.pin", "sessions.archive"]
+  }
+}

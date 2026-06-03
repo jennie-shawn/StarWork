@@ -477,7 +477,7 @@
         <article class="panel">
           <span class="badge">状态</span>
           <h3>alpha.17</h3>
-          <p>当前 npm latest 为 <code>@jennie-shawn/starwork@0.1.0-alpha.17</code>。已收敛为 Project Kit 与 项目中心 Kit 两类结构，补齐 项目中心 侧 <code>audit</code> / <code>repair</code> 链路，修正系统级 Skill 与 Kit 自带 Skill 的分发边界，新增可选项目知识库命令组 <code>starwork knowledge</code>，并完成 Codex 多会话 <code>multiagent launch/instruct/read</code> 的真实复验。</p>
+          <p>当前 npm latest 为 <code>@jennie-shawn/starwork@0.1.0-alpha.17</code>。已收敛为 Project Kit 与 项目中心 Kit 两类结构，补齐 项目中心 侧 <code>audit</code> / <code>repair</code> 链路，修正系统级 Skill 与 Kit 自带 Skill 的分发边界，新增可选项目知识库命令组 <code>starwork knowledge</code>，完成 Codex 多会话 <code>multiagent launch/instruct/read</code> 的真实复验，并开始把 Host Adapter 扩展到 Claude Code、Cursor 和 Trae。</p>
         </article>
       </div>
     </section>
@@ -548,10 +548,10 @@
           <tr>
             <td><strong><code>starwork adapt</code></strong></td>
             <td>生成 AI 工具适配入口。</td>
-            <td>为 Codex、Claude Code、Cursor、Trae 写入轻量适配文件；记录 adapters 安装状态。</td>
-            <td><code>codex</code>、<code>claude</code>、<code>cursor</code>、<code>trae</code>、<code>all</code>、<code>--target</code></td>
-            <td><code>CLAUDE.md</code>、Cursor / Trae rules 或工作台身份证适配记录。</td>
-            <td>要求工作台检查没有阻塞问题；不改变工作台协议和场景能力。</td>
+            <td>读取宿主能力 profile；<code>--capabilities</code> 只读输出；正式适配会写入宿主规则入口、Skill 目录和 <code>.starwork/adapters.json</code>。</td>
+            <td><code>codex</code>、<code>claude-code</code>、<code>cursor</code>、<code>trae</code>、<code>all</code>、<code>--target</code>、<code>--capabilities</code></td>
+            <td><code>AGENTS.md</code>、<code>CLAUDE.md</code>、Cursor / Trae rules、宿主 Skill 目录和 adapter state。</td>
+            <td>要求工作台检查没有阻塞问题；不改变工作台协议和场景能力；不读写宿主私有数据库或 transcript。</td>
             <td><span class="status done">已实现</span></td>
           </tr>
           <tr>
@@ -566,10 +566,10 @@
           <tr>
             <td><strong><code>starwork multiagent</code></strong></td>
             <td>管理同一项目内多个 AI 会话的职责位协作。</td>
-            <td>初始化 Agent Lanes；新增自定义 lane；维护 lane worklog；绑定或释放 session；可选同步 Codex 宿主会话名；观察 host 状态；读取、launch 和 instruct Codex lane thread；登记跨 lane 可读输出。</td>
-            <td><code>init</code>、<code>add</code>、<code>bind --pin</code>、<code>release</code>、<code>status --host</code>、<code>read</code>、<code>instruct</code>、<code>launch</code>、<code>share</code></td>
+            <td>初始化 Agent Lanes；新增自定义 lane；维护 lane worklog；绑定或释放 session；Codex 可自动 launch / instruct；Claude Code 可绑定环境会话、读取 transcript 摘要并输出 resume 命令；Cursor / Trae 默认生成 manual handoff。</td>
+            <td><code>init</code>、<code>add</code>、<code>bind --pin</code>、<code>release</code>、<code>status --host</code>、<code>read</code>、<code>instruct</code>、<code>handoff</code>、<code>continue</code>、<code>launch</code>、<code>share</code></td>
             <td><code>_系统/协作/agent-lanes.md</code>、<code>_系统/协作/shared.md</code>、<code>.starwork/agent-lanes/state.json</code> 和 lane <code>worklog.md</code>。</td>
-            <td>不内置固定职责；不做自动调度、文件锁或并发冲突仲裁；不依赖 Codex 前端是否即时刷新。</td>
+            <td>不内置固定职责；不做自动调度、文件锁或并发冲突仲裁；不把 Cursor / Trae 的人工交付说成自动送达。</td>
             <td><span class="status done">已实现</span></td>
           </tr>
           <tr>
@@ -716,13 +716,16 @@ starwork upgrade --target ./old-workspace --blueprint ./upgrade-blueprint.json -
         </div>
         <div>
           <h3>适配与安装场景能力</h3>
-          <pre>starwork adapt claude --target ./my-workspace --yes
+          <pre>starwork adapt all --capabilities --json
+starwork adapt claude --target ./my-workspace --yes
 starwork pack install content-creator --target ./my-workspace --dry-run</pre>
         </div>
         <div>
           <h3>多 AI 协作</h3>
           <pre>starwork multiagent init --lanes research,writing,review --target ./my-workspace --yes
 starwork multiagent bind research --session codex:manual-research-1 --session-name "Research Agent" --target ./my-workspace --yes
+starwork multiagent handoff review --from research --message "请手动验收这份输出。" --target ./my-workspace --dry-run
+starwork multiagent continue research --target ./my-workspace --json
 starwork multiagent share research --title "Source notes draft" --path notes/source-notes.md --audience writing,review --target ./my-workspace --yes</pre>
         </div>
       </div>

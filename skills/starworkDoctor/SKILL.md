@@ -17,6 +17,8 @@ description: 'Diagnose StarWork workspaces, legacy templates, or Project Center-
 - 应该如何整理、补齐或升级，且不破坏用户历史文件
 - 用户确认升级语义后，生成可 dry-run 的 `upgrade-blueprint.json` 和配套规则文件
 
+历史上独立的 `starworkUpgrade` 系统 Skill 已取消；旧模板升级、旧宿主规则提炼和 upgrade blueprint 设计都由 `starworkDoctor` 承接。不要重新引导用户安装或调用独立 `starworkUpgrade` Skill。
+
 Kit / Pack 不是本 skill 的主线任务。只有在生成升级蓝图时，才选择 CLI 可执行的落地参数：单项目默认 `general` Pack；类似项目中心的旧工作区使用 `hub + preserve-names + pack:null`，避免创建重复标准目录。
 
 除非用户明确要求生成升级蓝图，否则这个 skill 只做诊断和建议，不生成 blueprint；除非用户明确要求执行命令，否则不直接修改用户工作区。
@@ -110,6 +112,29 @@ starwork doctor --target <path> --json --inventory-depth all
 
 `doctor` 输出只当作事实和信号，不把其中的 legacy 判断当作最终诊断。
 
+如果用户指定了宿主，或你从目录里看到宿主痕迹，再追加宿主诊断：
+
+```bash
+starwork doctor --target <path> --host <codex|claude-code|cursor|trae|all> --json
+```
+
+宿主痕迹包括：
+
+- `AGENTS.md` / `.agents/skills/`：Codex 或通用 Agent
+- `CLAUDE.md` / `.claude/skills/`：Claude Code
+- `.cursor/rules/` / `.cursor/skills/`：Cursor
+- `.trae/rules/` / `.trae/skills/` / `.trae/skill-config.json`：Trae
+
+解释时分开说：
+
+- StarWork 工作台结构问题
+- 宿主入口问题
+- Skill 目录问题
+- 同名 Skill 冲突
+- 宿主能力限制
+
+不要把宿主适配问题说成 Core 坏了。Cursor / Trae 不支持后台跨会话派活，也不是 StarWork 故障；那只是需要人工交付。
+
 ### Step 2：读取少量关键文件
 
 只读取最能解释项目性质的文件：
@@ -129,6 +154,21 @@ starwork doctor --target <path> --json --inventory-depth all
 如果文件不存在，只记录缺失，不报错。
 
 读取入口规则时，目标不是把旧规则全文塞进新 `AGENTS.md`，而是识别其中仍有效的行为规则、写入边界、确认门槛和只读范围。规则提炼方法见 `references/rules-extraction-guide.md`。
+
+旧宿主规则文件也要纳入提炼范围：
+
+- `CLAUDE.md`
+- `.cursor/rules/**`
+- `.trae/rules/**`
+- 旧 `AGENTS.md`
+
+把旧规则分成三类：
+
+- 可保留：项目事实、工作边界、用户偏好。
+- 需要改写：旧目录路径、旧术语、旧工作流。
+- 应废弃：过期命令、冲突规则、污染业务目录的临时指令。
+
+升级后的入口不能出现 StarWork 内部占位符；旧规则原文应保留为证据，不要原样塞回新入口。
 
 ### Step 3：建立 Core 角色映射
 

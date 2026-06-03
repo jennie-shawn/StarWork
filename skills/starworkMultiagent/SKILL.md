@@ -55,12 +55,14 @@ _system/collaboration/shared.md
 | “把当前会话创建为常用智能体，负责 X” | 登记当前会话为一个稳定职责位 | 必要时 `init`，再 `add`，再 `bind` |
 | “初始化多 Agent 协作层” | 创建 Agent Lanes 协议文件 | `multiagent init` |
 | “增加一个负责 X 的 Agent / lane” | 新增职责位，暂不一定绑定会话 | `multiagent add` |
-| “把当前 Codex 绑定到 X” | 将具体 session 绑定到已有 lane | `multiagent bind` |
+| “把当前 Codex / Claude Code 绑定到 X” | 将具体 session 绑定到已有 lane | `multiagent bind` |
 | “这个会话不再负责 X” | 释放 lane 当前绑定 | `multiagent release` |
 | “看看现在有哪些 Agent 分工” | 读取协作状态 | `multiagent status --json` |
 | “这个输出给其他 Agent 看” | 登记共享输出索引 | `multiagent share` |
 | “让开发 lane 开始开发” | 向目标 lane 发送格式化跨会话指令 | `multiagent instruct <lane>` |
-| “看看开发 lane 做到哪了” | 读取目标 lane 的 Codex host 观察结果 | `multiagent read <lane>` 或 `multiagent status --host` |
+| “看看开发 lane 做到哪了” | 读取目标 lane 可用的宿主观察结果 | `multiagent read <lane>` 或 `multiagent status --host` |
+| “把这条消息交给另一个工具里的会话” | 生成并记录人工交付消息 | `multiagent handoff <lane>` |
+| “继续 Claude Code 里的这个 lane” | 输出 resume 命令或人工继续步骤 | `multiagent continue <lane>` |
 | “帮我创建产品、开发、验收三个智能体” | 为已有 lanes 创建并绑定 Codex threads | `multiagent launch --lanes ...` |
 | “把这个 lane 固定起来” | 绑定 lane 后 best-effort 置顶 Codex thread | `multiagent bind --pin` |
 
@@ -96,6 +98,33 @@ starwork multiagent bind <lane> --session <agent:session-id> --session-name "<di
 `--session-name` 是宿主工具显示增强，不是 StarWork 事实源。用户未要求改名时不要强行添加；如果添加，必须在 dry-run 中说明会尝试修改宿主会话标题，且失败不影响 lane binding。
 
 ## 子命令使用规则
+
+## 宿主能力分支
+
+开始跨会话操作前，先看当前工作台是否已有 adapter state：
+
+```bash
+starwork doctor --target <path> --host all --json
+```
+
+不同宿主能力不同，不能把 Codex 的能力当成所有工具都支持：
+
+| Host | 使用方式 |
+|---|---|
+| Codex | 可以自动读取、创建和发送跨会话指令，但仍以 StarWork worklog 和 shared context 为准。 |
+| Claude Code | 可以绑定当前会话、读取 transcript 候选摘要、resume；不能后台发消息给非当前会话。 |
+| Cursor | 先按 partial 能力处理；自动化不可确认时生成可复制交付消息。 |
+| Trae | 默认是人工交付宿主；读取 StarWork worklog / handoff，不读加密数据库，不说自动送达。 |
+
+如果用户要给 Claude Code、Cursor 或 Trae 做多会话协作，先确认对应宿主已经适配：
+
+```bash
+starwork adapt <host> --target <path> --dry-run
+starwork adapt <host> --target <path> --yes
+starwork doctor --target <path> --host <host>
+```
+
+不要把 `adapter profile`、`host_native_dirs`、`capabilities` 等内部词直接讲给用户；说“这个工具能自动做什么、哪些需要你手动复制”。
 
 ### init
 
@@ -135,10 +164,13 @@ starwork multiagent add <lane> --purpose "<text>" --write "<path-globs>" --targe
 
 把具体会话绑定到已有 lane。
 
-优先使用真实 session ID。Codex 环境可尝试读取 `CODEX_THREAD_ID`；读取不到时，要求用户提供：
+优先使用真实 session ID。Codex 环境可尝试读取 `CODEX_THREAD_ID`；Claude Code 环境可尝试读取 `CLAUDE_CODE_SESSION_ID`；读取不到时，要求用户提供：
 
 ```text
 codex:<session-id>
+claude-code:<session-id>
+cursor:<session-id>
+trae:<session-id>
 ```
 
 命令：
@@ -159,7 +191,7 @@ starwork multiagent bind <lane> --session <agent:session-id> --session-name "<di
 <项目或产品名> <职责> Agent
 ```
 
-例如 `StarWork CLI 维护 Agent`。当前只有 Codex session 支持同步宿主会话名；失败只作为 warning，不影响绑定。
+例如 `StarWork CLI 维护 Agent`。当前只有 Codex session 支持同步宿主会话名；Claude Code、Cursor、Trae 绑定时不要承诺能改宿主会话标题。失败只作为 warning，不影响绑定。
 
 如果用户要求置顶这个 lane，可加入：
 
@@ -258,6 +290,24 @@ starwork multiagent read <to-lane> --turns 3 --target <path> --json
 ```
 
 只有看到目标 turn 为 `completed`，或目标 lane 后续明确回报，才把这次跨会话指令视为完成。
+
+对非 Codex 宿主：
+
+- Claude Code / Cursor / Trae 不能默认说“已自动发送给另一个会话”。
+- 如果 CLI 返回 `manual_handoff_required`，只能说“已生成交付消息，等待用户手动发送”。
+- 交付消息必须包含目标 lane、任务、上下文、写入边界和完成后回报方式。
+
+如果用户明确只想生成人工交付包，使用：
+
+```bash
+starwork multiagent handoff <to-lane> --from <from-lane> --message "<text>" --target <path> --dry-run
+```
+
+如果用户想继续 Claude Code 中的 lane，使用：
+
+```bash
+starwork multiagent continue <lane> --target <path> --json
+```
 
 ### launch
 

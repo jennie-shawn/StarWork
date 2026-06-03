@@ -28,6 +28,33 @@ starworkKnowledgeProject = 项目开启知识库后安装到当前项目里的�
 
 `starwork knowledge init` 成功后，CLI 会把 `starworkKnowledgeProject` 安装进当前项目。不要让用户把这个项目内业务 Skill 装到全局。
 
+## 宿主适配
+
+知识库开启后，如果当前工作台已经适配了 Codex、Claude Code、Cursor 或 Trae，要确认对应宿主入口也能说明知识库边界。
+
+可运行：
+
+```bash
+starwork doctor --target <path> --host all --json
+```
+
+如果用户明确说“让 Cursor / Trae / Claude Code 也能正确使用知识库”，先用：
+
+```bash
+starwork adapt <host> --target <path> --dry-run
+```
+
+解释会更新哪个入口文件。用户确认后再执行 `--yes`，然后运行 `starwork doctor --host <host>`。
+
+各宿主入口必须让 Agent 明白：
+
+- 知识库是长期理解层。
+- 参考资料是输入材料。
+- 草稿和输出是过程与成果。
+- 宿主 transcript、summary、memory 不是 StarWork 知识库。
+
+Claude Code transcript 可以作为候选资料来源，但必须用户确认后才能吸收。Cursor / Trae 内部历史没有稳定官方导出时，不建议直接吸收。
+
 ## 工作流程
 
 ### 1. 用户想开启知识库
@@ -140,6 +167,7 @@ synthesis/  = 思考成果
 ## 禁止事项
 
 - 不把原始资料整包搬进知识库。
+- 不把宿主 transcript、memory、summary 直接当成知识库。
 - 不把临时草稿、命令输出、单次任务过程放进知识库。
 - 不默认提交到项目中心。
 - 不自动移动、删除或改名旧 `知识/` / `knowledge/`。

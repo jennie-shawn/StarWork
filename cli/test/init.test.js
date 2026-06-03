@@ -906,6 +906,102 @@ test("multiagent instruct marks incomplete delivery as started_unverified", () =
   assert.equal(state.requests[0].host_delivery.status, "started_unverified");
 });
 
+test("multiagent bind detects Claude Code session from environment and outputs resume command", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "research", "--purpose", "预研", "--write", "_系统/协作/lanes/research/**", "--target", dir, "--yes"]);
+
+  const bind = runCommand([
+    "multiagent", "bind", "research",
+    "--agent", "claude-code",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ], { env: { CLAUDE_CODE_SESSION_ID: "claude-session-1" } });
+  const result = JSON.parse(bind.stdout);
+  const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
+  const continued = runCommand(["multiagent", "continue", "research", "--target", dir, "--json"]);
+  const continueResult = JSON.parse(continued.stdout);
+
+  assert.equal(bind.status, 0);
+  assert.equal(result.session, "claude-code:claude-session-1");
+  assert.equal(state.lanes.research.host, "claude-code");
+  assert.equal(state.lanes.research.thread_id, null);
+  assert.equal(continued.status, 0);
+  assert.equal(continueResult.status, "manual_command");
+  assert.equal(continueResult.command, "claude --resume claude-session-1");
+});
+
+test("multiagent read summarizes Claude Code transcript without dumping full transcript", () => {
+  const dir = tempDir();
+  const transcriptDir = tempDir();
+  const transcript = path.join(transcriptDir, "claude-session-2.jsonl");
+  fs.writeFileSync(transcript, [
+    JSON.stringify({ uuid: "u1", message: { role: "user", content: "请分析这个项目的 Host Adapter 需求。" } }),
+    JSON.stringify({ uuid: "a1", message: { role: "assistant", content: [{ type: "text", text: "可以，先从宿主能力表开始，不要写私有 transcript。" }] } })
+  ].join("\n") + "\n", "utf8");
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "research", "--purpose", "预研", "--write", "_系统/协作/lanes/research/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "bind", "research", "--session", "claude-code:claude-session-2", "--target", dir, "--yes"]);
+
+  const read = runCommand(["multiagent", "read", "research", "--turns", "1", "--transcript", transcript, "--target", dir, "--json"]);
+  const status = runCommand(["multiagent", "status", "--host", "--transcript", transcriptDir, "--target", dir, "--json"]);
+  const report = JSON.parse(read.stdout);
+  const statusReport = JSON.parse(status.stdout);
+
+  assert.equal(read.status, 0);
+  assert.equal(status.status, 0);
+  assert.equal(report.host.adapter, "claude-code");
+  assert.equal(report.host.readable, true);
+  assert.equal(report.host.turns.length, 1);
+  assert.equal(report.host.turns[0].role, "assistant");
+  assert.match(report.host.turns[0].summary, /不要写私有 transcript/);
+  assert.equal(statusReport.lanes[0].host.readable, true);
+  assert.equal(statusReport.lanes[0].host.turn_count, 2);
+});
+
+test("multiagent instruct returns manual handoff for Trae lane instead of fake delivery", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "bind", "development", "--session", "trae:dev-session-1", "--target", dir, "--yes"]);
+
+  const instruct = runCommand([
+    "multiagent", "instruct", "development",
+    "--from", "product-planning",
+    "--message", "请继续处理 Host Adapter。",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ]);
+  const result = JSON.parse(instruct.stdout);
+  const shared = fs.readFileSync(path.join(dir, "_系统", "协作", "shared.md"), "utf8");
+  const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
+
+  assert.equal(instruct.status, 0);
+  assert.equal(result.host_delivery.adapter, "trae");
+  assert.equal(result.host_delivery.status, "manual_handoff_required");
+  assert.match(result.host_delivery.formatted_message, /STARWORK:MULTIAGENT_MESSAGE v1/);
+  assert.match(shared, /product-planning \| development \| 请继续处理 Host Adapter。 \| manual_handoff_required \| manual_handoff_required/);
+  assert.equal(state.requests[0].host_delivery.status, "manual_handoff_required");
+});
+
+test("init --adapter creates host adapter state after workspace initialization", () => {
+  const dir = tempDir();
+
+  const init = runCommand(["init", "--type", "project", "--pack", "general", "--target", dir, "--adapter", "cursor", "--yes"]);
+  const adaptersState = readJson(path.join(dir, ".starwork", "adapters.json"));
+
+  assert.equal(init.status, 0);
+  assert.equal(adaptersState.adapters.cursor.enabled, true);
+  assert.equal(adaptersState.adapters.cursor.rules_entry, ".cursor/rules/starwork.mdc");
+  assert.equal(fs.existsSync(path.join(dir, ".cursor", "skills")), true);
+});
+
 test("multiagent launch creates and binds Codex threads with launch message", () => {
   const dir = tempDir();
   const inputPath = path.join(tempDir(), "codex-input.jsonl");
@@ -1745,11 +1841,59 @@ test("adapt creates a Claude adapter and records it in workspace state", () => {
 
   const result = runCommand(["adapt", "claude", "--target", dir, "--yes"]);
   const state = readJson(path.join(dir, ".starwork", "workspace.json"));
+  const adaptersState = readJson(path.join(dir, ".starwork", "adapters.json"));
   const claude = fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8");
+  const claudeAdapter = fs.readFileSync(path.join(dir, "CLAUDE.starwork.md"), "utf8");
 
   assert.equal(result.status, 0);
-  assert.match(claude, /StarWork Adapter for Claude Code/);
-  assert.equal(state.adapters[0].id, "claude");
+  assert.match(claude, /Claude 工作规则/);
+  assert.match(claudeAdapter, /StarWork Adapter for Claude Code/);
+  assert.match(claudeAdapter, /STARWORK:ADAPTER_ENTRY v0\.1 host=claude-code/);
+  assert.equal(state.adapters["claude-code"].rules_entry, "CLAUDE.starwork.md");
+  assert.equal(adaptersState.schema, "starwork.adapters.state.v0.1");
+  assert.equal(adaptersState.adapters["claude-code"].enabled, true);
+  assert.equal(adaptersState.adapters["claude-code"].rules_entry, "CLAUDE.starwork.md");
+  assert.equal(adaptersState.adapters["claude-code"].capabilities["sessions.send_message"], "manual");
+  assert.equal(fs.existsSync(path.join(dir, ".claude", "skills")), true);
+});
+
+test("adapt does not overwrite user-authored Claude rules that mention AGENTS", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  const userRules = "# My Claude Rules\n\n请先阅读 AGENTS.md，但不要覆盖我。\n";
+  fs.writeFileSync(path.join(dir, "CLAUDE.md"), userRules, "utf8");
+
+  const result = runCommand(["adapt", "claude-code", "--target", dir, "--yes"]);
+  const primary = fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8");
+  const sidecar = fs.readFileSync(path.join(dir, "CLAUDE.starwork.md"), "utf8");
+  const workspaceState = readJson(path.join(dir, ".starwork", "workspace.json"));
+  const adaptersState = readJson(path.join(dir, ".starwork", "adapters.json"));
+  const doctor = runDoctor(["--target", dir, "--host", "claude-code", "--json"]);
+  const report = JSON.parse(doctor.stdout);
+
+  assert.equal(result.status, 0);
+  assert.equal(primary, userRules);
+  assert.match(sidecar, /STARWORK:ADAPTER_ENTRY v0\.1 host=claude-code/);
+  assert.equal(adaptersState.adapters["claude-code"].rules_entry, "CLAUDE.starwork.md");
+  assert.deepEqual(adaptersState.adapters["claude-code"].generated_entries, ["CLAUDE.starwork.md"]);
+  assert.equal(workspaceState.adapters["claude-code"].rules_entry, "CLAUDE.starwork.md");
+  assert.equal(report.adapters.checked_hosts[0].rules_entry, "CLAUDE.starwork.md");
+  assert.ok(report.checks.some((check) => check.id === "adapter.claude-code.rules.skills_manifest" && check.level === "pass" && check.path === "CLAUDE.starwork.md"));
+});
+
+test("adapt can update StarWork-managed Claude rules", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  fs.writeFileSync(path.join(dir, "CLAUDE.md"), "# Old Adapter\n\n<!-- STARWORK:ADAPTER_ENTRY v0.1 host=claude-code -->\n", "utf8");
+
+  const result = runCommand(["adapt", "claude-code", "--target", dir, "--yes"]);
+  const primary = fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8");
+  const adaptersState = readJson(path.join(dir, ".starwork", "adapters.json"));
+
+  assert.equal(result.status, 0);
+  assert.match(primary, /StarWork Adapter for Claude Code/);
+  assert.equal(fs.existsSync(path.join(dir, "CLAUDE.starwork.md")), false);
+  assert.equal(adaptersState.adapters["claude-code"].rules_entry, "CLAUDE.md");
 });
 
 test("adapt creates Cursor rules", () => {
@@ -1762,6 +1906,82 @@ test("adapt creates Cursor rules", () => {
   assert.equal(result.status, 0);
   assert.match(cursorRule, /alwaysApply: true/);
   assert.match(cursorRule, /AGENTS\.md/);
+  assert.match(cursorRule, /\.starwork\/skills\.json/);
+  assert.equal(fs.existsSync(path.join(dir, ".cursor", "skills")), true);
+});
+
+test("adapter profiles expose valid capabilities without writing files", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+
+  const result = runCommand(["adapt", "all", "--capabilities", "--json", "--target", dir]);
+  const payload = JSON.parse(result.stdout);
+
+  assert.equal(result.status, 0);
+  assert.equal(payload.schema, "starwork.adapter.capabilities.v0.1");
+  assert.deepEqual(payload.hosts.map((host) => host.host).sort(), ["claude-code", "codex", "cursor", "trae"]);
+  assert.equal(payload.hosts.find((host) => host.host === "trae").sessions.send_message, "manual");
+  assert.equal(payload.hosts.find((host) => host.host === "trae").sessions.read, "unsupported");
+  assert.ok(payload.hosts.find((host) => host.host === "cursor").skills.project_mount_dirs.includes(".cursor/skills/"));
+  assert.equal(fs.existsSync(path.join(dir, ".starwork", "adapters.json")), false);
+});
+
+test("adapt supports multiple host adapter state entries", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+
+  const claude = runCommand(["adapt", "claude-code", "--target", dir, "--yes"]);
+  const cursor = runCommand(["adapt", "cursor", "--target", dir, "--yes"]);
+  const adaptersState = readJson(path.join(dir, ".starwork", "adapters.json"));
+
+  assert.equal(claude.status, 0);
+  assert.equal(cursor.status, 0);
+  assert.equal(adaptersState.adapters["claude-code"].enabled, true);
+  assert.equal(adaptersState.adapters.cursor.enabled, true);
+  assert.equal(adaptersState.adapters.cursor.rules_entry, ".cursor/rules/starwork.mdc");
+});
+
+test("adapt --check delegates to doctor host checks without writing new adapter state", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+
+  const check = runCommand(["adapt", "cursor", "--check", "--target", dir, "--json"]);
+  const report = JSON.parse(check.stdout);
+
+  assert.equal(check.status, 0);
+  assert.equal(report.adapters.checked_hosts[0].host, "cursor");
+  assert.equal(report.adapters.checked_hosts[0].enabled, false);
+  assert.equal(fs.existsSync(path.join(dir, ".starwork", "adapters.json")), false);
+});
+
+test("doctor --host reports enabled adapter checks", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["adapt", "cursor", "--target", dir, "--yes"]);
+
+  const doctor = runDoctor(["--target", dir, "--host", "cursor", "--json"]);
+  const report = JSON.parse(doctor.stdout);
+
+  assert.equal(doctor.status, 0);
+  assert.equal(report.adapters.checked_hosts[0].host, "cursor");
+  assert.ok(report.checks.some((check) => check.id === "adapter.cursor.rules.skills_manifest" && check.level === "pass"));
+  assert.ok(report.checks.some((check) => check.id.startsWith("adapter.cursor.skills.mount_dir") && check.level === "pass"));
+});
+
+test("doctor --host catches Trae unsafe send_message capability state", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["adapt", "trae", "--target", dir, "--yes"]);
+  const statePath = path.join(dir, ".starwork", "adapters.json");
+  const state = readJson(statePath);
+  state.adapters.trae.capabilities["sessions.send_message"] = "supported";
+  fs.writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+
+  const doctor = runDoctor(["--target", dir, "--host", "trae", "--json"]);
+  const report = JSON.parse(doctor.stdout);
+
+  assert.equal(doctor.status, 1);
+  assert.ok(report.checks.some((check) => check.id === "adapter.trae.capabilities.send_message" && check.level === "fail"));
 });
 
 test("adapt refuses an unhealthy workspace using the same doctor checks", () => {
