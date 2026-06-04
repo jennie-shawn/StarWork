@@ -31,8 +31,8 @@ Cursor、Trae、Claude Code 都能兼容 StarWork MultiAgent 的“项目内协�
 
 差异出现在“宿主会话控制层”：
 
-- Cursor 有少量可编程入口，适合做轻量 host adapter：可尝试会话命名、会话继续、读取本地 transcript 或创建 chat，但都要保留降级路径。
-- Trae 目前更适合做观察型 adapter：可以读到部分 session 元数据，但不能稳定改名、读取完整消息、继续会话、发送指令或创建新会话。
+- Cursor 有少量可编程入口，适合做轻量 host adapter：本轮只适配本地 transcript 只读回溯和状态观察，其他会话动作保留人工降级路径。
+- Trae 不再做会话能力适配：检测到 Trae 或绑定 `trae:<id>` 时，直接转人工操作。
 - Claude Code 适合做 transcript / resume 型 adapter：可以稳定识别 session id、读取 transcript、恢复历史会话和支持多会话并行，但不能像 Codex 一样向非当前会话后台发送 follow-up。
 
 因此，StarWork 对 Cursor / Trae / Claude Code 的适配不应照搬 Codex v0.2 的 `launch/read/instruct` 全能力，而应采用能力分层和降级策略。
@@ -96,22 +96,30 @@ failed
 | `multiagent init` | 可兼容 | 可兼容 | 可兼容 | 纯项目文件能力，三个宿主都支持。 |
 | `multiagent add` | 可兼容 | 可兼容 | 可兼容 | 纯项目文件能力，三个宿主都支持。 |
 | `multiagent bind --session <id>` | 可兼容 | 可兼容 | 可兼容 | 支持人工或探测得到的 session id；格式为 `cursor:<id>` / `trae:<id>` / `claude-code:<id>`。 |
-| 自动识别当前 session id | 部分兼容 | 部分兼容 | 可兼容 | Cursor 可从新建 chat / transcript UUID 获得 ID，但当前 IDE 会话 ID 无稳定官方直出；Trae 可从 `state.vscdb` 读取 session 映射；Claude Code 可直接读 `$CLAUDE_CODE_SESSION_ID`。 |
+| 自动识别当前 session id | 部分兼容 | 不适配 | 可兼容 | Cursor 可从 transcript UUID 获得候选 ID，但当前 IDE 会话 ID 无稳定官方直出；Trae 不再读取私有存储识别会话；Claude Code 可直接读 `$CLAUDE_CODE_SESSION_ID`。 |
 | `bind --session-name` | 部分兼容 | 不兼容 | 部分兼容 | Cursor 有 `rename_chat` MCP 线索但 CLI 独立运行时未必可用；Trae 未发现入口；Claude Code 启动时可用 `claude -n`，已运行会话需手工 `/rename-conversation`。 |
 | `bind --pin` | 不兼容 | 不兼容 | 不兼容 | 三者都未发现稳定置顶 API。StarWork 只能记录建议，不应自动承诺。 |
 | `status` | 可兼容 | 可兼容 | 可兼容 | StarWork 项目状态可读，不依赖宿主。 |
-| `status --host` | 部分兼容 | 部分兼容 | 可兼容 | Cursor 可报告 transcript / CLI / 认证状态；Trae 可报告 session 元数据；Claude Code 可读取 session id、transcript cwd、git branch、permissionMode 等元数据。 |
+| `status --host` | 部分兼容 | 人工宿主 | 可兼容 | Cursor 可报告 transcript / CLI / 认证状态；Trae 只报告 `manual_host`，不读取私有会话存储；Claude Code 可读取 session id、transcript cwd、git branch、permissionMode 等元数据。 |
 | `read <lane>` | 部分兼容 | 不兼容 | 可兼容 | Cursor 可尝试读取本地 transcript；Trae 完整消息在加密数据库中，不应读取；Claude Code transcript JSONL 可安全只读解析。 |
 | `instruct <lane>` | 仅人工兼容 | 仅人工兼容 | 仅人工兼容 | 三者当前均未确认有标准后台投递 API。不得用 `resume` / `continue` 冒充自动发送；应生成可复制 handoff 消息，或提示用户恢复对应会话后手动发送。 |
-| `launch <lane>` | 部分兼容 | 仅人工兼容 | 部分兼容 | Cursor 有 `create-chat` 入口但需验证；Trae 无创建会话 API；Claude Code 可生成 `claude -n ... --session-id ...` 启动命令，但不能在当前进程后台启动并完成交付。 |
-| `continue <lane>` | 部分兼容 | 仅人工兼容 | 可兼容 | Cursor CLI 有 `--resume` / `--continue`；Trae 只能通过 UI；Claude Code 可映射到 `claude --resume <session-id>`。 |
+| `launch <lane>` | 仅人工兼容 | 仅人工兼容 | 部分兼容 | Cursor 本轮不实现 create-chat；Trae 无创建会话 API；Claude Code 可生成 `claude -n ... --session-id ...` 启动命令，但不能在当前进程后台启动并完成交付。 |
+| `continue <lane>` | 仅人工兼容 | 仅人工兼容 | 可兼容 | Cursor 本轮不把 CLI resume 作为正式能力；Trae 只能通过 UI；Claude Code 可映射到 `claude --resume <session-id>`。 |
 | `release` | 可兼容 | 可兼容 | 可兼容 | StarWork 侧解除 binding、提醒更新 worklog，三个宿主都支持。 |
 | `release --archive-session` | 不兼容 | 不兼容 | 部分兼容 | 宿主都不支持真正 archive；Claude Code 可安全复制 transcript 到 lane workspace 作为 StarWork 侧归档，但不能删除或归档宿主会话。 |
-| 会话列表 | 部分兼容 | 部分兼容 | 部分兼容 | Cursor 有 `cursor agent ls` 和 transcript 线索；Trae 可枚举元数据；Claude Code 可解析 `history.jsonl`，但缺少准确标题。 |
+| 会话列表 | 部分兼容 | 不适配 | 部分兼容 | Cursor 有 transcript 线索；Trae 不再枚举私有会话元数据；Claude Code 可解析 `history.jsonl`，但缺少准确标题。 |
 | 会话导出 | 不兼容 | 不兼容 | 部分兼容 | 三者都无稳定官方导出；Claude Code 可安全复制 transcript JSONL 并转换摘要。 |
 | checkpoint / revert | 不兼容 | 不兼容 | 不兼容 | Trae / Claude Code 有内部或 worktree 机制，但 StarWork 不应直接依赖宿主 checkpoint。 |
 
 ## Cursor 适配判断
+
+2026-06-04 追加实测校准：
+
+- 当前 Cursor 项目下可只读枚举并读取 `~/.cursor/projects/<project-key>/agent-transcripts/<uuid>/<uuid>.jsonl`。
+- transcript 可还原用户首条意图、部分助手文本、工具调用名和工具 input；通常缺少完整 stdout / stderr、被读文件全文和富媒体。
+- 当前未发现 MCP / Agent 工具可向另一条 Cursor IDE 会话投递消息；`rename_chat` 只作用当前会话。
+- `cursor agent --resume <uuid> "<prompt>"` 需要 `cursor agent login` 或 `CURSOR_API_KEY`；未登录会失败。即使登录成功，也应视为 headless resume 实验，不等价于向已打开的 IDE chat 标签发送消息。
+- 因此 Cursor 的 `sessions.send_message` 应按 `manual` 处理；本轮只为 `read/status --host` 增加 transcript 只读观察。
 
 ### 可做
 
@@ -125,10 +133,12 @@ starwork multiagent bind research --session cursor:<id> --target . --yes
 - 增加 Cursor host capability probe，输出当前可用能力，例如：
   - 是否存在 `cursor` CLI。
   - 是否可执行 `cursor agent --help`。
-  - 是否可用 `cursor agent create-chat`。
-  - 是否找到本地 transcript。
+  - 是否可用 `cursor agent status`。
+  - 是否已登录或配置 `CURSOR_API_KEY`。
+  - 是否找到本地 `agent-transcripts`。
+  - 绑定的 session id 是否有对应 JSONL。
   - 是否疑似未登录或认证不可用。
-- 在有可靠 chatId 时，只能探索 `continue <lane>` 的 Cursor 版本：通过 `cursor agent --resume <chatId>` 帮用户恢复会话。除非 Cursor 明确提供标准后台消息投递 API，否则不实现自动 `instruct`。
+- 除非 Cursor 明确提供标准后台消息投递 API，否则不实现自动 `instruct`。
 
 ### 谨慎做
 
@@ -138,42 +148,38 @@ starwork multiagent bind research --session cursor:<id> --target . --yes
   - 创建 chat 后是否能稳定拿到 chatId。
   - 初始 Launch Message 是否真的进入目标 chat。
   - 用户是否能在 Cursor UI 中找到该 chat。
+  - CLI 登录状态和 IDE UI 状态是否一致。
 
 ### 不做
 
 - 不直接改写 Cursor 私有数据库。
+- 不写 `agent-transcripts/*.jsonl`。
 - 不承诺 pin / archive / delete。
+- 不承诺向另一条 Cursor IDE 会话自动发送消息。
 - 不把 Cursor transcript 当成 StarWork 正式交接记录。
 
 ## Trae 适配判断
 
-### 可做
+2026-06-04 追加产品决策：
 
-- 保留 StarWork L0 项目协作层完整能力。
-- 支持手动绑定 Trae 会话：
+- Trae 不再继续做会话能力适配。
+- 检测到 Trae 或 lane 绑定为 `trae:<id>` 时，StarWork 直接转人工操作。
+- `status --host` 只报告 `manual_host`，不读取 Trae 私有会话存储。
+- `read`、`instruct`、`continue`、`launch` 都返回人工操作说明或 `unsupported`，不伪装成自动能力。
 
-```bash
-starwork multiagent bind research --session trae:<id> --target . --yes
-```
+保留能力：
 
-- 做 Trae host capability probe，输出当前可读元数据：
-  - 是否疑似 Trae 工作区。
-  - 是否找到 workspaceStorage / globalStorage。
-  - 是否可只读读取 `state.vscdb`。
-  - 可枚举哪些 session id、agent、model 元数据。
-- 在 `status --host` 中说明 Trae 当前只能提供元数据观察，不能读取完整消息。
+- StarWork L0 项目协作层仍可用：lane、worklog、shared context、写入边界和人工 handoff。
+- 现有 `starwork adapt trae` 若保留，只能维护 StarWork 可控入口，例如 `.trae/rules/`、`.trae/skills/` 和 `.agents/skills/`。
 
-### 谨慎做
+明确不做：
 
-- 从 `state.vscdb` 读取 session 元数据只能只读，且必须清楚提示这是内部存储观察结果。
-- 可以根据 Trae 自动摘要参数提醒用户更新 worklog，但不要依赖 Trae 摘要作为交接记录。
-
-### 不做
-
-- 不读取或改写 Trae 加密 `database.db`。
-- 不承诺自动改名、置顶、归档、删除。
-- 不承诺自动 `instruct` 或 `launch`。
-- 不依赖 Trae snapshot v2 做 StarWork checkpoint / revert。
+- 不读取 Trae `database.db`。
+- 不读取 Trae `state.vscdb` 作为 MultiAgent session 元数据来源。
+- 不枚举 Trae session。
+- 不读取 Trae transcript。
+- 不继续做 Trae observation probe。
+- 不实现 Trae 自动 `launch`、`continue` 或 `instruct`。
 
 ## Claude Code 适配判断
 
@@ -331,32 +337,34 @@ Cursor / Trae / Claude Code 如果不能自动发送跨会话指令，`starworkM
 - `continue <lane>` 输出或执行清楚的 `claude --resume` 路径。
 - 不写入 Claude Code 私有状态，不执行 `project purge`。
 
-### Phase 3：Cursor 轻量适配
+### Phase 3：Cursor transcript 只读适配
 
 目标：
 
-- 支持 Cursor session 手动绑定和 capability probe。
-- 在可用 chatId 下实验 `continue`；只有 Cursor 明确提供标准后台投递 API 时，才重新评估自动 `instruct`。
+- 支持 Cursor session 手动绑定和 transcript 只读读取。
+- 支持 `read/status --host` 输出受控摘要和能力状态。
+- 只有 Cursor 明确提供标准后台投递 API 时，才重新评估自动 `instruct`。
 - `bind --session-name` 只做 best-effort 或 skill 内操作建议，不影响 StarWork binding。
 
 验收：
 
-- Cursor 用户可建立 lanes、绑定会话、查看 StarWork 状态。
+- Cursor 用户可建立 lanes、绑定会话、查看 StarWork 状态和 transcript 摘要。
 - 在不具备稳定 chatId 或认证不可用时，CLI 不报假成功，而是给人工交付方式。
 
-### Phase 4：Trae 观察型适配
+### Phase 4：Trae 人工操作收敛
 
 目标：
 
-- 支持 Trae session 手动绑定和元数据观察。
-- 不做自动 `launch` / `instruct`。
+- 停止 Trae session 观察型适配。
+- 检测到 Trae 或绑定 `trae:<id>` 时直接返回人工操作。
 - 为跨会话指令生成可复制的格式化消息。
 
 验收：
 
-- Trae 用户可建立 lanes、绑定会话、查看 StarWork 状态。
-- `status --host` 清楚说明“只能看到会话元数据，看不到完整聊天内容”。
+- Trae 用户可使用 StarWork lane、worklog、shared context 和人工 handoff。
+- `status --host` 清楚说明 Trae 是 `manual_host`。
 - `instruct` 不伪装成自动发送，而是输出人工发送步骤。
+- CLI 不读取 Trae `database.db`、`state.vscdb` 或其他私有会话存储。
 
 ### Phase 5：课程和 A 测口径
 
@@ -373,10 +381,8 @@ Cursor / Trae / Claude Code 如果不能自动发送跨会话指令，`starworkM
 ## 待确认问题
 
 1. Cursor `rename_chat` MCP 是否能被 StarWork CLI 独立调用，还是只能由运行在 Cursor 内的 Agent 使用。
-2. Cursor `cursor agent create-chat` 创建的 chat，是否能稳定出现在用户当前 Cursor UI 历史中。
-3. Cursor 是否存在明确的标准后台消息投递 API；仅有 `cursor agent --resume <chatId>` 不足以支持自动 `instruct`。
-4. Trae 是否存在未发现的公开 IPC / CLI session API。
-5. Trae `state.vscdb` 的读取是否在不同版本、不同账号、不同语言包下保持一致。
-6. Claude Code transcript JSONL 在不同版本和旧版目录格式下的解析兼容范围。
-7. Claude Code `claude --resume <session-id>` 是否适合由 CLI 直接执行，还是只输出命令让用户复制执行。
-8. 是否需要新增 `multiagent handoff` 命令，专门生成人工交付包，供 Cursor / Trae / Claude Code 低自动交付场景使用。
+2. Cursor 是否存在明确的标准后台消息投递 API；仅有 `cursor agent --resume <chatId>` 不足以支持自动 `instruct`。
+3. Trae 是否存在未发现的公开 IPC / CLI session API。除非官方能力明确，否则 StarWork 不再投入 Trae 会话适配。
+4. Claude Code transcript JSONL 在不同版本和旧版目录格式下的解析兼容范围。
+5. Claude Code `claude --resume <session-id>` 是否适合由 CLI 直接执行，还是只输出命令让用户复制执行。
+6. 是否需要新增 `multiagent handoff` 命令，专门生成人工交付包，供 Cursor / Trae / Claude Code 低自动交付场景使用。

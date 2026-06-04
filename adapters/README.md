@@ -27,9 +27,9 @@ Host Adapter v0.1 已先落地底座：
 - `starwork adapt <host|all>`：写入宿主规则入口、Skill 目录和 `.starwork/adapters.json`。
 - `starwork doctor --host <host|all>`：检查宿主入口、Skill 目录、Cursor / Trae frontmatter、Trae disabled config 和不安全能力声明。
 - `starwork init --adapter <host|all>`：初始化完成后继续生成对应宿主入口。
-- `starwork multiagent`：Claude Code 可用 `CLAUDE_CODE_SESSION_ID` 绑定和 `claude --resume` 继续命令；Cursor / Trae 默认走 manual handoff，不伪装后台送达。
+- `starwork multiagent`：Claude Code 可用 `CLAUDE_CODE_SESSION_ID` 绑定和 `claude --resume` 继续命令；Cursor 仅做 `agent-transcripts/<uuid>/<uuid>.jsonl` 只读摘要；Trae 仅保留人工操作入口；二者都不伪装后台送达。
 
-Cursor / Trae 的深度 probe、Claude Code 真实本机 transcript 路径适配和更完整用户文档仍需继续 A 测打磨。
+Cursor transcript 路径兼容、Claude Code 真实本机 transcript 路径适配和更完整用户文档仍需继续 A 测打磨。Trae 会话私有存储不作为 StarWork 读取目标。
 
 产品规划事实源见：
 

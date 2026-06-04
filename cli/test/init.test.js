@@ -111,6 +111,37 @@ rl.on("line", (line) => {
   };
 }
 
+function fakeCursorBin({ exitCode = 0, stdout = "Logged in as fake@example.com\n", stderr = "" } = {}) {
+  const dir = tempDir();
+  const binDir = path.join(dir, "bin");
+  fs.mkdirSync(binDir, { recursive: true });
+  const cursor = path.join(binDir, "cursor");
+  fs.writeFileSync(cursor, `#!/usr/bin/env node
+if (${JSON.stringify(stderr)}) process.stderr.write(${JSON.stringify(stderr)});
+const args = process.argv.slice(2).join(" ");
+if (args === "agent status") {
+  if (${exitCode} !== 0) process.exit(${exitCode});
+  process.stdout.write(${JSON.stringify(stdout)});
+  process.exit(0);
+}
+process.exit(0);
+`, "utf8");
+  fs.chmodSync(cursor, 0o755);
+  return {
+    env: {
+      PATH: `${binDir}${path.delimiter}${process.env.PATH}`
+    }
+  };
+}
+
+function writeCursorTranscriptFixture(projectsDir, sessionId, lines, projectKey = "cursor-project") {
+  const transcriptDir = path.join(projectsDir, projectKey, "agent-transcripts", sessionId);
+  fs.mkdirSync(transcriptDir, { recursive: true });
+  const transcript = path.join(transcriptDir, `${sessionId}.jsonl`);
+  fs.writeFileSync(transcript, lines.join("\n") + "\n", "utf8");
+  return transcript;
+}
+
 test("prints version and product-oriented help", () => {
   const version = runCommand(["--version"]);
   assert.equal(version.status, 0);
@@ -999,6 +1030,29 @@ test("multiagent instruct returns manual handoff when adapted host lacks standar
   assert.match(result.host_delivery.formatted_message, /STARWORK:MULTIAGENT_MESSAGE v1/);
 });
 
+test("multiagent instruct prints copyable handoff message in non-json output", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--adapter", "cursor", "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "bind", "development", "--session", "cursor:cursor-thread-3", "--target", dir, "--yes"]);
+
+  const instruct = runCommand([
+    "multiagent", "instruct", "development",
+    "--from", "product-planning",
+    "--message", "请修复 handoff 输出。",
+    "--target", dir,
+    "--yes"
+  ]);
+
+  assert.equal(instruct.status, 0);
+  assert.match(instruct.stdout, /manual_handoff_required/);
+  assert.match(instruct.stdout, /STARWORK:MULTIAGENT_MESSAGE v1/);
+  assert.match(instruct.stdout, /请修复 handoff 输出。/);
+  assert.doesNotMatch(instruct.stdout, /已通知|已发送成功/);
+});
+
 test("multiagent bind detects Claude Code session from environment and outputs resume command", () => {
   const dir = tempDir();
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
@@ -1055,6 +1109,138 @@ test("multiagent read summarizes Claude Code transcript without dumping full tra
   assert.equal(statusReport.lanes[0].host.turn_count, 2);
 });
 
+test("multiagent read summarizes Cursor transcript from agent-transcripts only", () => {
+  const dir = tempDir();
+  const projectsDir = tempDir();
+  const sessionId = "e1717037-1b15-411b-8665-ae922b421f74";
+  writeCursorTranscriptFixture(projectsDir, sessionId, [
+    JSON.stringify({ type: "user", text: "请开始根据 Host Adapter v0.2 工作。" }),
+    JSON.stringify({ type: "tool_call", name: "ReadFile", input: { path: "product/cli/src/cli.js" } }),
+    JSON.stringify({ type: "tool_call", name: "ApplyPatch", input: { path: "product/docs/multiagent/cursor-session-management-research-result.md", patch: "x".repeat(600) } }),
+    JSON.stringify({ type: "assistant", text: "已经完成只读摘要。" }),
+    JSON.stringify({ type: "user", text: "若存在则输出最近用户消息。" })
+  ]);
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--adapter", "cursor", "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "research", "--purpose", "预研", "--write", "product/docs/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "bind", "research", "--session", `cursor:${sessionId}`, "--target", dir, "--yes"]);
+
+  const read = runCommand(["multiagent", "read", "research", "--target", dir, "--json"], {
+    env: { STARWORK_CURSOR_PROJECTS_DIR: projectsDir }
+  });
+  const report = JSON.parse(read.stdout);
+
+  assert.equal(read.status, 0);
+  assert.equal(report.host.adapter, "cursor");
+  assert.equal(report.host.status, "transcript_observed");
+  assert.equal(report.host.session_id, sessionId);
+  assert.equal(report.host.line_count, 5);
+  assert.match(report.host.first_user_query, /Host Adapter v0\.2/);
+  assert.equal(report.host.last_user_query, "若存在则输出最近用户消息。");
+  assert.deepEqual(report.host.tool_names.sort(), ["ApplyPatch", "ReadFile"]);
+  assert.ok(report.host.candidate_outputs.includes("product/docs/multiagent/cursor-session-management-research-result.md"));
+  assert.doesNotMatch(JSON.stringify(report), /x{300}/);
+});
+
+test("multiagent read reports Cursor missing and malformed transcript states", () => {
+  const dir = tempDir();
+  const projectsDir = tempDir();
+  const sessionId = "bad-cursor-session";
+  writeCursorTranscriptFixture(projectsDir, sessionId, [
+    JSON.stringify({ type: "user", text: "可解析的用户消息" }),
+    "{bad json",
+    JSON.stringify({ type: "tool_call", name: "Shell", input: { command: "npm test" } })
+  ]);
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--adapter", "cursor", "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "research", "--purpose", "预研", "--write", "product/docs/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "bind", "research", "--session", `cursor:${sessionId}`, "--target", dir, "--yes"]);
+
+  const malformed = runCommand(["multiagent", "read", "research", "--target", dir, "--json"], {
+    env: { STARWORK_CURSOR_PROJECTS_DIR: projectsDir }
+  });
+  const malformedReport = JSON.parse(malformed.stdout);
+  runCommand(["multiagent", "bind", "research", "--session", "cursor:missing-session", "--target", dir, "--yes"]);
+  const missing = runCommand(["multiagent", "read", "research", "--target", dir, "--json"], {
+    env: { STARWORK_CURSOR_PROJECTS_DIR: projectsDir }
+  });
+  const missingReport = JSON.parse(missing.stdout);
+
+  assert.equal(malformed.status, 0);
+  assert.equal(malformedReport.host.status, "malformed_partial");
+  assert.equal(malformedReport.host.bad_line_count, 1);
+  assert.match(malformedReport.host.warning, /坏行/);
+  assert.equal(missing.status, 0);
+  assert.equal(missingReport.host.status, "not_found");
+  assert.equal(missingReport.host.bound_transcript_exists, false);
+});
+
+test("multiagent status --host reports Cursor host facts without leaking API key", () => {
+  const dir = tempDir();
+  const projectsDir = tempDir();
+  const sessionId = "cursor-status-session";
+  writeCursorTranscriptFixture(projectsDir, sessionId, [
+    JSON.stringify({ type: "user", text: "状态观察" })
+  ]);
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--adapter", "cursor", "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "research", "--purpose", "预研", "--write", "product/docs/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "bind", "research", "--session", `cursor:${sessionId}`, "--target", dir, "--yes"]);
+
+  const status = runCommand(["multiagent", "status", "--host", "--target", dir, "--json"], {
+    env: {
+      ...fakeCursorBin({ stdout: "Logged in as fake@example.com\n" }).env,
+      STARWORK_CURSOR_PROJECTS_DIR: projectsDir,
+      CURSOR_API_KEY: "cursor-secret-token"
+    }
+  });
+  const report = JSON.parse(status.stdout);
+  const serialized = JSON.stringify(report);
+
+  assert.equal(status.status, 0);
+  assert.equal(report.lanes[0].host.adapter, "cursor");
+  assert.equal(report.lanes[0].host.adapter_enabled, true);
+  assert.equal(report.lanes[0].host.rules_entry_exists, true);
+  assert.equal(report.lanes[0].host.skills_dir_exists, true);
+  assert.equal(report.lanes[0].host.transcript_root_exists, true);
+  assert.equal(report.lanes[0].host.bound_transcript_exists, true);
+  assert.equal(report.lanes[0].host.cursor_api_key_present, true);
+  assert.equal(report.lanes[0].host.cursor_agent_status, "logged_in");
+  assert.doesNotMatch(serialized, /cursor-secret-token/);
+  assert.doesNotMatch(serialized, /fake@example\.com/);
+});
+
+test("multiagent status --host reports Cursor agent status failures without secrets", () => {
+  const dir = tempDir();
+  const sessionId = "cursor-status-failure-session";
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--adapter", "cursor", "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "research", "--purpose", "预研", "--write", "product/docs/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "bind", "research", "--session", `cursor:${sessionId}`, "--target", dir, "--yes"]);
+
+  const notLoggedIn = runCommand(["multiagent", "status", "--host", "--target", dir, "--json"], {
+    env: {
+      ...fakeCursorBin({ stdout: "Not logged in\n" }).env,
+      CURSOR_API_KEY: "cursor-secret-token"
+    }
+  });
+  const failed = runCommand(["multiagent", "status", "--host", "--target", dir, "--json"], {
+    env: {
+      ...fakeCursorBin({ exitCode: 2, stderr: "super-secret-error\n" }).env,
+      CURSOR_API_KEY: "cursor-secret-token"
+    }
+  });
+  const notLoggedInReport = JSON.parse(notLoggedIn.stdout);
+  const failedReport = JSON.parse(failed.stdout);
+  const serialized = `${notLoggedIn.stdout}\n${failed.stdout}`;
+
+  assert.equal(notLoggedIn.status, 0);
+  assert.equal(notLoggedInReport.lanes[0].host.cursor_agent_status, "not_logged_in");
+  assert.equal(failed.status, 0);
+  assert.equal(failedReport.lanes[0].host.cursor_agent_status, "error");
+  assert.doesNotMatch(serialized, /cursor-secret-token|super-secret-error/);
+});
+
 test("multiagent instruct returns manual handoff for Trae lane instead of fake delivery", () => {
   const dir = tempDir();
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--adapter", "trae", "--yes"]);
@@ -1081,6 +1267,48 @@ test("multiagent instruct returns manual handoff for Trae lane instead of fake d
   assert.match(result.host_delivery.formatted_message, /STARWORK:MULTIAGENT_MESSAGE v1/);
   assert.match(shared, /product-planning \| development \| 请继续处理 Host Adapter。 \| manual_handoff_required \| manual_handoff_required/);
   assert.equal(state.requests[0].host_delivery.status, "manual_handoff_required");
+});
+
+test("Trae lane read status continue and launch stay manual without private session reads", () => {
+  const dir = tempDir();
+  const privateDir = path.join(tempDir(), "Trae CN");
+  fs.mkdirSync(path.join(privateDir, "User", "workspaceStorage"), { recursive: true });
+  fs.writeFileSync(path.join(privateDir, "database.db"), "do not read", "utf8");
+  fs.writeFileSync(path.join(privateDir, "User", "workspaceStorage", "state.vscdb"), "do not read", "utf8");
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--adapter", "trae", "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "bind", "development", "--session", "trae:dev-session-2", "--target", dir, "--yes"]);
+
+  const read = runCommand(["multiagent", "read", "development", "--target", dir, "--json"], {
+    env: { STARWORK_TRAE_HOME: privateDir }
+  });
+  const status = runCommand(["multiagent", "status", "--host", "--target", dir, "--json"], {
+    env: { STARWORK_TRAE_HOME: privateDir }
+  });
+  const continued = runCommand(["multiagent", "continue", "development", "--target", dir, "--json"], {
+    env: { STARWORK_TRAE_HOME: privateDir }
+  });
+  const launch = runCommand(["multiagent", "launch", "development", "--target", dir, "--host", "trae", "--json", "--yes"], {
+    env: { STARWORK_TRAE_HOME: privateDir }
+  });
+  const readReport = JSON.parse(read.stdout);
+  const statusReport = JSON.parse(status.stdout);
+  const continueReport = JSON.parse(continued.stdout);
+  const launchReport = JSON.parse(launch.stdout);
+  const serialized = `${read.stdout}\n${status.stdout}\n${continued.stdout}\n${launch.stdout}`;
+
+  assert.equal(read.status, 0);
+  assert.equal(readReport.host.status, "manual_handoff_required");
+  assert.equal(status.status, 0);
+  assert.equal(statusReport.lanes[0].host.status, "manual_host");
+  assert.equal(continued.status, 0);
+  assert.equal(continueReport.status, "manual_handoff_required");
+  assert.equal(launch.status, 0);
+  assert.equal(launchReport.launches[0].launch_status, "manual_handoff_required");
+  assert.equal(launchReport.launches[0].binding_status, "unbound");
+  assert.doesNotMatch(serialized, new RegExp(privateDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(serialized, /do not read/);
 });
 
 test("init --adapter creates host adapter state after workspace initialization", () => {
@@ -2080,8 +2308,13 @@ test("adapter profiles expose valid capabilities without writing files", () => {
   assert.equal(result.status, 0);
   assert.equal(payload.schema, "starwork.adapter.capabilities.v0.1");
   assert.deepEqual(payload.hosts.map((host) => host.host).sort(), ["claude-code", "codex", "cursor", "trae"]);
+  assert.equal(payload.hosts.find((host) => host.host === "cursor").sessions.continue, "manual");
+  assert.equal(payload.hosts.find((host) => host.host === "cursor").sessions.create, "unsupported");
   assert.equal(payload.hosts.find((host) => host.host === "trae").sessions.send_message, "manual");
   assert.equal(payload.hosts.find((host) => host.host === "trae").sessions.read, "unsupported");
+  assert.equal(payload.hosts.find((host) => host.host === "trae").sessions.detect_current, "unsupported");
+  assert.equal(payload.hosts.find((host) => host.host === "trae").sessions.list, "unsupported");
+  assert.equal(payload.hosts.find((host) => host.host === "trae").sessions.create, "unsupported");
   assert.ok(payload.hosts.find((host) => host.host === "cursor").skills.project_mount_dirs.includes(".cursor/skills/"));
   assert.equal(fs.existsSync(path.join(dir, ".starwork", "adapters.json")), false);
 });

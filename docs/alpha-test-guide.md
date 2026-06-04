@@ -222,6 +222,51 @@ starwork multiagent instruct development \
 
 预期：Trae 目标应返回 `manual_handoff_required`，表示已经生成可复制交付消息，但没有自动送达。
 
+测试 Cursor 只读 transcript 摘要：
+
+```bash
+starwork multiagent bind development \
+  --session cursor:<cursor-session-uuid> \
+  --target ~/Desktop/starwork-cursor-a-test \
+  --yes
+
+starwork multiagent read development \
+  --target ~/Desktop/starwork-cursor-a-test \
+  --json
+
+starwork multiagent status \
+  --host \
+  --target ~/Desktop/starwork-cursor-a-test \
+  --json
+```
+
+预期：Cursor 目标只读取 `~/.cursor/projects/<project-key>/agent-transcripts/<uuid>/<uuid>.jsonl` 并输出受控摘要，例如 `transcript_observed`、`not_found`、`malformed_partial`；不会输出完整 JSONL、不会写 Cursor transcript，也不会把 `cursor agent --resume` 当作自动跨会话发送。
+
+测试 Trae 只保留人工操作宿主：
+
+```bash
+starwork multiagent read development \
+  --target ~/Desktop/starwork-alpha-project \
+  --json
+
+starwork multiagent status \
+  --host \
+  --target ~/Desktop/starwork-alpha-project \
+  --json
+
+starwork multiagent continue development \
+  --target ~/Desktop/starwork-alpha-project \
+  --json
+
+starwork multiagent launch development \
+  --host trae \
+  --target ~/Desktop/starwork-alpha-project \
+  --json \
+  --yes
+```
+
+预期：绑定为 `trae:<id>` 或显式 `--host trae` 时，`read/status/continue/launch` 均返回人工操作或 unsupported 语义；StarWork 不读取 Trae `database.db`、`state.vscdb` 或其他私有会话存储。
+
 测试 Claude Code 继续命令：
 
 ```bash

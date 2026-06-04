@@ -276,3 +276,21 @@ npm test
 残余边界：
 
 - 当前版本尚未实现 Codex 标准自动投递；正确行为是降级为 handoff。后续如要启用自动 `delivered`，必须先接入宿主标准投递 API，不能重新启用 `thread/resume` + `turn/start` 作为 `instruct` 主路径。
+
+## 发布版本复验
+
+2026-06-03 product-planning lane 基于发布包复验通过。
+
+发布事实：
+
+- Git 提交：`c710e34 feat: route multiagent host delivery`
+- npm latest：`@jennie-shawn/starwork@0.1.0-alpha.19`
+- `npx --yes @jennie-shawn/starwork@latest --version` 返回 `0.1.0-alpha.19`
+
+发布包手工复验结果：
+
+- `npx @latest multiagent instruct` 对未绑定 lane 返回 `unbound`。
+- 绑定 `codex:published-dev-thread` 后执行 `instruct --wait-completion` 返回 `manual_handoff_required`，warning 明确说明不使用低层 turn API。
+- 绑定 `cursor:published-cursor-session` 且未适配时返回 `needs_adapt`。
+- 非 StarWork 目录执行 `multiagent launch` 返回失败，并提示使用 `starworkInit` Skill 接入。
+- `multiagent launch --dry-run --lanes product-planning,development` 输出 `产品规划 Agent`、`功能开发 Agent`。

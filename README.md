@@ -171,9 +171,9 @@ product/planning/features/<feature>/
 - `knowledge`：开启、检查和按确认方案整理项目本地知识库；成功开启后安装项目内知识库助手，默认不会移动旧 `知识/` 或 `knowledge/`。
 - `spawn`：从已有项目中心创建并登记项目工作台，支持中文或英文目录镜像。
 - `upgrade`：按 `starworkDoctor` skill 生成的升级蓝图，把历史模板或类似项目中心的旧工作区安全接入 StarWork 工作台。
-- `adapt`：生成 Claude Code、Cursor 等 AI 工具的适配文件。
+- `adapt`：生成 Claude Code、Cursor 等 AI 工具的适配文件；Cursor 仅支持只读 transcript 摘要，Trae 仅支持人工操作入口。
 - `pack install`：向兼容工作台安装支持的场景能力。
-- `multiagent`：为同一项目建立自定义 AI 职责位、绑定会话、登记跨 lane 共享输出，并支持会话观察、launch 和格式化跨会话指令；`instruct` 由 CLI 运行时判断宿主能力，不能标准投递时返回 `manual_handoff_required`。
+- `multiagent`：为同一项目建立自定义 AI 职责位、绑定会话、登记跨 lane 共享输出，并支持会话观察、launch 和格式化跨会话指令；`instruct` 由 CLI 运行时判断宿主能力，不能标准投递时返回 `manual_handoff_required`。Cursor 绑定只用于 `read/status --host` 的只读摘要，Trae 绑定会转人工或 unsupported。
 
 ## 仓库结构
 

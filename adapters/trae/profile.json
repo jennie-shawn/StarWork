@@ -29,13 +29,13 @@
     "disabled_config": ".trae/skill-config.json"
   },
   "sessions": {
-    "detect_current": "partial",
-    "rename": "unsupported",
-    "list": "partial",
+    "detect_current": "unsupported",
+    "list": "unsupported",
     "read": "unsupported",
     "continue": "manual",
     "send_message": "manual",
-    "create": "manual",
+    "create": "unsupported",
+    "rename": "unsupported",
     "pin": "unsupported",
     "archive": "unsupported"
   },
@@ -50,7 +50,7 @@
     "cli_available": "partial",
     "api_available": "unsupported",
     "requires_auth": "partial",
-    "can_probe": "partial"
+    "can_probe": "unsupported"
   },
   "safety": {
     "private_paths_readonly": ["~/Library/Application Support/Trae/**", "~/Library/Application Support/Trae CN/**"],

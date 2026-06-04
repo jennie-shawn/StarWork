@@ -29,12 +29,12 @@
   },
   "sessions": {
     "detect_current": "partial",
-    "rename": "partial",
     "list": "partial",
     "read": "partial",
-    "continue": "partial",
-    "send_message": "partial",
-    "create": "partial",
+    "continue": "manual",
+    "send_message": "manual",
+    "create": "unsupported",
+    "rename": "partial",
     "pin": "unsupported",
     "archive": "unsupported"
   },

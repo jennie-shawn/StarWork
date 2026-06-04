@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 
 const PRODUCT_ROOT = path.resolve(__dirname, "..", "..");
 const PACKAGE_VERSION = require(path.join(PRODUCT_ROOT, "package.json")).version;
@@ -1106,6 +1106,8 @@ async function collectLanesHostStatus(workspaceRoot, registry, options = {}) {
   const lanes = await Promise.all(registry.lanes.map(async (lane) => {
     const hostState = lanesState.lanes?.[lane.lane] || {};
     const host = await observeHostSession(hostState.current_session || lane.current_session, {
+      workspaceRoot,
+      command: "status",
       includeTurns: false,
       load: Boolean(options.load),
       transcriptPath: options.transcript
@@ -1168,6 +1170,8 @@ async function lanesRead(argv) {
     throw new Error("--turns 必须是正整数。");
   }
   const observation = await observeHostSession(session, {
+    workspaceRoot,
+    command: "read",
     includeTurns: Boolean(options.includeTurns || turnLimit),
     load: false,
     turnLimit,
@@ -1317,8 +1321,16 @@ async function lanesInstruct(argv) {
     return;
   }
   console.log("");
-  console.log(`已记录跨 lane 指令：${requestId}`);
+  console.log(delivery.status === MANUAL_HANDOFF_STATUS
+    ? `已记录跨 lane 指令（尚未自动送达）：${requestId}`
+    : `已记录跨 lane 指令：${requestId}`);
   console.log(`Host delivery：${delivery.status}${delivery.warning ? ` (${delivery.warning})` : ""}`);
+  if (delivery.status === MANUAL_HANDOFF_STATUS && delivery.formatted_message) {
+    console.log("");
+    console.log("需要手动转交以下消息：");
+    console.log("");
+    console.log(delivery.formatted_message.trimEnd());
+  }
 }
 
 async function lanesHandoff(argv) {
@@ -1376,6 +1388,26 @@ async function lanesLaunch(argv) {
   const lanes = laneIds.map((laneId) => findLaneOrThrow(registry.lanes, laneId));
   const actions = [];
   const launchResults = [];
+  const launchHost = resolveLaneLaunchHost({ options, lanes, workspaceRoot });
+  if (launchHost && launchHost !== "codex") {
+    for (const lane of lanes) {
+      launchResults.push(buildManualHostLaunchResult({
+        lane,
+        host: launchHost,
+        sessionName: buildLaneLaunchSessionName({ lane, workspaceRoot, explicitName: options.sessionName }),
+        dryRun: Boolean(options.dryRun),
+        message: renderMultiagentLaunchMessage({ lane, fromLane: options.from || "user", workspaceRoot, collaboration })
+      }));
+    }
+    if (options.json) {
+      console.log(JSON.stringify({ schema: "starwork.agent_lanes.launch.v0.3", dry_run: Boolean(options.dryRun), launches: launchResults }, null, 2));
+      return;
+    }
+    console.log("");
+    console.log(`${launchHost} lane launch 需要人工启动：`);
+    launchResults.forEach((result) => console.log(`- ${result.lane}: ${result.launch_status}${result.instructions ? `；${result.instructions}` : ""}`));
+    return;
+  }
   if (options.dryRun) {
     for (const lane of lanes) {
       const sessionName = buildLaneLaunchSessionName({ lane, workspaceRoot, explicitName: options.sessionName });
@@ -7099,6 +7131,38 @@ function buildLaneLaunchSessionName({ lane, workspaceRoot, explicitName }) {
   return normalizeMarkdownCell(`${roleName || "Agent"} Agent`);
 }
 
+function resolveLaneLaunchHost({ options, lanes, workspaceRoot }) {
+  const explicit = typeof options.host === "string" ? options.host : (options.agent || options.adapter || "");
+  if (explicit) return normalizeAdapterHost(explicit);
+  const boundHosts = new Set(lanes
+    .map((lane) => parseAdapterSession(lane.current_session).host)
+    .filter((host) => host && host !== "none" && host !== "manual"));
+  if (boundHosts.size === 1) return [...boundHosts][0];
+  const adaptersState = readAdaptersState(workspaceRoot);
+  const enabledHosts = Object.entries(adaptersState.adapters || {})
+    .filter(([, record]) => record?.enabled)
+    .map(([host]) => normalizeAdapterHost(host));
+  if (enabledHosts.length === 1) return enabledHosts[0];
+  return "codex";
+}
+
+function buildManualHostLaunchResult({ lane, host, sessionName, dryRun, message }) {
+  const label = host === "trae" ? "Trae" : (host === "cursor" ? "Cursor" : host);
+  const status = dryRun ? "manual_handoff_required" : "manual_handoff_required";
+  return {
+    lane: lane.lane,
+    dry_run: dryRun,
+    session_name: sessionName,
+    launch_status: status,
+    rename_status: "unsupported",
+    binding_status: "unbound",
+    host,
+    message,
+    instructions: `${label} host session launch is not adapted. Open ${label} manually, paste the launch message, then bind the lane to a real session id if needed.`,
+    warning: `${label} launch/create-chat is not supported by StarWork CLI.`
+  };
+}
+
 function normalizeLaneId(value, label) {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`${label} 必须是非空 lane ID。`);
@@ -7186,20 +7250,10 @@ async function observeHostSession(session, options = {}) {
     return observeClaudeCodeSession(parsed, options);
   }
   if (parsed.host === "cursor") {
-    return observeManualHostSession(parsed, {
-      status: "partial",
-      warning: commandExistsOnPath("cursor")
-        ? "Cursor v0.1 只做轻量 probe；不能承诺读取完整聊天内容或后台派活。"
-        : "未在 PATH 中发现 cursor CLI；Cursor v0.1 只做轻量 probe，不能承诺读取完整聊天内容或后台派活。"
-    });
+    return observeCursorSession(parsed, options);
   }
   if (parsed.host === "trae") {
-    return observeManualHostSession(parsed, {
-      status: "manual",
-      warning: commandExistsOnPath("trae")
-        ? "Trae v0.1 不读取加密数据库，不承诺自动 launch / instruct；请以 worklog 和 handoff 为准。"
-        : "未在 PATH 中发现 trae CLI；Trae v0.1 不读取加密数据库，不承诺自动 launch / instruct；请以 worklog 和 handoff 为准。"
-    });
+    return observeTraeManualHostSession(parsed, options);
   }
   return observeManualHostSession(parsed, {
     status: "manual",
@@ -7216,6 +7270,276 @@ function observeManualHostSession(parsed, details = {}) {
     warning: details.warning || "Manual handoff required",
     ui_visibility: "not_guaranteed"
   };
+}
+
+function observeTraeManualHostSession(parsed, options = {}) {
+  const status = options.command === "status" ? "manual_host" : MANUAL_HANDOFF_STATUS;
+  return {
+    adapter: "trae",
+    session_id: parsed.id,
+    readable: false,
+    status,
+    message: "Trae host session automation is not adapted. Use StarWork worklog/shared context and manual UI operation.",
+    warning: "Trae is a manual-operation host; StarWork does not read Trae database.db, state.vscdb, or private session storage.",
+    ui_visibility: "not_guaranteed"
+  };
+}
+
+function observeCursorSession(parsed, options = {}) {
+  const workspaceRoot = options.workspaceRoot || process.cwd();
+  const base = buildCursorHostFacts({ workspaceRoot, sessionId: parsed.id, transcriptPath: options.transcriptPath, command: options.command });
+  if (!parsed.id) {
+    return {
+      ...base,
+      adapter: "cursor",
+      session_id: parsed.id,
+      readable: false,
+      status: "not_found",
+      warning: "Cursor lane is missing a session id."
+    };
+  }
+  const transcriptPath = base.transcript_path_absolute;
+  if (!transcriptPath) {
+    return {
+      ...withoutInternalCursorFields(base),
+      adapter: "cursor",
+      session_id: parsed.id,
+      readable: false,
+      status: "not_found",
+      warning: "Cursor transcript not found. StarWork only reads agent-transcripts/<uuid>/<uuid>.jsonl."
+    };
+  }
+  try {
+    fs.accessSync(transcriptPath, fs.constants.R_OK);
+  } catch (error) {
+    return {
+      ...withoutInternalCursorFields(base),
+      adapter: "cursor",
+      session_id: parsed.id,
+      readable: false,
+      status: "unreadable",
+      transcript_path: transcriptPath,
+      warning: `Cursor transcript exists but is unreadable: ${error.message}`
+    };
+  }
+  try {
+    const summary = readCursorTranscriptSummary(transcriptPath);
+    return {
+      ...withoutInternalCursorFields(base),
+      adapter: "cursor",
+      session_id: parsed.id,
+      readable: summary.status !== "not_found",
+      status: summary.status,
+      transcript_path: transcriptPath,
+      line_count: summary.line_count,
+      bad_line_count: summary.bad_line_count,
+      first_user_query: summary.first_user_query,
+      last_user_query: summary.last_user_query,
+      tool_names: summary.tool_names,
+      candidate_outputs: summary.candidate_outputs,
+      warning: summary.warning
+    };
+  } catch (error) {
+    return {
+      ...withoutInternalCursorFields(base),
+      adapter: "cursor",
+      session_id: parsed.id,
+      readable: false,
+      status: "unreadable",
+      transcript_path: transcriptPath,
+      warning: `Cursor transcript could not be summarized: ${error.message}`
+    };
+  }
+}
+
+function buildCursorHostFacts({ workspaceRoot, sessionId, transcriptPath, command }) {
+  const adaptersState = readAdaptersState(workspaceRoot);
+  const transcriptRoot = resolveCursorProjectsDir(transcriptPath);
+  const resolvedTranscriptPath = resolveCursorTranscriptPath(sessionId, transcriptPath);
+  return {
+    adapter_enabled: Boolean(adaptersState.adapters?.cursor?.enabled),
+    rules_entry_exists: fs.existsSync(path.join(workspaceRoot, ".cursor", "rules", "starwork.mdc")),
+    skills_dir_exists: fs.existsSync(path.join(workspaceRoot, ".cursor", "skills")),
+    transcript_root: transcriptRoot,
+    transcript_root_exists: Boolean(transcriptRoot && fs.existsSync(transcriptRoot)),
+    bound_transcript_exists: Boolean(resolvedTranscriptPath && fs.existsSync(resolvedTranscriptPath)),
+    transcript_path_absolute: resolvedTranscriptPath,
+    cursor_cli_exists: commandExistsOnPath("cursor"),
+    cursor_agent_status: command === "status" ? probeCursorAgentStatus() : "not_checked",
+    cursor_api_key_present: Boolean(process.env.CURSOR_API_KEY)
+  };
+}
+
+function probeCursorAgentStatus() {
+  if (!commandExistsOnPath("cursor")) return "not_found";
+  const result = spawnSync("cursor", ["agent", "status"], {
+    encoding: "utf8",
+    timeout: 3000,
+    maxBuffer: 64 * 1024
+  });
+  if (result.error) {
+    return result.error.code === "ETIMEDOUT" ? "timeout" : "error";
+  }
+  const text = `${result.stdout || ""}\n${result.stderr || ""}`;
+  const parsed = parseCursorAgentStatusText(text);
+  if (result.status && result.status !== 0) return parsed === "unknown" ? "error" : parsed;
+  return parsed;
+}
+
+function parseCursorAgentStatusText(text) {
+  const normalized = String(text || "").toLowerCase();
+  if (/not\s+logged\s+in|not\s+authenticated|login\s+required|signed\s+out/.test(normalized)) {
+    return "not_logged_in";
+  }
+  if (/logged\s+in|authenticated|signed\s+in/.test(normalized)) {
+    return "logged_in";
+  }
+  return "unknown";
+}
+
+function withoutInternalCursorFields(facts) {
+  const { transcript_path_absolute, ...publicFacts } = facts;
+  return publicFacts;
+}
+
+function resolveCursorProjectsDir(explicitPath) {
+  if (explicitPath) {
+    const absolute = path.resolve(expandHomePath(explicitPath));
+    if (!fs.existsSync(absolute)) return absolute;
+    if (fs.statSync(absolute).isFile()) return path.dirname(path.dirname(path.dirname(absolute)));
+    return absolute;
+  }
+  if (process.env.STARWORK_CURSOR_PROJECTS_DIR) {
+    return path.resolve(expandHomePath(process.env.STARWORK_CURSOR_PROJECTS_DIR));
+  }
+  const home = process.env.HOME || process.env.USERPROFILE;
+  return home ? path.join(home, ".cursor", "projects") : null;
+}
+
+function resolveCursorTranscriptPath(sessionId, explicitPath) {
+  if (!sessionId) return null;
+  if (explicitPath) {
+    const absolute = path.resolve(expandHomePath(explicitPath));
+    if (fs.existsSync(absolute) && fs.statSync(absolute).isFile()) return absolute;
+    return findCursorTranscriptInRoot(absolute, sessionId);
+  }
+  const projectsDir = resolveCursorProjectsDir();
+  return projectsDir ? findCursorTranscriptInRoot(projectsDir, sessionId) : null;
+}
+
+function findCursorTranscriptInRoot(root, sessionId) {
+  if (!root || !fs.existsSync(root)) return null;
+  const directCandidates = [
+    path.join(root, "agent-transcripts", sessionId, `${sessionId}.jsonl`),
+    path.join(root, sessionId, `${sessionId}.jsonl`),
+    path.join(root, `${sessionId}.jsonl`)
+  ];
+  for (const candidate of directCandidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  const stat = fs.statSync(root);
+  if (!stat.isDirectory()) return null;
+  for (const projectKey of fs.readdirSync(root).sort()) {
+    const candidate = path.join(root, projectKey, "agent-transcripts", sessionId, `${sessionId}.jsonl`);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+function expandHomePath(value) {
+  const raw = String(value || "");
+  if (raw === "~") return process.env.HOME || process.env.USERPROFILE || raw;
+  if (raw.startsWith("~/")) {
+    const home = process.env.HOME || process.env.USERPROFILE;
+    return home ? path.join(home, raw.slice(2)) : raw;
+  }
+  return raw;
+}
+
+function readCursorTranscriptSummary(transcriptPath) {
+  const lines = fs.readFileSync(transcriptPath, "utf8").split(/\r?\n/).filter((line) => line.trim());
+  const userQueries = [];
+  const toolNames = new Set();
+  const candidateOutputs = new Set();
+  let badLineCount = 0;
+  for (const line of lines) {
+    let payload;
+    try {
+      payload = JSON.parse(line);
+    } catch {
+      badLineCount += 1;
+      continue;
+    }
+    const role = normalizeCursorTranscriptRole(payload);
+    const text = extractTranscriptText(payload.text || payload.content || payload.message?.content || payload.summary || payload.data?.text);
+    if (role === "user" && text) userQueries.push(text.slice(0, 500));
+    const toolName = extractCursorToolName(payload);
+    if (toolName) toolNames.add(toolName);
+    for (const candidate of extractCandidateOutputPaths(payload)) {
+      candidateOutputs.add(candidate);
+    }
+  }
+  const parsedCount = lines.length - badLineCount;
+  const status = badLineCount > 0 ? "malformed_partial" : "transcript_observed";
+  return {
+    status,
+    line_count: lines.length,
+    bad_line_count: badLineCount,
+    first_user_query: userQueries[0] || null,
+    last_user_query: userQueries[userQueries.length - 1] || null,
+    tool_names: [...toolNames].sort(),
+    candidate_outputs: [...candidateOutputs].sort(),
+    warning: badLineCount > 0
+      ? `Cursor transcript 有 ${badLineCount} 行坏行，已跳过；StarWork worklog/shared 仍是事实源。`
+      : "Cursor transcript is incomplete host observation; StarWork worklog/shared remain the source of truth.",
+    parsed_count: parsedCount
+  };
+}
+
+function normalizeCursorTranscriptRole(payload) {
+  const raw = String(payload.role || payload.type || payload.message?.role || payload.event?.role || "").toLowerCase();
+  if (raw.includes("user")) return "user";
+  if (raw.includes("assistant")) return "assistant";
+  if (raw.includes("tool")) return "tool";
+  return raw || "unknown";
+}
+
+function extractCursorToolName(payload) {
+  const candidates = [
+    payload.name,
+    payload.tool_name,
+    payload.toolName,
+    payload.function?.name,
+    payload.call?.name,
+    payload.data?.name
+  ];
+  return candidates.find((candidate) => typeof candidate === "string" && candidate.trim())?.trim() || null;
+}
+
+function extractCandidateOutputPaths(value, results = new Set()) {
+  if (!value) return results;
+  if (typeof value === "string") {
+    const matches = value.match(/\b(?:product|docs|_系统|\.starwork|src|cli)\/[A-Za-z0-9._/@+-]+(?:\/[A-Za-z0-9._/@+-]+)*/g) || [];
+    matches.forEach((match) => {
+      if (!match.includes("node_modules")) results.add(match);
+    });
+    return results;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((item) => extractCandidateOutputPaths(item, results));
+    return results;
+  }
+  if (typeof value === "object") {
+    for (const [key, nested] of Object.entries(value)) {
+      if (key === "patch" || key === "diff") continue;
+      if (["path", "file", "filePath", "filepath", "relative_path", "output_path"].includes(key) && typeof nested === "string") {
+        results.add(nested);
+        continue;
+      }
+      extractCandidateOutputPaths(nested, results);
+    }
+  }
+  return results;
 }
 
 function observeClaudeCodeSession(parsed, options = {}) {
@@ -7380,6 +7704,19 @@ function resolveHostRuntimeCapability({ workspaceRoot, parsedSession, command })
   const adaptersState = readAdaptersState(workspaceRoot);
   const adapterRecord = adaptersState.adapters?.[profile.host] || null;
   const adapterEnabled = Boolean(adapterRecord?.enabled);
+  if (profile.host === "trae") {
+    return {
+      host: profile.host,
+      session: parsedSession.session,
+      command,
+      profile_level: profile.sessions?.send_message || "manual",
+      adapter_enabled: adapterEnabled,
+      runtime_available: false,
+      status: MANUAL_HANDOFF_STATUS,
+      action: "manual_handoff",
+      warning: "Trae host session automation is not adapted. Use manual UI operation."
+    };
+  }
   if (profile.host !== "codex" && !adapterEnabled) {
     return {
       host: profile.host,
@@ -7493,14 +7830,14 @@ function buildHostContinueResult(parsedSession) {
   if (parsedSession.host === "cursor") {
     return {
       adapter: parsedSession.host,
-      status: "manual_steps",
+      status: "manual_handoff_required",
       instructions: "在 Cursor 中打开当前项目，并把 handoff message 复制给目标会话。"
     };
   }
   if (parsedSession.host === "trae") {
     return {
       adapter: parsedSession.host,
-      status: "manual_steps",
+      status: "manual_handoff_required",
       instructions: "在 Trae 中打开当前项目，并按 lane worklog / shared context 手动继续。"
     };
   }

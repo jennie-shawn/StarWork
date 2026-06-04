@@ -36,7 +36,7 @@ v0.1 只覆盖最小可用安装和适配能力：
 - `starwork upgrade` 第一版：可以读取 `starworkDoctor` skill 生成的升级蓝图，把历史模板、非标准目录或类似项目中心的旧主库安全升级为 StarWork 工作台；alpha.9 支持 `hub + preserve-names + pack:null`，旧主库接入时不会创建重复标准目录；v0.1 只支持 `--blueprint`，不自动判断升级方案。
 - `starwork adapt` Host Adapter v0.1：可以读取 Codex、Claude Code、Cursor、Trae 的宿主能力 profile；`--capabilities` 只输出能力不写文件；正式适配会写入 `.starwork/adapters.json`，并保留 `.starwork/workspace.json.adapters` 摘要。
 - `starwork pack install` 第一版：可以在健康工作台上补装 Pack，并更新路径、规则、模板和 workspace state。
-- `starwork multiagent` v0.2+Host Adapter：在原有 Agent Lanes 基础上增加宿主分支；Codex 支持自动读取、发送和 launch；Claude Code 支持 `CLAUDE_CODE_SESSION_ID` 绑定、`claude --resume` 继续命令和 transcript 摘要；Cursor / Trae 默认返回人工交付消息，不伪装自动送达。
+- `starwork multiagent` v0.2+Host Adapter：在原有 Agent Lanes 基础上增加宿主分支；Codex 支持自动读取和 launch；Claude Code 支持 `CLAUDE_CODE_SESSION_ID` 绑定、`claude --resume` 继续命令和 transcript 摘要；Cursor 只支持 `agent-transcripts/<uuid>/<uuid>.jsonl` 的只读摘要，用于 `read/status --host`；Trae 不做会话读取或自动化，默认返回人工交付消息或 unsupported。
 - `starwork audit` 第一版：可以从项目中心读取语言映射后的项目注册表，批量巡检中心管理的项目工作台，并复用 `doctor` 聚合健康事实。
 - `starwork repair` 第一版：可以执行 `starworkAudit` 生成的保守 repair blueprint，支持补目录、补缺失文件、重写 sync、更新 registry 和更新 workspace state。
 - Skill 管理与分发第一版：工作台模板可以自带 Skill，项目中心可以托管用户常用 Skill；`init` 写入 `.starwork/skills.json`，`spawn` 按项目中心 registry 选择性分发 Skill，`doctor` 暴露 Skill manifest / registry / mount 事实。

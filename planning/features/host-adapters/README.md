@@ -21,4 +21,5 @@ Host Adapter 应覆盖：
 
 - [v0.1 SPEC](specs/v0.1.md)
 - [v0.1 implementation SPEC](specs/v0.1-implementation.md)
+- [v0.2 Cursor 会话读取与 Trae 人工操作 SPEC](specs/v0.2-cursor-session-adapter.md)
 - [SPEC index](specs/index.md)

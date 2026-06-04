@@ -8,6 +8,8 @@
 
 | ID | 标题 | 类型 | 优先级 | 状态 | 负责人 | 来源 | 详情 | 下一步 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ISSUE-013 | Cursor status --host 未真实报告 cursor agent status 登录态 | cli / adapter / workflow | P1 | closed | development lane | Host Adapter v0.2 产品复验 | [ISSUE-013.md](ISSUE-013.md) | 已关闭：fake Cursor CLI 的 logged in / not logged in / error 场景均通过，且不泄露 token、邮箱或 stderr。 |
+| ISSUE-012 | manual_handoff_required 时不应误报已通知，必须提供可复制消息 | cli / skill / workflow | P1 | closed | development lane | 用户反馈 / 真实跨 lane 通知 | [ISSUE-012.md](ISSUE-012.md) | 已关闭：非 JSON `manual_handoff_required` 输出已直接展示完整 handoff message，并明确尚未自动送达。 |
 | ISSUE-011 | StarWork Skill 不应内置宿主适配百科，运行时宿主能力应由 CLI 判断 | skill / cli / adapter / workflow | P1 | closed | development lane | 用户反馈 / 产品架构判断 | [ISSUE-011.md](ISSUE-011.md) | 已关闭：Skill 已收敛为 CLI 调用与状态解释；运行时宿主能力由 CLI 判断。 |
 | ISSUE-010 | MultiAgent 创建 Agent 时应强制使用可读会话命名格式 | cli / skill / workflow | P2 | closed | development lane | 用户反馈 / 产品补充要求 | [ISSUE-010.md](ISSUE-010.md) | 已关闭：默认会话名已改为 `<职责名> Agent`，不含项目名和内部词。 |
 | ISSUE-009 | 非 StarWork 目录的 MultiAgent 引导应转入 starworkInit Skill，而不是直接提示运行 CLI | skill / cli / workflow | P2 | closed | development lane | 用户反馈 / 产品验收 | [ISSUE-009.md](ISSUE-009.md) | 已关闭：CLI / Skill / A 测文档均指向 `starworkInit` Skill 接入流程。 |
