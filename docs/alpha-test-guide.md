@@ -7,7 +7,7 @@
 - npm package：`@jennie-shawn/starwork`
 - CLI command：`starwork`
 - A 测 tag：`latest`
-- 当前 `latest`：`0.1.0-alpha.17`
+- 当前 `latest`：`0.1.0-alpha.20`
 
 ## A 测用户安装 CLI
 
@@ -26,7 +26,7 @@ npx @jennie-shawn/starwork --version
 npx @jennie-shawn/starwork --help
 ```
 
-预期版本应为 `0.1.0-alpha.17` 或更新版本。
+预期版本应为 `0.1.0-alpha.20` 或更新版本。
 
 ## A 测用户安装系统 Skills
 

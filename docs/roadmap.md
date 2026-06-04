@@ -23,12 +23,13 @@ StarWork 现在不缺想法，缺的是一条清晰的主线。
 - `starwork spawn --blueprint` 第一版已经可以按工作台定制单创建定制化项目工作台；`starworkSpawn` skill 第一版用于生成工作台定制单。
 - `starwork --version` 与产品化 help 文案已补齐，方便 A 测用户确认安装版本和入口命令。
 - `starwork audit` / `starwork repair` 第一版已经可以让项目中心巡检并保守修复已登记项目。
-- `starwork multiagent` 第一版已经可以维护 Agent Lanes，并支持绑定 lane 后 best-effort 同步 Codex 宿主会话名；Codex 多会话 `launch/read/instruct` 主链路已经通过真实复验。
+- `starwork multiagent` 已从早期 Codex 单宿主编排升级为 v0.4 runtime host routing：能识别宿主能力、返回 `manual_handoff_required` / `unbound` / `needs_adapt` 等状态，并在无法自动投递时输出可复制交接消息。
+- Host Adapter v0.2 已补齐 Cursor transcript 只读摘要、Cursor agent status 安全探测和 Trae 人工宿主收敛。
 - M2.8 已统一工作台命名体系，对外使用“项目工作台 / 项目中心 / 中心管理的项目工作台”。
 - M2.10 已完成 Core Kit / Pack 边界清理：Project Kit 不再固定通用工作目录，General Pack 负责参考资料、草稿和确认成果目录。
-- M2.11 知识库能力已发布到 `@jennie-shawn/starwork@0.1.0-alpha.17`：Project Kit 不再默认包含 `知识/knowledge`，项目知识库通过 `starwork knowledge` 和 `starworkKnowledge` 按需开启。
+- M2.11 知识库能力已进入当前公开口径：Project Kit 不再默认包含 `知识/knowledge`，项目知识库通过 `starwork knowledge` 和 `starworkKnowledge` 按需开启。
 
-所以，下一步不应该立刻进入新场景 Pack。当前应继续保持 A 测链路稳定，围绕 `alpha.17` 做发布后验证，重点观察安装、Skill 安装、项目中心、知识库和 MultiAgent Codex 多会话链路是否足够清楚。
+所以，下一步不应该立刻进入新场景 Pack。当前应进入 M2.12 发布与 A 测稳定化，先把 `0.1.0-alpha.20` 的 README、docs、CLI、Skills、本机安装和 npm latest 口径彻底对齐，再用 Golden Demo Workspaces 验证 StarWork 是否能被新人稳定理解。
 
 ## 总路线
 
@@ -46,6 +47,10 @@ M2.6 既有功能优化与 A 测稳定化
 M2.8/M2.10 命名体系与 Kit/Pack 边界清理
   ↓
 M2.11 知识库能力
+  ↓
+M2.12 发布与 A 测稳定化
+  ↓
+M2.13 Golden Demo Workspaces
   ↓
 M3 Content Creator Pack v0.1
   ↓
@@ -149,11 +154,12 @@ M8 v1.0 稳定产品
 - `starworkInit`、`starworkDoctor`、`starworkMultiagent` 可通过一条 `npx skills add` 命令安装为系统 Skill；`starworkDoctor` 同时承担历史模板诊断、类似项目中心的旧工作区诊断和升级蓝图生成；`starworkSpawn`、`starworkAudit` 改为项目中心自带 Skill。
 - 公开 README 已改为中文首页。
 - 已新增面向 Agent 的安装指南：`product/docs/agent-install-guide.md`。
-- npm `latest` 已发布到 `@jennie-shawn/starwork@0.1.0-alpha.17`，本机 CLI 与系统 Skills 已完成更新验证。
+- npm `latest` 已发布到 `@jennie-shawn/starwork@0.1.0-alpha.20`，本机 CLI 与系统 Skills 已完成更新验证。
 - `starwork --version` 已可直接输出包版本，`starwork --help` 已改为面向 A 测用户的命令入口说明。
 - `starwork upgrade --blueprint`、`starworkDoctor`、类似项目中心的旧工作区 preserve-names 接入和 Skill 分发第一版已进入公开包。
 - `starwork audit` / `starwork repair` 已进入公开包，项目中心可巡检并按 blueprint 保守修复它管理的项目工作台。
-- `starwork multiagent bind --session-name` 已进入公开包，可在绑定 lane 后同步 Codex 宿主会话名；`launch/read/instruct` 已通过真实 Codex app-server 复验，未完成交付会以 `started_unverified` 标记。
+- `starwork multiagent` v0.4 已进入公开口径：通过 runtime host routing 解释宿主能力，不再用低层 thread/resume + turn/start 模拟跨会话投递；无法自动送达时返回 `manual_handoff_required` 并输出可复制交接消息。
+- Host Adapter v0.2 已进入公开口径：Cursor 支持 transcript 只读摘要和 `cursor agent status` 安全探测；Trae 收敛为人工宿主，不读取私有会话存储。
 
 验收标准：
 
@@ -212,7 +218,7 @@ M8 v1.0 稳定产品
 
 ## M2.11 知识库能力
 
-状态：已发布到 `@jennie-shawn/starwork@0.1.0-alpha.17`，进入 A 测验证。
+状态：已完成本地验收，并进入当前 A 测口径。
 
 目标：把 `知识/knowledge` 从“默认目录”进一步定义为可选知识库能力，避免它在项目资料、长期理解和项目中心共享知识之间语义混乱。
 
@@ -236,9 +242,46 @@ M8 v1.0 稳定产品
 - 用真实 A 测样本验证 `starworkKnowledge` 是否能避免把原始资料、草稿和知识库混在一起。
 - 继续观察项目中心共享知识库是否需要另开需求。
 
+## M2.12 发布与 A 测稳定化
+
+状态：当前阶段。
+
+目标：把已经进入公开包的 CLI、Skills、文档和发布材料统一成可信的 A 测入口，减少“代码可用但用户被旧文档带偏”的风险。
+
+当前重点：
+
+- 对齐 README、A 测指南、Agent 安装指南、CLI/Skill 注册说明和 roadmap 的版本号、命令和能力边界。
+- 为 `manual_handoff_required`、Cursor transcript 只读摘要、Trae 人工宿主等 host adapter 行为补齐用户可理解说明。
+- 建立每次 npm 发布后的 release checklist：版本检查、latest 检查、本机 CLI/Skill 更新、关键命令 smoke test、文档漂移检查。
+- 继续复验 `init -> doctor -> hub init -> spawn -> audit -> repair`、`knowledge`、`multiagent`、`adapt` 这些 A 测高频链路。
+
+验收标准：
+
+- `product/README.md`、`product/docs/`、`product/cli/README.md` 和 A 测指南中的 latest 版本与实际 npm latest 一致。
+- 新用户只按公开文档操作时，不会遇到已经废弃的 alpha 版本、旧 MultiAgent 状态名或旧宿主能力说法。
+- 每个无法自动化的跨会话动作，都有可复制消息和明确的人工交付说明。
+
+## M2.13 Golden Demo Workspaces
+
+状态：建议紧随 M2.12 启动。
+
+目标：用少量高质量示例证明 StarWork 的价值，不再只靠命令和 SPEC 解释产品。
+
+建议最小样本：
+
+- 一个项目工作台：展示 `init`、`doctor`、`knowledge`、`general pack` 和基础规则入口。
+- 一个项目中心：展示 `hub init`、`spawn`、`audit`、`repair` 和中心管理项目登记。
+- 一个 MultiAgent 协作样本：展示 product-planning、development、operations 等 lane 的职责边界、worklog、shared 消息和人工交接。
+
+验收标准：
+
+- 新人能在 10 分钟内看懂 StarWork 到底解决什么问题。
+- Demo 能暴露真实工作流，而不是只展示目录树。
+- Demo 中的 CLI 输出、Skill 行为和文档说明一致。
+
 ## M3 Content Creator Pack v0.1
 
-状态：后续阶段，等待 A 测稳定化和 GFM 新一期课程内容一起整理。
+状态：后续阶段，等待 M2.12/M2.13 稳定后再启动，并结合 GFM 新一期课程内容整理。
 
 目标：做出第一个真正能解决场景问题的 Pack，而不是只有目录结构。
 
@@ -377,15 +420,16 @@ v1.0 应具备：
 
 ## 当前下一步
 
-当前最应该做的不是重开 Core、继续无边界扩张 CLI，或立刻进入新 Pack，而是完成 `alpha.17` 发布后验证并继续 A 测稳定化：
+当前最应该做的不是重开 Core、继续无边界扩张 CLI，或立刻进入新 Pack，而是完成 M2.12 发布与 A 测稳定化：
 
 1. 用公开安装命令验证 `@jennie-shawn/starwork@latest`、系统级 Skills 和本机更新链路。
-2. 用真实项目验证知识库能力是否能清楚区分参考资料、输出和长期知识。
-3. 用 Codex 真实会话继续验证 `multiagent launch/read/instruct`，尤其是失败时的 `started_unverified` 是否容易理解。
-4. 继续优化安装、`init`、`doctor -> starworkDoctor -> upgrade`、`hub -> spawn -> audit -> repair`、`multiagent` 和 `knowledge` 这些既有链路。
-5. 持续收集 A 测用户对 CLI 安装、Skills 安装、历史模板升级、规则文档质量、知识库边界和多会话协作的反馈。
-6. 等 GFM 新一期课程敲定时，再启动 Content Creator Pack v0.1 功能档案，把首个场景 Pack 的目录、规则、模板和 Demo 定下来。
+2. 清理 README、docs、CLI README、A 测指南和 Skill 注册说明中的版本漂移。
+3. 用真实项目验证知识库能力是否能清楚区分参考资料、输出和长期知识。
+4. 用真实宿主继续验证 `multiagent read/status/instruct/launch` 的状态输出，尤其是 `manual_handoff_required` 是否足够清楚。
+5. 继续优化安装、`init`、`doctor -> starworkDoctor -> upgrade`、`hub -> spawn -> audit -> repair`、`multiagent`、`knowledge` 和 `adapt` 这些既有链路。
+6. 制作 Golden Demo Workspaces，把产品价值从“命令能跑”推进到“新人能看懂”。
+7. 等 M2.12/M2.13 稳定后，再启动 Content Creator Pack v0.1 功能档案，把首个场景 Pack 的目录、规则、模板和 Demo 定下来。
 
-如果只能选一个，先优化历史模板升级和规则文档质量，因为这直接决定现有用户能不能平滑迁移。
+如果只能选一个，先修复版本、发布和文档漂移，因为这直接决定 A 测用户能不能按公开入口跑通。
 
-原因：M2 已经提供了最小 CLI 工具链，A 测版本也已发布；现在最容易产生体验落差的是 CLI 与 Skill 之间的协同、提示、容错和文档状态漂移。
+原因：M2 已经提供了最小 CLI 工具链，A 测版本也已发布；现在最容易产生体验落差的是 CLI 与 Skill 之间的协同、提示、容错、宿主能力边界和文档状态漂移。

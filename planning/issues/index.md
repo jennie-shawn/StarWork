@@ -8,6 +8,7 @@
 
 | ID | 标题 | 类型 | 优先级 | 状态 | 负责人 | 来源 | 详情 | 下一步 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ISSUE-014 | MultiAgent 创建流程不应额外生成 AGENTS.starwork.md 和 README.starwork-new.md | cli / skill / workflow | P1 | closed | development lane | GitHub Issue #3 / 用户反馈 | [ISSUE-014.md](ISSUE-014.md) | 已关闭：v0.5 二次复验通过，已有项目生成 agent docs 草稿 / pending merge，不再生成根入口 sidecar 或 README 副本。 |
 | ISSUE-013 | Cursor status --host 未真实报告 cursor agent status 登录态 | cli / adapter / workflow | P1 | closed | development lane | Host Adapter v0.2 产品复验 | [ISSUE-013.md](ISSUE-013.md) | 已关闭：fake Cursor CLI 的 logged in / not logged in / error 场景均通过，且不泄露 token、邮箱或 stderr。 |
 | ISSUE-012 | manual_handoff_required 时不应误报已通知，必须提供可复制消息 | cli / skill / workflow | P1 | closed | development lane | 用户反馈 / 真实跨 lane 通知 | [ISSUE-012.md](ISSUE-012.md) | 已关闭：非 JSON `manual_handoff_required` 输出已直接展示完整 handoff message，并明确尚未自动送达。 |
 | ISSUE-011 | StarWork Skill 不应内置宿主适配百科，运行时宿主能力应由 CLI 判断 | skill / cli / adapter / workflow | P1 | closed | development lane | 用户反馈 / 产品架构判断 | [ISSUE-011.md](ISSUE-011.md) | 已关闭：Skill 已收敛为 CLI 调用与状态解释；运行时宿主能力由 CLI 判断。 |

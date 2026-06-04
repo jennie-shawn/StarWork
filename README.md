@@ -9,7 +9,7 @@ StarWork 是一套面向 AI 的工作台协议和工具集，用来帮助用户�
 - **Packs**：场景模板包。当前 A 测阶段默认使用通用工作能力。
 - **Skills**：给 Codex 等 AI 工具使用的工作流说明，让 AI 能更可靠地帮用户设计和生成 StarWork 工作台。
 
-当前版本处于 A 测阶段。npm `latest` 为 `@jennie-shawn/starwork@0.1.0-alpha.18`，适合测试安装流程、基础命令、工作台结构、AI Skill 使用体验和 MultiAgent 会话协作链路。
+当前版本处于 A 测阶段。npm `latest` 为 `@jennie-shawn/starwork@0.1.0-alpha.20`，适合测试安装流程、基础命令、工作台结构、AI Skill 使用体验和 MultiAgent 会话协作链路。
 
 ## 安装 CLI
 

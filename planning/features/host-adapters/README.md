@@ -6,7 +6,13 @@ Host Adapters 是 StarWork 面向不同 AI 宿主的通用适配层。
 
 ## 当前判断
 
-`starwork adapt` v0.1 目前只生成轻量规则入口，例如 `CLAUDE.md`、Cursor rules、Trae rules。随着 MultiAgent、Knowledge、Skills、Upgrade 等能力变多，adapter 需要升级为全局能力层。
+`starwork adapt` v0.1 目前只生成轻量规则入口，例如 `CLAUDE.md`、Cursor rules、Trae rules。随着 MultiAgent、Knowledge、Skills、Upgrade 等能力变多，adapter 已开始升级为全局能力层。
+
+Host Adapter v0.2 已完成并进入 `0.1.0-alpha.20` A 测口径：
+
+- Cursor 支持会话 transcript 只读摘要、`read/status --host` 的 transcript 状态输出，以及不泄露 API key、邮箱和 stderr 的 `cursor agent status` 安全探测。
+- Cursor 的 `instruct/launch/create-chat` 不做自动化，仍返回 `manual_handoff_required`。
+- Trae 被明确收敛为人工宿主，`read/status/instruct/continue/launch` 均返回人工或 unsupported 语义，不读取私有会话存储。
 
 Host Adapter 应覆盖：
 

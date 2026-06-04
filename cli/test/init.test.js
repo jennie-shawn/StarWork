@@ -160,9 +160,21 @@ test("starworkMultiagent skill delegates host routing to CLI", () => {
   assert.doesNotMatch(skill, /\| Host \|/);
   assert.doesNotMatch(skill, /Codex app-server/);
   assert.doesNotMatch(skill, /Claude Code \|/);
+  assert.doesNotMatch(skill, /<项目或产品名> <职责> Agent/);
+  assert.doesNotMatch(skill, /StarWork CLI 维护 Agent/);
+  assert.match(skill, /<职责名> Agent/);
   assert.match(skill, /CLI 返回/);
   assert.match(skill, /manual_handoff_required/);
   assert.match(skill, /needs_adapt/);
+  assert.match(skill, /pending_merge/);
+});
+
+test("starworkInit skill keeps existing projects in agent-docs draft mode", () => {
+  const skill = fs.readFileSync(path.join(root, "skills", "starworkInit", "SKILL.md"), "utf8");
+
+  assert.match(skill, /--agent-docs draft/);
+  assert.match(skill, /已有非空项目/);
+  assert.doesNotMatch(skill, /starwork init --type project --pack general --language zh --adapter codex --target <path> --yes/);
 });
 
 test("dry-run does not write files", () => {
@@ -613,11 +625,51 @@ test("creates a hub workspace with hub management pack", () => {
 test("does not overwrite existing user files", () => {
   const dir = tempDir();
   fs.writeFileSync(path.join(dir, "README.md"), "# Existing\n", "utf8");
+  fs.writeFileSync(path.join(dir, "AGENTS.md"), "# Existing Agent Rules\n", "utf8");
 
-  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  const output = runInit(["--type", "project", "--pack", "general", "--adapter", "codex", "--target", dir, "--yes"]);
+  const plan = readJson(path.join(dir, ".starwork", "drafts", "agent-docs-plan.json"));
+  const adaptersState = readJson(path.join(dir, ".starwork", "adapters.json"));
+  const doctor = runDoctor(["--target", dir, "--host", "codex", "--json"]);
+  const report = JSON.parse(doctor.stdout);
 
   assert.equal(fs.readFileSync(path.join(dir, "README.md"), "utf8"), "# Existing\n");
-  assert.equal(fs.existsSync(path.join(dir, "README.starwork-new.md")), true);
+  assert.equal(fs.readFileSync(path.join(dir, "AGENTS.md"), "utf8"), "# Existing Agent Rules\n");
+  assert.equal(fs.existsSync(path.join(dir, "README.starwork-new.md")), false);
+  assert.equal(fs.existsSync(path.join(dir, "AGENTS.starwork.md")), false);
+  assert.equal(fs.existsSync(path.join(dir, "AGENTS.starwork-new.md")), false);
+  assert.equal(fs.existsSync(path.join(dir, ".starwork", "drafts", "README.proposed.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, ".starwork", "drafts", "AGENTS.proposed.md")), true);
+  assert.equal(fs.existsSync(path.join(dir, ".starwork", "drafts", "adapter.codex.proposed.md")), true);
+  assert.match(output, /AI 入口文档需要 Skill 整合后再生效/);
+  assert.equal(plan.status, "draft_required");
+  assert.ok(plan.entries.some((entry) => entry.target_path === "README.md" && entry.draft_path === ".starwork/drafts/README.proposed.md"));
+  assert.ok(plan.entries.some((entry) => entry.host === "codex" && entry.draft_path === ".starwork/drafts/adapter.codex.proposed.md"));
+  assert.equal(adaptersState.adapters.codex.enabled, false);
+  assert.equal(adaptersState.adapters.codex.rules_entry, "AGENTS.md");
+  assert.equal(adaptersState.adapters.codex.rules_entry_status, "pending_merge");
+  assert.equal(adaptersState.adapters.codex.draft_entry, ".starwork/drafts/adapter.codex.proposed.md");
+  assert.ok(report.checks.some((check) => check.id === "agent_docs.plan.pending" && check.level === "warn"));
+  assert.ok(report.checks.some((check) => check.id === "adapter.codex.rules.pending_merge" && check.level === "warn"));
+});
+
+test("init dry-run with adapter previews agent docs drafts and pending merge plan", () => {
+  const dir = tempDir();
+  fs.writeFileSync(path.join(dir, "README.md"), "# Existing\n", "utf8");
+  fs.writeFileSync(path.join(dir, "AGENTS.md"), "# Existing Agent Rules\n", "utf8");
+  fs.writeFileSync(path.join(dir, "package.json"), "{\"name\":\"plain\"}\n", "utf8");
+
+  const output = runInit(["--type", "project", "--pack", "general", "--language", "zh", "--adapter", "codex", "--target", dir, "--dry-run"]);
+
+  assert.match(output, /\.starwork\/drafts\/README\.proposed\.md/);
+  assert.match(output, /\.starwork\/drafts\/AGENTS\.proposed\.md/);
+  assert.match(output, /\.starwork\/drafts\/adapter\.codex\.proposed\.md/);
+  assert.match(output, /\.starwork\/drafts\/agent-docs-plan\.json/);
+  assert.match(output, /初始化后的 AI 工具适配预览/);
+  assert.match(output, /pending_merge/);
+  assert.equal(fs.existsSync(path.join(dir, ".starwork")), false);
+  assert.equal(fs.existsSync(path.join(dir, "AGENTS.starwork.md")), false);
+  assert.equal(fs.existsSync(path.join(dir, "README.starwork-new.md")), false);
 });
 
 test("doctor passes on a single-light workspace with general pack", () => {
@@ -1435,6 +1487,18 @@ test("multiagent launch refuses non-StarWork targets without sidecar initializat
   assert.equal(fs.readFileSync(path.join(dir, "AGENTS.md"), "utf8"), "# Existing project rules\n");
 });
 
+test("multiagent write commands stop while host agent docs are pending merge", () => {
+  const dir = tempDir();
+  fs.writeFileSync(path.join(dir, "AGENTS.md"), "# Existing Agent Rules\n", "utf8");
+  runInit(["--type", "project", "--pack", "general", "--adapter", "codex", "--target", dir, "--yes"]);
+
+  const result = runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /pending_merge/);
+  assert.match(result.stderr, /starworkInit/);
+});
+
 test("multiagent launch binds when final verification read times out after completion", () => {
   const dir = tempDir();
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
@@ -2231,18 +2295,23 @@ test("adapt creates a Claude adapter and records it in workspace state", () => {
   const state = readJson(path.join(dir, ".starwork", "workspace.json"));
   const adaptersState = readJson(path.join(dir, ".starwork", "adapters.json"));
   const claude = fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8");
-  const claudeAdapter = fs.readFileSync(path.join(dir, "CLAUDE.starwork.md"), "utf8");
+  const claudeAdapter = fs.readFileSync(path.join(dir, ".starwork", "drafts", "adapter.claude-code.proposed.md"), "utf8");
 
   assert.equal(result.status, 0);
   assert.match(claude, /Claude 工作规则/);
   assert.match(claudeAdapter, /StarWork Adapter for Claude Code/);
   assert.match(claudeAdapter, /STARWORK:ADAPTER_ENTRY v0\.1 host=claude-code/);
-  assert.equal(state.adapters["claude-code"].rules_entry, "CLAUDE.starwork.md");
+  assert.equal(state.adapters["claude-code"].rules_entry, "CLAUDE.md");
+  assert.equal(state.adapters["claude-code"].rules_entry_status, "pending_merge");
+  assert.equal(state.adapters["claude-code"].draft_entry, ".starwork/drafts/adapter.claude-code.proposed.md");
   assert.equal(adaptersState.schema, "starwork.adapters.state.v0.1");
-  assert.equal(adaptersState.adapters["claude-code"].enabled, true);
-  assert.equal(adaptersState.adapters["claude-code"].rules_entry, "CLAUDE.starwork.md");
+  assert.equal(adaptersState.adapters["claude-code"].enabled, false);
+  assert.equal(adaptersState.adapters["claude-code"].rules_entry, "CLAUDE.md");
+  assert.equal(adaptersState.adapters["claude-code"].rules_entry_status, "pending_merge");
+  assert.equal(adaptersState.adapters["claude-code"].draft_entry, ".starwork/drafts/adapter.claude-code.proposed.md");
   assert.equal(adaptersState.adapters["claude-code"].capabilities["sessions.send_message"], "manual");
   assert.equal(fs.existsSync(path.join(dir, ".claude", "skills")), true);
+  assert.equal(fs.existsSync(path.join(dir, "CLAUDE.starwork.md")), false);
 });
 
 test("adapt does not overwrite user-authored Claude rules that mention AGENTS", () => {
@@ -2253,7 +2322,7 @@ test("adapt does not overwrite user-authored Claude rules that mention AGENTS", 
 
   const result = runCommand(["adapt", "claude-code", "--target", dir, "--yes"]);
   const primary = fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8");
-  const sidecar = fs.readFileSync(path.join(dir, "CLAUDE.starwork.md"), "utf8");
+  const draft = fs.readFileSync(path.join(dir, ".starwork", "drafts", "adapter.claude-code.proposed.md"), "utf8");
   const workspaceState = readJson(path.join(dir, ".starwork", "workspace.json"));
   const adaptersState = readJson(path.join(dir, ".starwork", "adapters.json"));
   const doctor = runDoctor(["--target", dir, "--host", "claude-code", "--json"]);
@@ -2261,12 +2330,18 @@ test("adapt does not overwrite user-authored Claude rules that mention AGENTS", 
 
   assert.equal(result.status, 0);
   assert.equal(primary, userRules);
-  assert.match(sidecar, /STARWORK:ADAPTER_ENTRY v0\.1 host=claude-code/);
-  assert.equal(adaptersState.adapters["claude-code"].rules_entry, "CLAUDE.starwork.md");
-  assert.deepEqual(adaptersState.adapters["claude-code"].generated_entries, ["CLAUDE.starwork.md"]);
-  assert.equal(workspaceState.adapters["claude-code"].rules_entry, "CLAUDE.starwork.md");
-  assert.equal(report.adapters.checked_hosts[0].rules_entry, "CLAUDE.starwork.md");
-  assert.ok(report.checks.some((check) => check.id === "adapter.claude-code.rules.skills_manifest" && check.level === "pass" && check.path === "CLAUDE.starwork.md"));
+  assert.match(draft, /STARWORK:ADAPTER_ENTRY v0\.1 host=claude-code/);
+  assert.equal(fs.existsSync(path.join(dir, "CLAUDE.starwork.md")), false);
+  assert.equal(adaptersState.adapters["claude-code"].enabled, false);
+  assert.equal(adaptersState.adapters["claude-code"].rules_entry, "CLAUDE.md");
+  assert.equal(adaptersState.adapters["claude-code"].rules_entry_status, "pending_merge");
+  assert.equal(adaptersState.adapters["claude-code"].draft_entry, ".starwork/drafts/adapter.claude-code.proposed.md");
+  assert.deepEqual(adaptersState.adapters["claude-code"].generated_entries, [".starwork/drafts/adapter.claude-code.proposed.md"]);
+  assert.equal(workspaceState.adapters["claude-code"].rules_entry, "CLAUDE.md");
+  assert.equal(workspaceState.adapters["claude-code"].rules_entry_status, "pending_merge");
+  assert.equal(report.adapters.checked_hosts[0].rules_entry, "CLAUDE.md");
+  assert.equal(report.adapters.checked_hosts[0].rules_entry_status, "pending_merge");
+  assert.ok(report.checks.some((check) => check.id === "adapter.claude-code.rules.pending_merge" && check.level === "warn" && check.path === ".starwork/drafts/adapter.claude-code.proposed.md"));
 });
 
 test("adapt can update StarWork-managed Claude rules", () => {
@@ -2329,8 +2404,11 @@ test("adapt supports multiple host adapter state entries", () => {
 
   assert.equal(claude.status, 0);
   assert.equal(cursor.status, 0);
-  assert.equal(adaptersState.adapters["claude-code"].enabled, true);
+  assert.equal(adaptersState.adapters["claude-code"].enabled, false);
+  assert.equal(adaptersState.adapters["claude-code"].rules_entry_status, "pending_merge");
+  assert.equal(adaptersState.adapters["claude-code"].draft_entry, ".starwork/drafts/adapter.claude-code.proposed.md");
   assert.equal(adaptersState.adapters.cursor.enabled, true);
+  assert.equal(adaptersState.adapters.cursor.rules_entry_status, "active");
   assert.equal(adaptersState.adapters.cursor.rules_entry, ".cursor/rules/starwork.mdc");
 });
 

@@ -58,6 +58,8 @@ starwork doctor --target <path> --json
 
 如果目标不是 StarWork 工作台，立即停止 multiagent 写入，不要尝试局部初始化，不要新建 `AGENTS.starwork-new.md` 或只补 `_系统/协作/`。下一步是切换到 `starworkInit` Skill，由它采访用户、选择工作台类型和 Pack、处理已有规则入口，并在用户确认后调用 CLI。`starworkInit` 完成且 `starwork doctor --target <path>` 通过后，才继续 multiagent 流程。
 
+如果 `starwork doctor --target <path> --host <host> --json` 或 `.starwork/adapters.json` 显示 `rules_entry_status: pending_merge`，也必须停止 `multiagent init/add/bind/launch`。这表示 AI 入口文档还只是 `.starwork/drafts/` 草稿，先切回 `starworkInit` 整合最终 `AGENTS.md` / 宿主规则入口；完成并重新 doctor 后，才能继续创建或绑定团队。
+
 ## 判断用户意图
 
 优先把用户话语归到一个入口，不要一开始讲 CLI 子命令。
@@ -82,7 +84,7 @@ starwork doctor --target <path> --json
 
 “创建 Agent 团队 / 创建多个智能体 / 产品、开发、验收三个智能体”不是只创建 lane。完整成功标准是：每个目标职责都有 lane、每个 lane 已绑定可工作的独立 session，或者输出中明确说明哪些 lane 未完成以及阻塞原因。
 
-1. 先按“前置边界”确认目标是 StarWork 工作台；非 StarWork 目标转 `starworkInit`，不要运行 `multiagent init` 做局部初始化。
+1. 先按“前置边界”确认目标是 StarWork 工作台，并确认宿主入口不是 `pending_merge`；非 StarWork 目标或 `pending_merge` 目标都转 `starworkInit`，不要运行 `multiagent init` 做局部初始化。
 2. 读取 `agent-lanes.md` 和 `state.json`，判断哪些 lane 已存在，哪些需要新增。
 3. 对缺失 lane 先 dry-run `multiagent add`，确认 `lane-id`、职责和写入范围；用户确认后执行 `--yes`。
 4. 对需要独立 session 的 lanes，执行：
@@ -206,10 +208,10 @@ starwork multiagent bind <lane> --session <agent:session-id> --session-name "<di
 推荐显示名称格式：
 
 ```text
-<项目或产品名> <职责> Agent
+<职责名> Agent
 ```
 
-例如 `StarWork CLI 维护 Agent`。是否能同步宿主标题由 CLI 返回；失败只作为 warning，不影响 StarWork binding。
+例如 `CLI 维护 Agent`、`产品规划 Agent`。不要默认加入项目名、目录名、thread id、UUID、日期、`lane`、`session` 等内部词。是否能同步宿主标题由 CLI 返回；失败只作为 warning，不影响 StarWork binding。
 
 如果用户要求置顶这个 lane，可加入：
 

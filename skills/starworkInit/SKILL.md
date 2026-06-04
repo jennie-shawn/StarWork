@@ -118,6 +118,7 @@ Step 7 采访额外固定区域和 Agent 规则
 - 中文项目可用简短拼音或用户给出的英文名；英文项目用小写单词和连字符，例如 `product-launch-plan`。
 - 如果用户改了文件夹名，后续 dry-run 和正式执行都必须使用用户确认后的路径，而不是 AI 最初建议的路径。
 - 目标目录如果已存在且非空，必须提示风险，不直接执行 `--yes`。
+- 已有非空项目必须把 AI 入口文档交给 Skill 整合：先运行 `starwork init ... --agent-docs draft --dry-run`，读取 `.starwork/drafts/agent-docs-plan.json` 和 proposed 草稿，再根据项目上下文整合 `AGENTS.md` / `README.md` / 宿主入口。
 - 用户没有确认最终路径时，只能讨论方案或执行 dry-run，不能正式写入。
 
 文件夹名建议示例：
@@ -201,7 +202,7 @@ Host Adapter 是初始化完成后的“让具体 AI 工具正确进入工作台
 初始化主体结构完成后，如果用户选择了宿主，先运行：
 
 ```bash
-starwork adapt <host> --target <path> --dry-run
+starwork adapt <host> --target <path> --agent-docs draft --dry-run
 ```
 
 用人话解释会补哪些入口：
@@ -214,9 +215,11 @@ starwork adapt <host> --target <path> --dry-run
 用户确认后再执行：
 
 ```bash
-starwork adapt <host> --target <path> --yes
+starwork adapt <host> --target <path> --agent-docs draft --yes
 starwork doctor --target <path> --host <host>
 ```
+
+如果 `doctor --host` 或 `.starwork/adapters.json` 显示 `rules_entry_status: pending_merge`，不要告诉用户宿主入口已经完成。读取 `.starwork/drafts/agent-docs-plan.json` 和对应 proposed 草稿，结合现有项目入口内容给出整合方案；用户确认后再由 Skill 写入最终入口，并重新运行 doctor 验证。
 
 完成后告诉用户三件事：
 
@@ -368,6 +371,15 @@ starwork init --type project --pack general --language <zh|en> --target <workspa
 starwork init --type project --pack general --language <zh|en> --target <workspace-path> --yes
 starwork doctor --target <workspace-path>
 ```
+
+已有非空项目不能把 `--yes` 当成最终 AI 入口文档确认。此时命令必须改成：
+
+```bash
+starwork init --type project --pack general --language <zh|en> --target <workspace-path> --agent-docs draft --dry-run
+starwork init --type project --pack general --language <zh|en> --target <workspace-path> --agent-docs draft --yes
+```
+
+执行后读取 `.starwork/drafts/agent-docs-plan.json`，保留用户已有入口规则，整合 StarWork read-first、写入边界、Skill 目录和 MultiAgent lane workflow，再经用户确认写入最终入口。不得把缺少 `--agent-docs draft` 的 `init --adapter codex --yes` 当成已有项目的完整接入方案。
 
 ## Init Blueprint 最小示例
 

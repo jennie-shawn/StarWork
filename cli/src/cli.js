@@ -139,6 +139,9 @@ const ADAPTER_ALIASES = {
 const ADAPTER_CAPABILITY_LEVELS = new Set(["supported", "partial", "manual", "unsupported", "unknown"]);
 const ADAPTER_STATE_SCHEMA = "starwork.adapters.state.v0.1";
 const ADAPTER_ENTRY_MARKER = "STARWORK:ADAPTER_ENTRY v0.1";
+const AGENT_DOCS_PLAN_SCHEMA = "starwork.agent_docs_plan.v0.1";
+const AGENT_DOCS_DRAFT_DIR = path.join(".starwork", "drafts");
+const LEGACY_AGENT_DOC_SIDECARS = ["AGENTS.starwork.md", "AGENTS.starwork-new.md", "README.starwork-new.md", "CLAUDE.starwork.md"];
 const MANUAL_HANDOFF_STATUS = "manual_handoff_required";
 
 const KIT_BUNDLED_SKILLS = {
@@ -290,6 +293,7 @@ async function init(argv) {
   const workspaceName = options.name || blueprint?.name || path.basename(targetDir);
   const formalSource = options.formalSource || blueprint?.paths?.formal_source || pack.overrides?.formal_source || getKitDefaultFormalSource(workspaceConfig.kit);
   const businessWorkArea = blueprint?.paths?.business_work_area || pack.overrides?.business_work_area || formalSource;
+  const agentDocsMode = normalizeAgentDocsMode(options.agentDocs);
 
   const plan = buildInitPlan({
     targetDir,
@@ -301,14 +305,29 @@ async function init(argv) {
     businessWorkArea,
     blueprint,
     includeSkills: !options.noSkills,
-    enableKnowledge: Boolean(options.knowledge)
+    enableKnowledge: Boolean(options.knowledge),
+    agentDocsMode
   });
 
-  printPlan(plan, options.dryRun);
   const adapterHosts = options.adapter ? resolveAdapterHosts(options.adapter) : [];
+  const dryRunAdapterPlan = adapterHosts.length
+    ? buildAdaptPlan({
+      workspaceRoot: targetDir,
+      state: plan.workspaceState,
+      hosts: adapterHosts,
+      agentDocsMode,
+      agentDocsEntriesSeed: plan.agentDocs?.entries || []
+    })
+    : null;
+
+  printPlan(plan, options.dryRun);
   if (adapterHosts.length && options.dryRun) {
     console.log("");
     console.log(`初始化完成后将继续适配 AI 工具：${adapterHosts.join(", ")}。`);
+    printGenericPlan("初始化后的 AI 工具适配预览（dry run）：", dryRunAdapterPlan.actions);
+    if (dryRunAdapterPlan.agentDocs?.status === "draft_required") {
+      console.log("AI 入口文档状态：pending_merge；需由 starworkInit 整合 .starwork/drafts/ 草稿后再生效。");
+    }
   }
 
   if (options.dryRun) {
@@ -328,7 +347,7 @@ async function init(argv) {
   applyPlan(plan);
   if (adapterHosts.length) {
     const createdState = readWorkspaceState(targetDir);
-    const adapterPlan = buildAdaptPlan({ workspaceRoot: targetDir, state: createdState, hosts: adapterHosts });
+    const adapterPlan = buildAdaptPlan({ workspaceRoot: targetDir, state: createdState, hosts: adapterHosts, agentDocsMode });
     applyPlan(adapterPlan);
   }
   console.log("");
@@ -341,7 +360,11 @@ async function init(argv) {
     console.log("3. 需要创建项目时，先用 starworkSpawn 设计，或直接运行 starwork spawn。");
     console.log("4. 创建项目后，运行 starwork audit 巡检项目中心里的项目登记。");
   } else {
-    console.log("2. 打开 AGENTS.md，确认 AI 入口规则。");
+    if (hasAgentDocsDrafts(targetDir)) {
+      console.log("2. AI 入口文档需要 Skill 整合后再生效；请用 starworkInit 读取 .starwork/drafts/agent-docs-plan.json 和 proposed 草稿。");
+    } else {
+      console.log("2. 打开 AGENTS.md，确认 AI 入口规则。");
+    }
     if (adapterHosts.length) {
       console.log(`3. 已生成 ${adapterHosts.join(", ")} 适配入口；运行 starwork doctor --target ${plan.targetDir} --host ${adapterHosts.length === 1 ? adapterHosts[0] : "all"} 再检查一次。`);
     } else {
@@ -693,6 +716,8 @@ function parseArgs(argv) {
       options.check = true;
     } else if (arg === "--adapter") {
       options.adapter = readValue(argv, ++i, arg);
+    } else if (arg === "--agent-docs") {
+      options.agentDocs = readValue(argv, ++i, arg);
     } else if (arg === "--transcript") {
       options.transcript = readValue(argv, ++i, arg);
     } else if (arg === "--inventory-depth") {
@@ -800,14 +825,18 @@ async function adapt(argv) {
     throw new Error("当前工作台未通过 doctor 检查，请先修复阻塞问题。");
   }
 
-  const plan = buildAdaptPlan({ workspaceRoot, state, hosts });
+  const plan = buildAdaptPlan({ workspaceRoot, state, hosts, agentDocsMode: normalizeAgentDocsMode(options.agentDocs) });
   printGenericPlan(options.dryRun ? "适配预览（dry run）：" : "适配计划：", plan.actions);
 
   if (options.dryRun) return;
   await confirmOrThrow(options, "是否执行适配？");
   applyPlan(plan);
   console.log("");
-  console.log("StarWork Agent 适配已完成。");
+  if (plan.agentDocs?.status === "draft_required") {
+    console.log("StarWork Agent 适配草稿已生成，AI 入口文档需要 Skill 整合后再生效。");
+  } else {
+    console.log("StarWork Agent 适配已完成。");
+  }
   console.log(`下一步建议：运行 starwork doctor --host ${hosts.length === 1 ? hosts[0] : "all"} 再检查一次宿主适配。`);
 }
 
@@ -885,6 +914,7 @@ async function lanesInit(argv) {
     return;
   }
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  assertAgentDocsReadyForMultiagent(workspaceRoot);
   const lanes = parseLaneList(options.lanes || "").map((id) => ({
     lane: id,
     purpose: "待补充",
@@ -916,6 +946,7 @@ async function lanesAdd(argv) {
     throw new Error("multiagent add 需要 --write <path-globs>。");
   }
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  assertAgentDocsReadyForMultiagent(workspaceRoot);
   const registry = readLanesRegistry(workspaceRoot);
   const collaboration = getCollaborationPaths(readWorkspaceState(workspaceRoot));
   if (registry.lanes.some((lane) => lane.lane === laneId)) {
@@ -949,6 +980,7 @@ async function lanesBind(argv) {
   }
   const laneId = normalizeLaneId(options._?.[0], "lane");
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  assertAgentDocsReadyForMultiagent(workspaceRoot);
   const registry = readLanesRegistry(workspaceRoot);
   const lane = findLaneOrThrow(registry.lanes, laneId);
   const session = resolveLaneSession(options);
@@ -1381,6 +1413,7 @@ async function lanesLaunch(argv) {
     return;
   }
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  assertAgentDocsReadyForMultiagent(workspaceRoot);
   const state = readWorkspaceState(workspaceRoot);
   const collaboration = getCollaborationPaths(state);
   const registry = readLanesRegistry(workspaceRoot);
@@ -1696,6 +1729,7 @@ function collectDoctorResult(targetDir, options = {}) {
   checkUpgradeRoleMappings(result, workspaceRoot, state);
   checkSkillInstallations(result, workspaceRoot, state);
   checkAgentRuleReferences(result, workspaceRoot);
+  checkAgentDocsDraftState(result, workspaceRoot);
   checkHostAdapters(result, workspaceRoot, state, options);
   result.ok = result.summary.fail === 0;
   result.strict_ok = result.ok;
@@ -2295,23 +2329,35 @@ function friendlyCapabilityLevel(level) {
   return labels[level] || level;
 }
 
-function buildAdaptPlan({ workspaceRoot, state, hosts }) {
+function buildAdaptPlan({ workspaceRoot, state, hosts, agentDocsMode = "draft", agentDocsEntriesSeed = [] }) {
   const actions = [];
   const profiles = hosts.map(loadAdapterProfile);
   const installations = [];
+  const agentDocsEntries = [];
   for (const profile of profiles) {
     let rulesEntry = profile.rules.entry_file || null;
     let generatedEntries = [];
+    let rulesEntryStatus = profile.rules.entry_file ? "missing" : "not_applicable";
+    let draftEntry = null;
     if (profile.rules.entry_file) {
-      const entryAction = adapterEntryAction(workspaceRoot, profile.rules.entry_file, renderAdapterContent(profile, state));
-      actions.push(entryAction);
-      rulesEntry = normalizeRelativePath(entryAction.relativePath);
-      generatedEntries = [rulesEntry];
+      const entryPlan = adapterEntryPlan(workspaceRoot, profile, renderAdapterContent(profile, state), agentDocsMode);
+      actions.push(entryPlan.action);
+      rulesEntry = entryPlan.rulesEntry;
+      generatedEntries = entryPlan.generatedEntry ? [entryPlan.generatedEntry] : [];
+      rulesEntryStatus = entryPlan.rulesEntryStatus;
+      draftEntry = entryPlan.draftEntry;
+      if (entryPlan.agentDocsEntry) {
+        agentDocsEntries.push(entryPlan.agentDocsEntry);
+      }
     }
     for (const dir of profile.skills.project_mount_dirs) {
       actions.push(directoryAction(workspaceRoot, dir));
     }
-    installations.push({ profile, rulesEntry, generatedEntries });
+    installations.push({ profile, rulesEntry, generatedEntries, rulesEntryStatus, draftEntry });
+  }
+  const agentDocsPlanAction = buildAgentDocsPlanAction(workspaceRoot, "adapt", agentDocsEntries, agentDocsEntriesSeed);
+  if (agentDocsPlanAction) {
+    actions.push(agentDocsPlanAction);
   }
 
   const nextAdaptersState = mergeAdaptersState(readAdaptersState(workspaceRoot), installations);
@@ -2321,22 +2367,65 @@ function buildAdaptPlan({ workspaceRoot, state, hosts }) {
 
   return {
     targetDir: workspaceRoot,
-    actions: dedupeActions(actions)
+    actions: dedupeActions(actions),
+    agentDocs: agentDocsEntries.length || agentDocsEntriesSeed.length ? { status: "draft_required", entries: mergeAgentDocsEntries(agentDocsEntriesSeed, agentDocsEntries) } : null
   };
 }
 
-function adapterEntryAction(workspaceRoot, relativePath, content) {
+function adapterEntryPlan(workspaceRoot, profile, content, agentDocsMode = "draft") {
+  const relativePath = profile.rules.entry_file;
   const absolute = path.join(workspaceRoot, relativePath);
+  if (agentDocsMode === "skip") {
+    return {
+      action: { type: "file", mode: "skip", target: absolute, relativePath, content: "" },
+      rulesEntry: normalizeRelativePath(relativePath),
+      generatedEntry: null,
+      rulesEntryStatus: "missing",
+      draftEntry: null,
+      agentDocsEntry: null
+    };
+  }
   if (!fs.existsSync(absolute)) {
-    return overwriteFileAction(workspaceRoot, relativePath, content);
+    return {
+      action: overwriteFileAction(workspaceRoot, relativePath, content),
+      rulesEntry: normalizeRelativePath(relativePath),
+      generatedEntry: normalizeRelativePath(relativePath),
+      rulesEntryStatus: "active",
+      draftEntry: null,
+      agentDocsEntry: null
+    };
   }
   const existing = fs.readFileSync(absolute, "utf8");
   if (!existing.trim() || existing.includes(ADAPTER_ENTRY_MARKER)) {
-    return overwriteFileAction(workspaceRoot, relativePath, content);
+    return {
+      action: overwriteFileAction(workspaceRoot, relativePath, content),
+      rulesEntry: normalizeRelativePath(relativePath),
+      generatedEntry: normalizeRelativePath(relativePath),
+      rulesEntryStatus: "active",
+      draftEntry: null,
+      agentDocsEntry: null
+    };
   }
-  const parsed = path.parse(relativePath);
-  const sidecar = path.join(parsed.dir, `${parsed.name}.starwork${parsed.ext || ".md"}`);
-  return fileAction(workspaceRoot, sidecar, content);
+  if (agentDocsMode === "write") {
+    throw new Error(`${relativePath} 已有用户内容，--agent-docs write 不能覆盖；请改用 --agent-docs draft 并由 starworkInit 整合。`);
+  }
+  const draftEntry = adapterDraftPath(profile.host);
+  return {
+    action: upsertFileAction(workspaceRoot, draftEntry, content),
+    rulesEntry: normalizeRelativePath(relativePath),
+    generatedEntry: draftEntry,
+    rulesEntryStatus: "pending_merge",
+    draftEntry,
+    agentDocsEntry: buildAgentDocsEntry({
+      kind: "agent_rules",
+      host: profile.host,
+      targetPath: relativePath,
+      targetExists: true,
+      draftPath: draftEntry,
+      action: "merge_required",
+      reason: `Existing ${relativePath} must be preserved and semantically integrated.`
+    })
+  };
 }
 
 function readAdaptersState(workspaceRoot) {
@@ -2363,10 +2452,12 @@ function mergeAdaptersState(existingState, installations) {
     adapters: { ...(existingState.adapters || {}) }
   };
   for (const installation of installations) {
-    const { profile, rulesEntry, generatedEntries } = installation;
+    const { profile, rulesEntry, generatedEntries, rulesEntryStatus, draftEntry } = installation;
     next.adapters[profile.host] = {
-      enabled: true,
+      enabled: rulesEntryStatus === "active",
       rules_entry: rulesEntry,
+      rules_entry_status: rulesEntryStatus,
+      ...(draftEntry ? { draft_entry: draftEntry } : {}),
       profile_version: profile.version || "0.1",
       installed_by: `starwork adapt ${profile.host}`,
       installed_at: next.adapters[profile.host]?.installed_at || now,
@@ -2408,11 +2499,13 @@ function renderWorkspaceAdaptersSummary(state, installations) {
     : { ...(existing || {}) };
   const now = new Date().toISOString();
   for (const installation of installations) {
-    const { profile, rulesEntry } = installation;
+    const { profile, rulesEntry, rulesEntryStatus, draftEntry } = installation;
     summary[profile.host] = {
       installed_at: summary[profile.host]?.installed_at || now,
       updated_at: now,
       rules_entry: rulesEntry,
+      rules_entry_status: rulesEntryStatus,
+      ...(draftEntry ? { draft_entry: draftEntry } : {}),
       profile_version: profile.version || "0.1"
     };
   }
@@ -2430,6 +2523,107 @@ function renderAdapterContent(profile, state) {
     return `# StarWork Adapter for ${adapterName}\n\n<!-- ${ADAPTER_ENTRY_MARKER} host=${profile.host} -->\n\nThis workspace follows StarWork Core ${state.core || "0.1"}.\n\n## Read First\n\n1. AGENTS.md\n2. ${rolePaths.projectStatus}\n3. ${rolePaths.currentWork}\n4. .starwork/workspace.json\n5. .starwork/skills.json\n\n## Project Skill Directories\n\n${skillDirs}\n\n## Host Boundary\n\nTrae can discover project Skills, but .starwork/skills.json remains the StarWork Skill fact source. Trae does not support automatic StarWork background cross-session instruction delivery in v0.1; use manual handoff when needed.\n`;
   }
   return `# StarWork Adapter for ${adapterName}\n\n<!-- ${ADAPTER_ENTRY_MARKER} host=${profile.host} -->\n\nThis workspace follows StarWork Core ${state.core || "0.1"}.\n\n## Read First\n\n1. AGENTS.md\n2. ${rolePaths.projectStatus}\n3. ${rolePaths.currentWork}\n4. .starwork/workspace.json\n5. .starwork/skills.json\n\n## Project Skill Directories\n\n${skillDirs}\n\n## Rule\n\nAGENTS.md is the source of truth. This file is only an adapter entrypoint for ${adapterName}.\n\nDo not overwrite user content silently. When unsure, ask before changing identity, lessons, shared knowledge, formal outputs, or synced repository content.\n`;
+}
+
+function normalizeAgentDocsMode(value) {
+  const mode = value || "draft";
+  if (["draft", "skip", "write"].includes(mode)) return mode;
+  throw new Error(`--agent-docs 只支持 draft、skip、write：${value}`);
+}
+
+function isAgentEntryDoc(relativePath) {
+  const normalized = normalizeRelativePath(relativePath);
+  return ["AGENTS.md", "README.md", "CLAUDE.md"].includes(normalized);
+}
+
+function maybeAgentDocDraftAction(targetDir, relativePath, content, agentDocsMode) {
+  if (!isAgentEntryDoc(relativePath)) return null;
+  if (agentDocsMode === "skip") return { skip: true };
+  const targetPath = path.join(targetDir, relativePath);
+  if (!fs.existsSync(targetPath)) return null;
+  const existing = fs.readFileSync(targetPath, "utf8");
+  if (!existing.trim() || existing.includes(ADAPTER_ENTRY_MARKER) || existing.includes("STARWORK:")) return null;
+  if (agentDocsMode === "write") {
+    throw new Error(`${relativePath} 已有用户内容，--agent-docs write 不能覆盖；请改用 --agent-docs draft 并由 starworkInit 整合。`);
+  }
+  const draftPath = agentDocDraftPath(relativePath);
+  return {
+    action: upsertFileAction(targetDir, draftPath, content),
+    entry: buildAgentDocsEntry({
+      kind: relativePath === "README.md" ? "readme" : "agent_rules",
+      targetPath: relativePath,
+      targetExists: true,
+      draftPath,
+      action: "merge_required",
+      reason: `Existing ${relativePath} must be preserved and semantically integrated.`
+    })
+  };
+}
+
+function agentDocDraftPath(relativePath) {
+  const parsed = path.parse(relativePath);
+  return normalizeRelativePath(path.join(AGENT_DOCS_DRAFT_DIR, `${parsed.name}.proposed${parsed.ext || ".md"}`));
+}
+
+function adapterDraftPath(host) {
+  return normalizeRelativePath(path.join(AGENT_DOCS_DRAFT_DIR, `adapter.${host}.proposed.md`));
+}
+
+function buildAgentDocsEntry({ kind, host = null, targetPath, targetExists, draftPath, action, reason }) {
+  return {
+    kind,
+    ...(host ? { host } : {}),
+    target_path: normalizeRelativePath(targetPath),
+    target_exists: Boolean(targetExists),
+    draft_path: normalizeRelativePath(draftPath),
+    action,
+    reason,
+    required_topics: [
+      "StarWork read-first files",
+      "workspace write boundaries",
+      "project Skill directories",
+      "MultiAgent lane workflow"
+    ]
+  };
+}
+
+function buildAgentDocsPlanAction(workspaceRoot, context, entries, seedEntries = []) {
+  if (!entries.length && !seedEntries.length) return null;
+  const existing = readAgentDocsPlan(workspaceRoot);
+  const mergedEntries = mergeAgentDocsEntries(mergeAgentDocsEntries(existing.entries || [], seedEntries), entries);
+  const plan = {
+    schema: AGENT_DOCS_PLAN_SCHEMA,
+    generated_at: new Date().toISOString(),
+    target: workspaceRoot,
+    context,
+    status: "draft_required",
+    entries: mergedEntries
+  };
+  return upsertFileAction(workspaceRoot, path.join(AGENT_DOCS_DRAFT_DIR, "agent-docs-plan.json"), `${JSON.stringify(plan, null, 2)}\n`);
+}
+
+function readAgentDocsPlan(workspaceRoot) {
+  const planPath = path.join(workspaceRoot, AGENT_DOCS_DRAFT_DIR, "agent-docs-plan.json");
+  if (!fs.existsSync(planPath)) return { entries: [] };
+  try {
+    const plan = JSON.parse(fs.readFileSync(planPath, "utf8"));
+    return Array.isArray(plan.entries) ? plan : { entries: [] };
+  } catch {
+    return { entries: [] };
+  }
+}
+
+function mergeAgentDocsEntries(existingEntries, newEntries) {
+  const byKey = new Map();
+  for (const entry of [...existingEntries, ...newEntries]) {
+    if (!entry?.target_path || !entry?.draft_path) continue;
+    byKey.set(`${entry.host || ""}:${entry.target_path}:${entry.draft_path}`, entry);
+  }
+  return [...byKey.values()];
+}
+
+function hasAgentDocsDrafts(workspaceRoot) {
+  return fs.existsSync(path.join(workspaceRoot, AGENT_DOCS_DRAFT_DIR, "agent-docs-plan.json"));
 }
 
 function buildPackInstallPlan({ workspaceRoot, state, pack }) {
@@ -3336,6 +3530,18 @@ function checkAgentRuleReferences(result, workspaceRoot) {
   );
 }
 
+function checkAgentDocsDraftState(result, workspaceRoot) {
+  const planPath = path.join(AGENT_DOCS_DRAFT_DIR, "agent-docs-plan.json");
+  if (fs.existsSync(path.join(workspaceRoot, planPath))) {
+    addCheck(result, "agent_docs.plan.pending", "warn", "存在待整合的 AI 入口文档草稿；请用 starworkInit 读取 agent-docs-plan.json 后合并最终入口。", planPath);
+  }
+  for (const relativePath of LEGACY_AGENT_DOC_SIDECARS) {
+    if (fs.existsSync(path.join(workspaceRoot, relativePath))) {
+      addCheck(result, `agent_docs.legacy_sidecar.${slugifyCheckId(relativePath)}`, "warn", `检测到旧流程生成的入口旁路文件：${relativePath}。请由 starworkInit 整合后再保留或删除。`, relativePath);
+    }
+  }
+}
+
 function checkHostAdapters(result, workspaceRoot, state, options = {}) {
   if (!options.host) return;
   const hostOption = options.host === true ? "all" : options.host;
@@ -3361,9 +3567,20 @@ function checkHostAdapters(result, workspaceRoot, state, options = {}) {
       label: profile.label,
       enabled: Boolean(record?.enabled),
       rules_entry: record?.rules_entry || profile.rules.entry_file,
+      rules_entry_status: record?.rules_entry_status || (record?.enabled ? "active" : "missing"),
+      draft_entry: record?.draft_entry || null,
       skill_mount_dirs: profile.skills.project_mount_dirs
     };
     result.adapters.checked_hosts.push(hostReport);
+
+    if (record?.rules_entry_status === "pending_merge") {
+      addCheck(result, `adapter.${profile.host}.rules.pending_merge`, "warn", `${profile.label} 入口规则仍是 pending_merge；请先用 starworkInit 整合 AI 入口文档，再继续 MultiAgent 团队创建。`, record.draft_entry || record.rules_entry);
+      for (const dir of profile.skills.project_mount_dirs) {
+        const exists = fs.existsSync(path.join(workspaceRoot, dir));
+        addCheck(result, `adapter.${profile.host}.skills.mount_dir.${slugifyCheckId(dir)}`, exists ? "pass" : "warn", exists ? `${profile.label} Skill mount dir exists: ${dir}` : `${profile.label} 缺少项目 Skill 挂载目录：${dir}`, dir);
+      }
+      continue;
+    }
 
     if (!record?.enabled) {
       if (workspaceSummary && !adaptersFileExists) {
@@ -4667,7 +4884,7 @@ function ask(question) {
   });
 }
 
-function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfig, pack, formalSource, businessWorkArea, blueprint = null, includeSkills = true, enableKnowledge = false }) {
+function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfig, pack, formalSource, businessWorkArea, blueprint = null, includeSkills = true, enableKnowledge = false, agentDocsMode = "draft" }) {
   const kitDir = path.join(PRODUCT_ROOT, "core", "kits", workspaceConfig.kit);
   if (!fs.existsSync(kitDir)) {
     throw new Error(`找不到 Kit：${workspaceConfig.kit}`);
@@ -4695,6 +4912,7 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
   const packRuleSlots = renderPackRuleSlots(pack, variables, "场景规则");
   const blueprintRuleSlots = renderInitBlueprintRuleSlots(blueprint, variables);
   const hasKnowledgeRule = enableKnowledge && workspaceType !== "hub";
+  const agentDocsEntries = [];
 
   for (const source of walkFiles(kitDir)) {
     const sourceRelativePath = normalizeRelativePath(path.relative(kitDir, source));
@@ -4719,6 +4937,13 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
     if (relativePath === "AGENTS.md" && (packRuleSlots.length || blueprintRuleSlots.length || hasKnowledgeRule)) {
       content = ensureRulesIndexReference(content);
     }
+    const semanticAction = maybeAgentDocDraftAction(targetDir, relativePath, content, agentDocsMode);
+    if (semanticAction?.action) {
+      actions.push(semanticAction.action);
+      agentDocsEntries.push(semanticAction.entry);
+      continue;
+    }
+    if (semanticAction?.skip) continue;
     actions.push(fileAction(targetDir, relativePath, content));
   }
   actions.push(...buildRuleSlotActions(targetDir, packRuleSlots));
@@ -4823,6 +5048,8 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
   }
   actions.push(fileAction(targetDir, path.join(".starwork", "workspace.json"), `${JSON.stringify(workspaceState, null, 2)}\n`));
   actions.push(fileAction(targetDir, path.join(".starwork", "skills.json"), renderProjectSkillsManifest(mergeSkillRecords(kitSkillPlan.records, knowledgeSkillPlan.records))));
+  const agentDocsPlanAction = buildAgentDocsPlanAction(targetDir, "init", agentDocsEntries);
+  if (agentDocsPlanAction) actions.push(agentDocsPlanAction);
 
   const filteredActions = blueprint?.removals?.length
     ? actions.filter((action) => !matchesAnyRemovedPath(action.relativePath, blueprint.removals))
@@ -4840,6 +5067,8 @@ function buildInitPlan({ targetDir, workspaceName, workspaceType, workspaceConfi
     formalSource,
     businessWorkArea,
     knowledgeRoot: enableKnowledge && workspaceType !== "hub" ? getKnowledgeDefaultRoot(pack.language || "zh") : null,
+    agentDocs: agentDocsEntries.length ? { status: "draft_required", entries: agentDocsEntries } : null,
+    workspaceState,
     targetExists: fs.existsSync(targetDir),
     skills: mergeSkillRecords(kitSkillPlan.records, knowledgeSkillPlan.records),
     actions: dedupeActions(filteredActions)
@@ -7163,6 +7392,16 @@ function buildManualHostLaunchResult({ lane, host, sessionName, dryRun, message 
   };
 }
 
+function assertAgentDocsReadyForMultiagent(workspaceRoot) {
+  const adaptersState = readAdaptersState(workspaceRoot);
+  const pendingHosts = Object.entries(adaptersState.adapters || {})
+    .filter(([, record]) => record?.rules_entry_status === "pending_merge")
+    .map(([host, record]) => `${host}${record.draft_entry ? ` (${record.draft_entry})` : ""}`);
+  if (pendingHosts.length) {
+    throw new Error(`AI 入口文档仍处于 pending_merge：${pendingHosts.join("、")}。请先使用 starworkInit 整合入口文档，再继续 multiagent init/add/bind/launch。`);
+  }
+}
+
 function normalizeLaneId(value, label) {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`${label} 必须是非空 lane ID。`);
@@ -8693,6 +8932,11 @@ function overwriteFileAction(targetDir, relativePath, content) {
   return { type: "file", mode: "overwrite", target, relativePath, content };
 }
 
+function upsertFileAction(targetDir, relativePath, content) {
+  const target = path.join(targetDir, relativePath);
+  return { type: "file", mode: fs.existsSync(target) ? "overwrite" : "create", target, relativePath, content };
+}
+
 function directoryAction(targetDir, relativePath) {
   const target = path.join(targetDir, relativePath);
   return { type: "directory", mode: fs.existsSync(target) ? "exists" : "create", target, relativePath };
@@ -9068,6 +9312,8 @@ Options:
       初始化时同时开启项目知识库。默认不开启。
   --adapter <codex|claude-code|cursor|trae|all>
       初始化完成后继续生成对应 AI 工具适配入口。
+  --agent-docs <draft|skip|write>
+      AI 入口文档策略。已有非空入口默认写入 .starwork/drafts 草稿，等待 starworkInit 整合。
   --target <path>
   --dry-run
   --no-skills
@@ -9241,6 +9487,7 @@ Options:
   --target <path>
   --capabilities
   --check
+  --agent-docs <draft|skip|write>
   --dry-run
   --json
   --yes, -y
