@@ -75,7 +75,21 @@ https://raw.githubusercontent.com/jennie-shawn/StarWork/main/docs/agent-install-
 
 ## 快速开始
 
-创建一个项目工作台：
+StarWork 会把一个目录整理成 AI 协作工作台，让 AI 能找到项目说明、当前任务、协作规则和交接记录。第一次使用建议先预览，不直接写入。
+
+预览一个项目工作台：
+
+```bash
+starwork init \
+  --type project \
+  --pack general \
+  --language zh \
+  --name "StarWork A Test" \
+  --target ~/Desktop/starwork-a-test \
+  --dry-run
+```
+
+确认预览没问题后再写入：
 
 ```bash
 starwork init \

@@ -183,9 +183,48 @@ test("starworkMultiagent skill uses Codex standard session tools directly", () =
 test("starworkInit skill keeps existing projects in agent-docs draft mode", () => {
   const skill = fs.readFileSync(path.join(root, "skills", "starworkInit", "SKILL.md"), "utf8");
 
+  assert.match(skill, /StarWork 是给 AI 协作准备的项目工作台/);
+  assert.match(skill, /确认这个工作台服务哪个项目/);
+  assert.match(skill, /预览 StarWork 准备补哪些协作文件/);
+  assert.match(skill, /不会直接改你的业务代码/);
   assert.match(skill, /--agent-docs draft/);
   assert.match(skill, /已有非空项目/);
+  assert.match(skill, /每次只问一个问题/);
   assert.doesNotMatch(skill, /starwork init --type project --pack general --language zh --adapter codex --target <path> --yes/);
+});
+
+test("init-family skills start with user-facing capability framing", () => {
+  const knowledge = fs.readFileSync(path.join(root, "skills", "starworkKnowledge", "SKILL.md"), "utf8");
+  const multiagent = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "SKILL.md"), "utf8");
+  const doctor = fs.readFileSync(path.join(root, "skills", "starworkDoctor", "SKILL.md"), "utf8");
+  const spawn = fs.readFileSync(path.join(root, "kit-skills", "starworkSpawn", "SKILL.md"), "utf8");
+  const spawnFirstScreen = spawn.split("第一屏之后")[0];
+
+  assert.match(knowledge, /项目知识库是让 AI 长期记住项目稳定理解的地方/);
+  assert.match(knowledge, /不是原始资料文件夹/);
+  assert.match(knowledge, /先检查当前项目是否已经有知识库/);
+  assert.match(multiagent, /多 Agent 分工是把一个项目里的不同 AI 会话按职责分开协作/);
+  assert.match(multiagent, /先设计职责/);
+  assert.match(multiagent, /再创建或绑定会话/);
+  assert.match(doctor, /诊断是先看清当前目录的事实/);
+  assert.match(doctor, /升级是无损补齐 StarWork 工作台规则/);
+  assert.match(doctor, /不会移动、删除或覆盖你的历史文件/);
+  assert.match(spawnFirstScreen, /从项目中心创建项目工作台，是把一个新项目登记到项目中心/);
+  assert.match(spawnFirstScreen, /项目中心负责登记多个项目/);
+  assert.match(spawnFirstScreen, /新项目工作台负责具体项目的日常协作/);
+  assert.match(spawnFirstScreen, /先确认新项目是什么、要交付什么/);
+  assert.match(spawnFirstScreen, /先预览，不会在你确认前创建项目工作台/);
+  assert.doesNotMatch(spawnFirstScreen, /Spawn Blueprint 是一个小型配置包/);
+});
+
+test("init help explains preview and safe agent docs language", () => {
+  const result = runCommand(["init", "--help"]);
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /starwork init 会把一个目录整理成 StarWork 工作台，让 AI 能找到项目说明、当前任务、协作规则和交接记录。/);
+  assert.match(result.stdout, /--dry-run[\s\S]*预览将要写入的文件，不做真实改动。/);
+  assert.match(result.stdout, /--yes[\s\S]*确认执行，会真实写入 StarWork 工作台文件。/);
+  assert.match(result.stdout, /--agent-docs <draft\|skip\|write>[\s\S]*已有 AI 规则文件时，先生成待整合草稿，不覆盖原文件。/);
 });
 
 test("dry-run does not write files", () => {
@@ -193,11 +232,89 @@ test("dry-run does not write files", () => {
   const output = runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--dry-run"]);
 
   assert.match(output, /创建工作台预览/);
+  assert.match(output, /这是预览，不会写入文件。/);
   assert.match(output, new RegExp(`目标目录：${dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
   assert.match(output, /是否新建目录：否，目标目录已存在/);
   assert.match(output, /日常工作会放在：输出\/草稿\//);
+  assert.match(output, /会创建：/);
+  assert.match(output, /会更新：/);
+  assert.match(output, /不会改动：/);
+  assert.match(output, /你的业务代码/);
+  assert.match(output, /已有非空 AI 规则文件/);
+  assert.match(output, /需要你确认：/);
+  assert.match(output, /目标路径是否正确/);
+  assert.match(output, /是否接受这些 StarWork 协作文件/);
   assert.equal(fs.existsSync(path.join(dir, "AGENTS.md")), false);
   assert.equal(fs.existsSync(path.join(dir, ".starwork", "workspace.json")), false);
+});
+
+test("init dry-run explains existing project draft safety", () => {
+  const dir = tempDir();
+  fs.writeFileSync(path.join(dir, "README.md"), "# Existing\n", "utf8");
+  fs.writeFileSync(path.join(dir, "AGENTS.md"), "# Existing Agent Rules\n", "utf8");
+
+  const output = runInit(["--type", "project", "--pack", "general", "--target", dir, "--agent-docs", "draft", "--dry-run"]);
+
+  assert.match(output, /检测到这是已有项目。/);
+  assert.match(output, /StarWork 会保留现有文件/);
+  assert.match(output, /先生成待整合草稿/);
+  assert.match(output, /不直接覆盖已有 AI 规则文件/);
+  assert.match(output, /\.starwork\/drafts\/README\.proposed\.md/);
+  assert.match(output, /\.starwork\/drafts\/AGENTS\.proposed\.md/);
+  assert.equal(fs.existsSync(path.join(dir, ".starwork")), false);
+});
+
+test("init json dry-run includes user summary for skills", () => {
+  const dir = tempDir();
+  fs.writeFileSync(path.join(dir, "README.md"), "# Existing\n", "utf8");
+  const result = runCommand(["init", "--type", "project", "--pack", "general", "--target", dir, "--agent-docs", "draft", "--dry-run", "--json"]);
+
+  assert.equal(result.status, 0);
+  const payload = JSON.parse(result.stdout);
+  assert.equal(payload.schema, "starwork.init.plan_result.v0.1");
+  assert.equal(payload.user_summary.product_purpose, "把项目整理成 AI 协作工作台");
+  assert.equal(payload.user_summary.mode, "preview_no_write");
+  assert.equal(payload.user_summary.target_kind, "existing_project");
+  assert.ok(payload.user_summary.will_create.includes(".starwork/workspace.json"));
+  assert.ok(payload.user_summary.will_not_touch.includes("你的业务代码"));
+  assert.ok(payload.user_summary.needs_confirmation.includes("目标路径是否正确"));
+});
+
+test("init dry-run groups rule slot writes by actual target existence", () => {
+  const dir = tempDir();
+  const rulePath = ".starwork/rules/pack.general.overview.md";
+  const manifestPath = ".starwork/rules/manifest.json";
+  const indexPath = ".starwork/rules/index.md";
+
+  const output = runInit(["--type", "project", "--pack", "general", "--target", dir, "--dry-run"]);
+  const createSection = output.match(/会创建：\n([\s\S]*?)\n\n会更新：/)?.[1] || "";
+  const updateSection = output.match(/会更新：\n([\s\S]*?)\n\n不会改动：/)?.[1] || "";
+
+  assert.match(createSection, new RegExp(rulePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(createSection, new RegExp(manifestPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(createSection, new RegExp(indexPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.doesNotMatch(updateSection, new RegExp(rulePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.equal(fs.existsSync(path.join(dir, rulePath)), false);
+});
+
+test("init json user summary groups planned overwrites by actual target existence", () => {
+  const dir = tempDir();
+  const rulePath = ".starwork/rules/pack.general.overview.md";
+  const newResult = runCommand(["init", "--type", "project", "--pack", "general", "--target", dir, "--dry-run", "--json"]);
+
+  assert.equal(newResult.status, 0);
+  const newPayload = JSON.parse(newResult.stdout);
+  assert.ok(newPayload.user_summary.will_create.includes(rulePath));
+  assert.equal(newPayload.user_summary.will_update.includes(rulePath), false);
+
+  fs.mkdirSync(path.join(dir, ".starwork", "rules"), { recursive: true });
+  fs.writeFileSync(path.join(dir, rulePath), "# Existing rule\n", "utf8");
+
+  const existingResult = runCommand(["init", "--type", "project", "--pack", "general", "--target", dir, "--dry-run", "--json"]);
+  assert.equal(existingResult.status, 0);
+  const existingPayload = JSON.parse(existingResult.stdout);
+  assert.ok(existingPayload.user_summary.will_update.includes(rulePath));
+  assert.equal(existingPayload.user_summary.will_create.includes(rulePath), false);
 });
 
 test("init dry-run shows absolute target for a new folder", () => {
@@ -238,7 +355,7 @@ test("init rejects unsupported language", () => {
 
 test("creates a single-light workspace with general pack", () => {
   const dir = tempDir();
-  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  const output = runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
 
   const state = readJson(path.join(dir, ".starwork", "workspace.json"));
   const skills = readJson(path.join(dir, ".starwork", "skills.json"));
@@ -247,6 +364,9 @@ test("creates a single-light workspace with general pack", () => {
   const lessons = fs.readFileSync(path.join(dir, "_系统", "教训", "README.md"), "utf8");
   const projectStatus = fs.readFileSync(path.join(dir, "_系统", "上下文", "当前项目.md"), "utf8");
   const currentWork = fs.readFileSync(path.join(dir, "_系统", "任务", "当前工作.md"), "utf8");
+  assert.match(output, /StarWork 工作台已经创建好了。/);
+  assert.match(output, /这次写入的是项目协作文件，不是业务代码。/);
+  assert.match(output, /下一步你可以用 Codex \/ Claude Code \/ Cursor 打开这个目录/);
   assert.equal(state.workspace_type, "project");
   assert.equal(state.kit, "project");
   assert.equal(state.packs[0].id, "general");

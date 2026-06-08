@@ -321,6 +321,11 @@ async function init(argv) {
     })
     : null;
 
+  if (options.json && options.dryRun) {
+    console.log(JSON.stringify(renderInitPlanJson(plan, true), null, 2));
+    return;
+  }
+
   printPlan(plan, options.dryRun);
   if (adapterHosts.length && options.dryRun) {
     console.log("");
@@ -352,7 +357,10 @@ async function init(argv) {
     applyPlan(adapterPlan);
   }
   console.log("");
-  console.log("StarWork 工作台已创建。");
+  console.log("StarWork 工作台已经创建好了。");
+  console.log("");
+  console.log("这次写入的是项目协作文件，不是业务代码。");
+  console.log("健康检查可以确认 AI 后续能找到项目说明、当前任务和协作规则。");
   console.log("");
   console.log("下一步建议：");
   console.log(`1. 运行 starwork doctor --target ${plan.targetDir}`);
@@ -362,14 +370,15 @@ async function init(argv) {
     console.log("4. 创建项目后，运行 starwork audit 巡检项目中心里的项目登记。");
   } else {
     if (hasAgentDocsDrafts(targetDir)) {
-      console.log("2. AI 入口文档需要 Skill 整合后再生效；请用 starworkInit 读取 .starwork/drafts/agent-docs-plan.json 和 proposed 草稿。");
+      console.log("2. 还有一步没有自动完成：你的项目已经有 AI 规则文件，所以 StarWork 只生成了待整合草稿，没有直接覆盖原文件。");
+      console.log("3. AI 入口文档需要 Skill 整合后再生效；请用 starworkInit 读取 .starwork/drafts/agent-docs-plan.json 和 proposed 草稿，确认后再合并最终入口。");
     } else {
       console.log("2. 打开 AGENTS.md，确认 AI 入口规则。");
     }
     if (adapterHosts.length) {
-      console.log(`3. 已生成 ${adapterHosts.join(", ")} 适配入口；运行 starwork doctor --target ${plan.targetDir} --host ${adapterHosts.length === 1 ? adapterHosts[0] : "all"} 再检查一次。`);
+      console.log(`4. 已生成 ${adapterHosts.join(", ")} 适配入口；运行 starwork doctor --target ${plan.targetDir} --host ${adapterHosts.length === 1 ? adapterHosts[0] : "all"} 再检查一次。`);
     } else {
-      console.log("3. 如需生成特定 AI 工具适配文件，运行 starwork adapt。");
+      console.log("3. 下一步你可以用 Codex / Claude Code / Cursor 打开这个目录，让 AI 先读项目规则。");
     }
   }
 }
@@ -4963,10 +4972,17 @@ async function choosePack(workspaceType, workspaceConfig, options) {
 function printInitIntro(options, targetDir) {
   if (options.yes || !process.stdin.isTTY) return;
   console.log("");
-  console.log("StarWork 初始化向导");
+  console.log("可以，我先简单说清楚 StarWork 在做什么。");
+  console.log("");
+  console.log("StarWork 是给 AI 协作准备的项目工作台。它会把项目说明、当前任务、协作规则、交接记录和健康检查入口放到固定位置，让 AI 每次进入项目时不用从零猜上下文。");
+  console.log("");
+  console.log("这次我会带你做三件事：");
+  console.log("1. 确认这个工作台服务哪个项目；");
+  console.log("2. 预览 StarWork 准备补哪些协作文件；");
+  console.log("3. 你确认后再正式写入，并做一次检查。");
   console.log("");
   console.log(`目标目录：${targetDir}`);
-  console.log("我会先确认工作台类型、语言和 Pack，然后给出写入预览。");
+  console.log("我会先预览，不会直接改你的业务代码，也不会直接覆盖已有 AI 规则文件。");
 }
 
 async function chooseLanguage(options) {
@@ -9266,12 +9282,16 @@ function printGenericPlan(title, actions) {
 }
 
 function printPlan(plan, dryRun) {
-  const creates = plan.actions.filter((action) => action.mode === "create");
-  const emptyUpdates = plan.actions.filter((action) => action.mode === "overwrite-empty");
+  const creates = plan.actions.filter(actionCreatesFromUserView);
+  const updates = plan.actions.filter(actionUpdatesFromUserView);
   const createNew = plan.actions.filter((action) => action.mode === "create-new");
+  const isExistingProject = isExistingProjectTarget(plan);
 
   console.log("");
   console.log(dryRun ? "创建工作台预览：" : "创建工作台计划：");
+  if (dryRun) {
+    console.log("这是预览，不会写入文件。");
+  }
   console.log("");
   console.log(`工作台名称：${plan.workspaceName}`);
   console.log(`工作台类型：${plan.workspaceLabel}`);
@@ -9289,23 +9309,107 @@ function printPlan(plan, dryRun) {
     console.log(`会带上的 AI 使用说明：${plan.skills.map((skill) => skill.id).join("、")}`);
   }
   console.log("");
+  if (isExistingProject) {
+    console.log("检测到这是已有项目。");
+    console.log("StarWork 会保留现有文件，先生成待整合草稿，不直接覆盖已有 AI 规则文件。");
+    console.log("");
+  }
 
+  console.log("会创建：");
   if (creates.length) {
-    console.log("会创建这些文件或文件夹：");
-    creates.slice(0, 40).forEach((action) => console.log(`- ${action.relativePath}`));
-    if (creates.length > 40) console.log(`- ... 另有 ${creates.length - 40} 项`);
-    console.log("");
+    creates.forEach((action) => console.log(`- ${action.relativePath}`));
+  } else {
+    console.log("- 无");
   }
-  if (emptyUpdates.length) {
-    console.log("会补充这些空文件：");
-    emptyUpdates.forEach((action) => console.log(`- ${action.relativePath}`));
-    console.log("");
+  console.log("");
+
+  console.log("会更新：");
+  if (updates.length) {
+    updates.forEach((action) => console.log(`- ${action.relativePath}`));
+  } else {
+    console.log("- 无");
   }
+  console.log("");
+
+  console.log("不会改动：");
+  console.log("- 你的业务代码");
+  console.log("- 已有非空 AI 规则文件");
   if (createNew.length) {
-    console.log("发现已有同名文件，不会覆盖，会另存为：");
+    console.log("- 已有同名文件会保留，StarWork 会另存旁路文件");
     createNew.forEach((action) => console.log(`- ${path.relative(plan.targetDir, action.originalTarget)} -> ${action.relativePath}`));
-    console.log("");
   }
+  console.log("");
+
+  console.log("需要你确认：");
+  console.log("- 目标路径是否正确");
+  console.log("- 是否接受这些 StarWork 协作文件");
+  console.log("");
+}
+
+function renderInitPlanJson(plan, dryRun) {
+  return {
+    schema: "starwork.init.plan_result.v0.1",
+    target: plan.targetDir,
+    dry_run: Boolean(dryRun),
+    ok: true,
+    workspace_type: plan.workspaceType,
+    kit: plan.kit,
+    language: plan.language,
+    pack: plan.pack?.id || null,
+    actions: plan.actions.map((action) => ({
+      type: action.type,
+      mode: action.mode,
+      path: action.relativePath,
+      status: action.mode === "exists" ? "exists" : "planned"
+    })),
+    user_summary: buildInitUserSummary(plan, dryRun)
+  };
+}
+
+function buildInitUserSummary(plan, dryRun) {
+  const willCreate = plan.actions
+    .filter(actionCreatesFromUserView)
+    .map((action) => action.relativePath);
+  const willUpdate = plan.actions
+    .filter(actionUpdatesFromUserView)
+    .map((action) => action.relativePath);
+  return {
+    product_purpose: "把项目整理成 AI 协作工作台",
+    mode: dryRun ? "preview_no_write" : "write_after_confirmation",
+    target_kind: isExistingProjectTarget(plan) ? "existing_project" : "new_workspace",
+    will_create: willCreate,
+    will_update: willUpdate,
+    will_not_touch: [
+      "你的业务代码",
+      "已有非空 AI 规则文件"
+    ],
+    needs_confirmation: [
+      "目标路径是否正确",
+      "是否接受这些 StarWork 协作文件"
+    ]
+  };
+}
+
+function actionCreatesFromUserView(action) {
+  if (!action || action.mode === "exists" || action.mode === "skip") return false;
+  if (action.type === "directory") return action.mode === "create";
+  if (action.type === "symlink") return action.mode === "create" && !fs.existsSync(action.target);
+  if (action.type !== "file") return false;
+  if (action.mode === "create" || action.mode === "create-new") return true;
+  if (action.mode === "overwrite" || action.mode === "overwrite-empty") return !fs.existsSync(action.target);
+  return false;
+}
+
+function actionUpdatesFromUserView(action) {
+  if (!action || action.type !== "file") return false;
+  if (action.mode !== "overwrite" && action.mode !== "overwrite-empty") return false;
+  return fs.existsSync(action.target);
+}
+
+function isExistingProjectTarget(plan) {
+  if (!plan.targetExists || !fs.existsSync(plan.targetDir)) return false;
+  const entries = fs.readdirSync(plan.targetDir).filter((entry) => entry !== ".DS_Store");
+  return entries.length > 0;
 }
 
 function printSpawnPlan(plan, dryRun) {
@@ -9541,12 +9645,13 @@ function printInitHelp() {
 Usage:
   starwork init [options]
 
-创建一个 StarWork 工作台。v0.1 中，项目工作台默认加入通用工作能力；
-项目中心会自动加入项目中心管理能力。
+starwork init 会把一个目录整理成 StarWork 工作台，让 AI 能找到项目说明、当前任务、协作规则和交接记录。
+
+项目工作台默认加入通用工作能力；项目中心会自动加入项目中心管理能力。
 
 Options:
   --type <project|hub>
-      project 创建项目工作台；hub 创建项目中心
+      project 创建项目工作台；hub 创建项目中心。
   --pack <general|content-creator|hub-management|path>
   --language <zh|en>
   --name <name>
@@ -9557,11 +9662,13 @@ Options:
   --adapter <codex|claude-code|cursor|trae|all>
       初始化完成后继续生成对应 AI 工具适配入口。
   --agent-docs <draft|skip|write>
-      AI 入口文档策略。已有非空入口默认写入 .starwork/drafts 草稿，等待 starworkInit 整合。
+      已有 AI 规则文件时，先生成待整合草稿，不覆盖原文件。
   --target <path>
   --dry-run
+      预览将要写入的文件，不做真实改动。
   --no-skills
   --yes, -y
+      确认执行，会真实写入 StarWork 工作台文件。
 
 示例：
   starwork init --type project --pack general --language zh --target ./my-workspace --yes

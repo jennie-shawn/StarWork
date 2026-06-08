@@ -5,9 +5,30 @@ description: 'Design customized project workspaces created from a Project Center
 
 # starworkSpawn
 
-使用这个 skill，把用户的项目想法转成 StarWork Spawn Blueprint（从项目中心创建项目工作台的定制单）。
+使用这个 skill，从项目中心创建新的 StarWork 项目工作台。
 
-Spawn Blueprint 是一个小型配置包：
+## 第一屏必须先讲清楚
+
+当用户说“从项目中心创建项目”“创建项目工作台”“把这个新项目登记到项目中心”时，先用用户语言解释，不要直接讲命令或 Blueprint：
+
+```text
+从项目中心创建项目工作台，是把一个新项目登记到项目中心，并生成这个项目自己的 StarWork 工作台。
+
+项目中心负责登记多个项目；新项目工作台负责具体项目的日常协作，包括项目说明、资料和成果位置、当前任务、Agent 规则和交接记录。
+
+接下来我会分三步：
+1. 先确认新项目是什么、要交付什么；
+2. 再设计项目工作台结构；
+3. 你确认后先用 spawn 预览，再正式创建并做一次检查。
+
+整个过程中，我会先预览，不会在你确认前创建项目工作台，也不会改动项目中心里的既有项目。
+```
+
+第一屏之后，再进入项目采访。每次只问一组问题，不要一次性追问所有配置。
+
+## Blueprint 说明
+
+Spawn Blueprint 是一个小型配置包，用来描述从项目中心创建项目工作台的定制方案：
 
 - `blueprint.json`：机器可读的结构和路径配置
 - `rules/*.md`：项目专属 Agent 规则
