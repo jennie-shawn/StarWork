@@ -1,29 +1,30 @@
-# StarWork Agent 安装执行指南
+# StarWork Agent 安装指南
 
 本文件面向正在帮助用户安装 StarWork 的 AI Agent。
 
-你的任务是帮助用户完成 StarWork CLI 和 StarWork Skills 的安装、更新与基础验证。不要默认创建工作区；只有用户明确表示需要初始化或测试工作区时，才进入 `starworkInit` 流程。
+你的任务只有一个：把 StarWork CLI 和 StarWork Skills 安装好，并确认它们可用。不要在安装阶段创建工作区，不要替用户初始化项目，也不要做额外测试目录。
 
-## 执行目标
+## 你需要完成什么
 
-1. 检查用户环境是否可以安装 StarWork。
-2. 安装或更新 StarWork CLI：`@jennie-shawn/starwork`。
-3. 安装或更新 StarWork Skills。
-4. 验证 CLI 和 Skills 是否可用。
-5. 询问用户是否需要继续创建或测试 StarWork 工作区。
+1. 确认用户机器可以运行 Node.js 和 npm。
+2. 安装或更新 StarWork CLI。
+3. 安装或更新 StarWork 系统 Skills。
+4. 验证 CLI 和 Skills 已经可用。
+5. 向用户汇报安装结果。
 
-## 安全边界
+## 不要做什么
 
-- 不要覆盖用户已有项目文件。
-- 不要在真实项目目录里做试验。
-- 不要默认创建 `/tmp` 测试工作区。
 - 不要默认执行 `starwork init`。
-- 如果发现已有 `starwork` 命令，先判断来源，再决定是否升级。
-- 如果用户需要创建工作区，必须转入 `starworkInit` skill 的采访流程。
+- 不要默认创建测试工作区。
+- 不要改动用户项目文件。
+- 不要逐个安装单个 Skill。
+- 不要把项目中心或项目内附带的 Skills 当成全局 Skills 安装。
 
-## Step 1：检查环境
+安装任务到这里结束。后续创建或接入项目不属于本指南。
 
-先运行：
+## Step 1：检查基础环境
+
+运行：
 
 ```bash
 node --version
@@ -32,29 +33,9 @@ npm --version
 
 如果 Node.js 或 npm 不可用，停止安装，并告诉用户需要先安装 Node.js。
 
-## Step 2：检查现有 CLI
+## Step 2：安装或更新 CLI
 
 运行：
-
-```bash
-which starwork
-starwork --version
-starwork --help
-```
-
-如果 `starwork` 不存在，可以继续安装。
-
-如果 `starwork` 已存在，继续检查它是否来自 npm 包 `@jennie-shawn/starwork`：
-
-```bash
-npm ls -g --depth=0 | grep starwork
-```
-
-如果它不是 `@jennie-shawn/starwork`，先向用户说明冲突来源，不要直接覆盖。
-
-## Step 3：安装或更新 CLI
-
-安装或更新：
 
 ```bash
 npm install -g @jennie-shawn/starwork@latest
@@ -65,72 +46,63 @@ npm install -g @jennie-shawn/starwork@latest
 ```bash
 starwork --version
 starwork --help
-npx @jennie-shawn/starwork@latest --version
 ```
 
-## Step 4：安装或更新 Skills
+如果用户不想全局安装 CLI，可以只验证临时运行方式：
 
-给 Codex 安装 StarWork Skills：
+```bash
+npx @jennie-shawn/starwork@latest --version
+npx @jennie-shawn/starwork@latest --help
+```
+
+## Step 3：安装或更新 Skills
+
+给 Codex 安装 StarWork 系统 Skills：
 
 ```bash
 npx skills add jennie-shawn/StarWork -g -a codex -y
 ```
 
-如果用户使用的不是 Codex，把 `-a codex` 换成对应 Agent 名称。不要逐个安装单个 Skill。
+如果用户使用的不是 Codex，把 `-a codex` 换成对应 Agent 名称。
 
-验证：
+验证本机已安装的全局 Skills：
 
 ```bash
-npx skills add jennie-shawn/StarWork -l
 npx skills ls -g -a codex --json
 ```
 
-第一条命令用于查看仓库里会被安装的 Skills，应该只显示这些系统级 Skills：
+确认能看到 StarWork 系统 Skills：
 
 - `starworkInit`
 - `starworkDoctor`
 - `starworkMultiagent`
 - `starworkKnowledge`
 
-第二条命令用于查看本机已安装的全局 Skills，确认上面这些已经出现在 Codex 的全局列表里。
+## 完成后怎么汇报
 
-确认不应该把 Kit 随附 Skills 安装到全局，例如 `starworkSpawn`、`starworkAudit` 和 `neat-freak`。它们应由 `starwork init` 按工作区类型写入具体工作台。
-
-也不要把能力开启后才需要的项目内业务 Skill 安装到全局，例如 `starworkKnowledgeProject`。它只应在项目执行 `starwork knowledge init` 后进入当前项目。
-
-## Step 5：询问是否继续初始化
-
-安装和验证完成后，先向用户汇报结果，然后询问：
+安装完成后，用用户容易理解的话简短汇报：
 
 ```text
-StarWork CLI 和 Skills 已安装完成。你是否需要我继续帮你创建或测试一个 StarWork 工作区？
+StarWork 已经装好了。
+
+我已经确认两件事：
+1. StarWork 命令可以正常运行。
+2. 当前 AI 工具已经安装好 StarWork Skills。
+
+现在你可以让 AI 帮你使用 StarWork 了。
 ```
 
-如果用户回答“不需要”，停止。
+如果安装失败，不要把完整报错直接甩给用户。先用一句话说明卡在哪里，再给一个明确的下一步建议：
 
-如果用户回答“需要”，进入 `starworkInit` skill 流程，由 `starworkInit` 采访用户并决定：
+```text
+这次还没有安装成功，卡在 Node.js / npm 环境检查。
 
-- 创建项目工作台，还是项目中心。
-- 使用中文还是英文。
-- 使用哪个目标路径。
-- 是否只是 dry-run 预览。
-- 如果需要定制目录，先生成 init blueprint，再运行 `starwork init --blueprint --dry-run`，确认后执行 `--yes` 并运行 `starwork doctor`。
+你需要先安装 Node.js，然后我再继续帮你安装 StarWork。
+```
 
-不要绕过 `starworkInit` 直接硬编码执行 `starwork init`。
+只在用户需要排查时，再补充关键错误信息。不要自动改动用户项目。
 
-## 完成汇报
-
-安装阶段完成后，向用户汇报：
-
-- StarWork CLI 版本。
-- `starwork --help` 是否可用。
-- Skills 安装结果。
-- 是否发现旧版本或命令冲突。
-- 是否已经询问用户继续初始化工作区。
-
-如果有失败，贴出关键错误信息和建议处理方式。
-
-## 常见情况
+## 常见问题
 
 ### 已经存在 `starwork` 命令
 
@@ -140,7 +112,7 @@ StarWork CLI 和 Skills 已安装完成。你是否需要我继续帮你创建�
 EEXIST: file already exists ... starwork
 ```
 
-说明机器上已经有一个 `starwork` 命令。先检查：
+先检查现有命令来源：
 
 ```bash
 which starwork
@@ -148,17 +120,9 @@ ls -l "$(which starwork)"
 npm ls -g --depth=0 | grep starwork
 ```
 
-确认后再决定是否卸载旧版本或覆盖安装。
+确认后再向用户说明是否需要卸载旧版本或重新安装。
 
-### 只想临时测试 CLI
-
-如果用户不想全局安装 CLI，可以运行：
-
-```bash
-npx @jennie-shawn/starwork@latest --help
-```
-
-### 更新 StarWork Skills
+### 只需要更新 Skills
 
 重新运行：
 
