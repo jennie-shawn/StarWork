@@ -51,7 +51,7 @@ CLI v0.1 安装与适配
 
 ## v0.1 当前收敛
 
-截至 2026-06-04，Core 被定义为开源 AI 工作区协议；Kit 是协议的参考落地结构；CLI 负责稳定生成、检查、升级、适配、安装 Pack、分发 Kit 自带 Skill 和组织多会话协作；Skill 负责帮助 Agent 生成配置、诊断目录、生成 blueprint 和调用工具；Pack 负责场景定制。
+截至 2026-06-08，Core 被定义为开源 AI 工作区协议；Kit 是协议的参考落地结构；CLI 负责稳定生成、检查、升级、适配、安装 Pack、分发 Kit 自带 Skill 和组织多会话协作；Skill 负责帮助 Agent 生成配置、诊断目录、生成 blueprint 和调用工具；Pack 负责场景定制。
 
 当前已经形成：
 
@@ -62,8 +62,9 @@ CLI v0.1 安装与适配
 - `starworkInit` skill 第一版，用于帮助 Agent 采访用户并生成初始化建议。
 - `starworkDoctor` 第一版，用于把历史模板诊断和升级蓝图生成交给 Agent 判断，再由 CLI 保守执行。
 - `starworkKnowledge` 第一版，用于引导开启和维护项目本地知识库。
-- `starworkMultiagent` 第一版，用于把多 Agent 分工、宿主会话观察、launch 和跨会话指令转换成 CLI 命令组合；CLI 运行时判断是否可自动投递，不可自动投递时输出可复制 handoff message。
+- `starworkMultiagent` v0.7，用于把多 Agent 分工、宿主会话观察、launch 和跨会话指令转换成 CLI 命令组合；Codex 主流程已改为直接使用 Codex 标准会话工具创建、投递、读取和改名，CLI 运行时继续判断是否可自动投递，不可自动投递时输出可复制 handoff message。
 - Host Adapter v0.2：Cursor 只做 `agent-transcripts/<uuid>/<uuid>.jsonl` 只读摘要，Trae 收敛为人工操作宿主，Claude Code / Codex 继续按运行时能力降级。
+- Project Structure v0.2：`starworkInit` 和 Init-family Skills 已补齐第一屏产品解释；`starwork init --dry-run` 会按“会创建 / 会更新 / 不会改动 / 需要确认”展示，并按目标文件真实存在性归类。
 - Skill 管理与分发第一版：系统 Skill、工作台模板自带 Skill、项目中心托管 Skill、Pack 自带 Skill 和项目本地 Skill 已有基本边界。
 - 公开 A 测分发入口：GitHub `jennie-shawn/StarWork` 与 npm `@jennie-shawn/starwork@0.1.0-alpha.20`。
 - Pack 源包结构：语言无关业务角色 + `languages/` 多语言落地配置。

@@ -63,11 +63,51 @@ npx skills ls -g -a codex --json
 
 说明：类似项目中心的旧工作区接入也走 `starworkDoctor -> starwork upgrade` 链路；默认保留 `projects/`、`knowledge/`、`skills/` 等原目录名，不创建重复标准目录。
 
+## 第一次使用 StarWork
+
+StarWork 是给 AI 协作准备的项目工作台。它会把项目说明、当前任务、协作规则、交接记录和健康检查入口整理到固定位置，让 Codex、Claude Code、Cursor 这类 AI 工具进入项目时不用从零猜上下文。
+
+第一次初始化时，建议按这个顺序走：
+
+1. 先确认是接入已有项目，还是新建空工作台试用。
+2. 再确认目标路径、语言和推荐结构。
+3. 先用 `--dry-run` 预览 StarWork 准备写入哪些协作文件。
+4. 用户确认后再用 `--yes` 写入，并运行 `starwork doctor` 检查。
+
+默认安全边界：
+
+- 不默认改业务代码。
+- 不直接覆盖已有非空 AI 规则文件。
+- 不在用户确认前正式写入。
+- 不要求第一次就开启知识库、多 Agent 或所有 AI 工具适配。
+
+三种推荐路径：
+
+| 场景 | 推荐 |
+| --- | --- |
+| 只是试用 | 新建空项目工作台，使用推荐结构，先预览。 |
+| 已有真实项目 | 接入已有项目，保留现有文件，已有 AI 规则先生成待整合草稿。 |
+| 已有成熟工作流 | 先接入已有项目并预览，再按需要定制结构。 |
+
 ## 最小测试流程
 
 交互式测试时，`starwork init` 会先询问工作台类型和语言；默认推荐项目工作台。项目中心会自动使用项目中心管理结构，项目工作台会默认使用通用工作能力。
 
 ### 1. 创建普通项目工作台
+
+先预览：
+
+```bash
+starwork init \
+  --type project \
+  --pack general \
+  --language zh \
+  --name "StarWork A Test" \
+  --target ~/Desktop/starwork-a-test \
+  --dry-run
+```
+
+确认预览后再写入：
 
 ```bash
 starwork init \
@@ -87,6 +127,19 @@ starwork doctor --target ~/Desktop/starwork-a-test
 
 ### 2. 创建项目中心
 
+先预览：
+
+```bash
+starwork init \
+  --type hub \
+  --language zh \
+  --name "StarWork Project Center A Test" \
+  --target ~/Desktop/starwork-hub-a-test \
+  --dry-run
+```
+
+确认预览后再写入：
+
 ```bash
 starwork init \
   --type hub \
@@ -103,6 +156,20 @@ starwork doctor --target ~/Desktop/starwork-hub-a-test
 ```
 
 ### 3. 从项目中心创建项目工作台
+
+先预览：
+
+```bash
+starwork spawn \
+  --hub ~/Desktop/starwork-hub-a-test \
+  --name "Alpha Project" \
+  --target ~/Desktop/starwork-alpha-project \
+  --mode project \
+  --language zh \
+  --dry-run
+```
+
+确认预览后再写入：
 
 ```bash
 starwork spawn \

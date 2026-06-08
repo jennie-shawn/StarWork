@@ -24,7 +24,9 @@ StarWork 现在不缺想法，缺的是一条清晰的主线。
 - `starwork --version` 与产品化 help 文案已补齐，方便 A 测用户确认安装版本和入口命令。
 - `starwork audit` / `starwork repair` 第一版已经可以让项目中心巡检并保守修复已登记项目。
 - `starwork multiagent` 已从早期 Codex 单宿主编排升级为 v0.4 runtime host routing：能识别宿主能力、返回 `manual_handoff_required` / `unbound` / `needs_adapt` 等状态，并在无法自动投递时输出可复制交接消息。
+- MultiAgent v0.7 已通过复验：Codex 主流程由 `starworkMultiagent` 直接使用标准会话工具创建、投递、读取、改名、置顶和归档，CLI 只生成消息模板、标题建议、状态记录和降级提示。
 - Host Adapter v0.2 已补齐 Cursor transcript 只读摘要、Cursor agent status 安全探测和 Trae 人工宿主收敛。
+- Project Structure v0.2 已补齐新手初始化语言：`starwork init` 和 Init-family Skills 先讲产品、流程和安全边界，dry-run 按用户视角展示“会创建 / 会更新 / 不会改动 / 需要确认”。
 - M2.8 已统一工作台命名体系，对外使用“项目工作台 / 项目中心 / 中心管理的项目工作台”。
 - M2.10 已完成 Core Kit / Pack 边界清理：Project Kit 不再固定通用工作目录，General Pack 负责参考资料、草稿和确认成果目录。
 - M2.11 知识库能力已进入当前公开口径：Project Kit 不再默认包含 `知识/knowledge`，项目知识库通过 `starwork knowledge` 和 `starworkKnowledge` 按需开启。
