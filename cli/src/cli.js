@@ -7531,7 +7531,11 @@ function buildLaneLaunchSessionName({ lane, workspaceRoot, explicitName }) {
 
 function deriveLaneRoleName(lane) {
   const fallback = humanizeLaneId(lane?.lane || "agent");
-  let roleName = normalizeMarkdownCell(lane?.purpose || "");
+  const purpose = normalizeMarkdownCell(lane?.purpose || "");
+  if (/^(根据|只负责|用于)\s*/u.test(purpose)) {
+    return sanitizeLaneRoleName(fallback);
+  }
+  let roleName = purpose;
   roleName = roleName.split(/[:：。；;，,、\n\r]/)[0].trim();
   roleName = roleName.replace(/^(只负责|主要负责|负责|用于|协助|根据)\s*/u, "").trim();
   if (!roleName || /^根据\s*/u.test(roleName) || /^(SPEC|spec|需求|任务)\b/.test(roleName)) {

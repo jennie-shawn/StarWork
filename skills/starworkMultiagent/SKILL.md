@@ -108,8 +108,10 @@ starwork doctor --target <path> --json
 starwork multiagent message launch <lane> --target <path> --json
 ```
 
-5. 直接调用 `create_thread`，把 Launch Message 作为 prompt，目标工作区使用当前项目 local 环境。
-6. 如需要命名，直接调用 `set_thread_title`。默认标题用 `<职责名> Agent`，不要加入项目名、目录名、thread id、UUID、日期、`lane`、`session` 等内部词。
+读取 JSON 里的 `message` 和 `session_name`。`session_name` 是唯一的默认标题建议；不要从 `purpose`、Launch Message 或用户使用场景长句自行拼标题。
+
+5. 直接调用 `create_thread`，把 `message` 作为 prompt，目标工作区使用当前项目 local 环境。
+6. 如需要命名，直接调用 `set_thread_title(threadId, session_name)`。默认标题只能使用 CLI 返回的 `<职责名> Agent`，不要加入项目名、目录名、thread id、UUID、日期、`lane`、`session` 等内部词。
 7. 如用户要求置顶，直接调用 `set_thread_pinned`。
 8. 只有 `create_thread` 返回 thread id 后，才记录绑定：
 

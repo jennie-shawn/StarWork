@@ -169,6 +169,9 @@ test("starworkMultiagent skill uses Codex standard session tools directly", () =
   assert.match(skill, /send_message_to_thread/);
   assert.match(skill, /read_thread/);
   assert.match(skill, /set_thread_title/);
+  assert.match(skill, /session_name` 是唯一的默认标题建议/);
+  assert.match(skill, /set_thread_title\(threadId, session_name\)/);
+  assert.match(skill, /不要从 `purpose`、Launch Message 或用户使用场景长句自行拼标题/);
   assert.match(skill, /set_thread_pinned/);
   assert.match(skill, /set_thread_archived/);
   assert.match(skill, /multiagent message launch/);
@@ -1405,34 +1408,66 @@ test("multiagent launch no longer creates Codex threads from CLI", () => {
 
 test("multiagent launch message uses short lane role names", () => {
   const dir = tempDir();
+  const cases = [
+    {
+      lane: "data-review",
+      purpose: "数据复盘: 根据用户提供的每周数据生成分析",
+      expected: "数据复盘 Agent"
+    },
+    {
+      lane: "asset-prep",
+      purpose: "素材准备：根据内容脚本准备封面方案",
+      expected: "素材准备 Agent"
+    },
+    {
+      lane: "content-writing",
+      purpose: "内容写作。根据已确认选题生成文稿",
+      expected: "内容写作 Agent"
+    },
+    {
+      lane: "topic-management",
+      purpose: "只负责登记自媒体选题、维护选题状态",
+      expected: "Topic Management Agent"
+    }
+  ];
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
   runCommand(["multiagent", "init", "--target", dir, "--yes"]);
-  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划：负责路线图和验收标准", "--write", "product/planning/**", "--target", dir, "--yes"]);
-  runCommand(["multiagent", "add", "development", "--purpose", "只负责根据 SPEC 实现 CLI 变更", "--write", "product/cli/**", "--target", dir, "--yes"]);
+  for (const item of cases) {
+    runCommand([
+      "multiagent", "add", item.lane,
+      "--purpose", item.purpose,
+      "--write", "_系统/协作/lanes/**",
+      "--target", dir,
+      "--yes"
+    ]);
+  }
 
-  const launchMessage = runCommand([
-    "multiagent", "message", "launch", "product-planning",
-    "--target", dir,
-    "--json"
-  ]);
+  const messageResults = cases.map((item) => {
+    const launchMessage = runCommand([
+      "multiagent", "message", "launch", item.lane,
+      "--target", dir,
+      "--json"
+    ]);
+    assert.equal(launchMessage.status, 0);
+    return JSON.parse(launchMessage.stdout);
+  });
   const launch = runCommand([
     "multiagent", "launch",
-    "--lanes", "product-planning,development",
+    "--lanes", cases.map((item) => item.lane).join(","),
     "--target", dir,
     "--json",
     "--yes"
   ]);
-  const messageResult = JSON.parse(launchMessage.stdout);
   const launchResult = JSON.parse(launch.stdout);
 
-  assert.equal(launchMessage.status, 0);
-  assert.equal(messageResult.session_name, "产品规划 Agent");
+  assert.deepEqual(messageResults.map((result) => result.session_name), cases.map((item) => item.expected));
   assert.equal(launch.status, 0);
-  assert.equal(launchResult.launches[0].session_name, "产品规划 Agent");
-  assert.equal(launchResult.launches[1].session_name, "Development Agent");
+  assert.deepEqual(launchResult.launches.map((result) => result.session_name), cases.map((item) => item.expected));
   assert.equal(launchResult.launches[0].rename_status, "requires_starworkMultiagent_tool");
   assert.equal(launchResult.launches[0].binding_status, "unbound");
-  assert.doesNotMatch(launchResult.launches[0].session_name, /：|负责/);
+  for (const result of launchResult.launches) {
+    assert.doesNotMatch(result.session_name, /[:：。]|根据|只负责|用于|\/Users|[0-9a-f]{8}-[0-9a-f]{4}/u);
+  }
 });
 
 test("multiagent launch does not call fake codex app-server even when available", () => {
