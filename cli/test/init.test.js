@@ -154,18 +154,26 @@ test("prints version and product-oriented help", () => {
   assert.match(help.stdout, /starwork init --help/);
 });
 
-test("starworkMultiagent skill delegates host routing to CLI", () => {
+test("starworkMultiagent skill uses Codex standard session tools directly", () => {
   const skill = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "SKILL.md"), "utf8");
 
   assert.doesNotMatch(skill, /\| Host \|/);
-  assert.doesNotMatch(skill, /Codex app-server/);
+  assert.doesNotMatch(skill, /Codex app-server|app-server/);
   assert.doesNotMatch(skill, /Claude Code \|/);
-  assert.doesNotMatch(skill, /<项目或产品名> <职责> Agent/);
-  assert.doesNotMatch(skill, /StarWork CLI 维护 Agent/);
+  assert.doesNotMatch(skill, /multiagent launch --lanes/);
+  assert.doesNotMatch(skill, /starwork multiagent instruct/);
+  assert.doesNotMatch(skill, /launch_status|binding_status|host_action_required|host-action complete/);
+  assert.doesNotMatch(skill, /thread\/start|turn\/start|thread\/resume|thread\/name\/set|thread\/read|thread\/list/);
   assert.match(skill, /<职责名> Agent/);
-  assert.match(skill, /CLI 返回/);
+  assert.match(skill, /create_thread/);
+  assert.match(skill, /send_message_to_thread/);
+  assert.match(skill, /read_thread/);
+  assert.match(skill, /set_thread_title/);
+  assert.match(skill, /set_thread_pinned/);
+  assert.match(skill, /set_thread_archived/);
+  assert.match(skill, /multiagent message launch/);
+  assert.match(skill, /multiagent request record/);
   assert.match(skill, /manual_handoff_required/);
-  assert.match(skill, /needs_adapt/);
   assert.match(skill, /pending_merge/);
 });
 
@@ -816,7 +824,7 @@ test("multiagent add bind share and status update markdown state", () => {
   assert.match(humanStatus.stdout, /职责位：1 个；已绑定会话：1 个；共享输出：1 项/);
 });
 
-test("multiagent bind can sync codex host session name", () => {
+test("multiagent bind records session name request without calling Codex app-server", () => {
   const dir = tempDir();
   const inputPath = path.join(tempDir(), "codex-input.jsonl");
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
@@ -839,20 +847,19 @@ test("multiagent bind can sync codex host session name", () => {
     "--yes"
   ], { env: fakeCodex.env });
   const result = JSON.parse(bind.stdout);
-  const input = fs.readFileSync(inputPath, "utf8");
   const registry = fs.readFileSync(path.join(dir, "_系统", "协作", "agent-lanes.md"), "utf8");
 
   assert.equal(bind.status, 0);
-  assert.equal(result.session_name_sync.status, "ok");
+  assert.equal(result.session_name_sync.status, "requires_starworkMultiagent_tool");
   assert.equal(result.session_name_sync.name, "StarWork 新功能预研 Agent");
-  assert.match(input, /"method":"initialize"/);
-  assert.match(input, /"method":"thread\/name\/set"/);
-  assert.match(input, /"threadId":"test-thread-1"/);
+  assert.match(result.session_name_sync.warning, /set_thread_title/);
   assert.match(registry, /codex:test-thread-1/);
+  assert.equal(fs.existsSync(inputPath), false);
 });
 
-test("multiagent bind keeps binding when host session rename fails", () => {
+test("multiagent bind pure record mode does not call fake codex app-server", () => {
   const dir = tempDir();
+  const inputPath = path.join(tempDir(), "codex-input.jsonl");
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
   runCommand(["multiagent", "init", "--target", dir, "--yes"]);
   runCommand([
@@ -863,11 +870,10 @@ test("multiagent bind keeps binding when host session rename fails", () => {
     "--yes"
   ]);
 
-  const fakeCodex = fakeCodexBin({ exitCode: 1, stderr: "app-server unavailable" });
+  const fakeCodex = fakeCodexBin({ inputPath, exitCode: 1, stderr: "app-server unavailable" });
   const bind = runCommand([
     "multiagent", "bind", "maintenance",
     "--session", "codex:test-thread-2",
-    "--session-name", "StarWork CLI 维护 Agent",
     "--target", dir,
     "--json",
     "--yes"
@@ -876,9 +882,9 @@ test("multiagent bind keeps binding when host session rename fails", () => {
   const registry = fs.readFileSync(path.join(dir, "_系统", "协作", "agent-lanes.md"), "utf8");
 
   assert.equal(bind.status, 0);
-  assert.equal(result.session_name_sync.status, "warning");
-  assert.match(result.session_name_sync.warning, /app-server unavailable/);
+  assert.equal(result.session_name_sync.status, "not_requested");
   assert.match(registry, /codex:test-thread-2/);
+  assert.equal(fs.existsSync(inputPath), false);
 });
 
 test("multiagent bind --pin records host metadata without rollback when pin is unsupported", () => {
@@ -908,13 +914,14 @@ test("multiagent bind --pin records host metadata without rollback when pin is u
   const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
 
   assert.equal(bind.status, 0);
-  assert.equal(result.pin_sync.status, "unsupported");
+  assert.equal(result.pin_sync.status, "requires_starworkMultiagent_tool");
+  assert.match(result.pin_sync.warning, /set_thread_pinned/);
   assert.match(registry, /codex:dev-thread-1/);
   assert.equal(state.lanes.development.thread_id, "dev-thread-1");
   assert.equal(state.lanes.development.current_session, "codex:dev-thread-1");
 });
 
-test("multiagent status --host and read expose Codex observations", () => {
+test("multiagent status --host and read route Codex observation to starworkMultiagent tools", () => {
   const dir = tempDir();
   const inputPath = path.join(tempDir(), "codex-input.jsonl");
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
@@ -929,19 +936,17 @@ test("multiagent status --host and read expose Codex observations", () => {
   const report = JSON.parse(status.stdout);
   const loadReport = JSON.parse(statusLoad.stdout);
   const readReport = JSON.parse(read.stdout);
-  const input = fs.readFileSync(inputPath, "utf8");
 
   assert.equal(status.status, 0);
   assert.equal(statusLoad.status, 0);
   assert.equal(report.schema, "starwork.agent_lanes.host_status.v0.2");
   assert.equal(loadReport.schema, "starwork.agent_lanes.host_status.v0.2");
   assert.equal(report.lanes[0].starwork.session, "codex:dev-thread-2");
-  assert.equal(report.lanes[0].host.status, "idle");
-  assert.equal(report.lanes[0].host.turn_count, 2);
+  assert.equal(report.lanes[0].host.status, "use_starworkMultiagent_tool");
+  assert.match(report.lanes[0].host.warning, /read_thread/);
   assert.equal(read.status, 0);
-  assert.equal(readReport.host.turns.length, 1);
-  assert.match(input, /"method":"thread\/read"/);
-  assert.match(input, /"method":"thread\/resume"/);
+  assert.equal(readReport.host.status, "use_starworkMultiagent_tool");
+  assert.equal(fs.existsSync(inputPath), false);
 });
 
 test("multiagent instruct returns manual handoff for Codex when standard send is unavailable", () => {
@@ -970,7 +975,7 @@ test("multiagent instruct returns manual handoff for Codex when standard send is
   assert.equal(result.schema, "starwork.agent_lanes.instruct.v0.4");
   assert.equal(result.host_delivery.status, "manual_handoff_required");
   assert.equal(result.host_delivery.mode, "manual_handoff");
-  assert.match(result.host_delivery.warning, /standard background delivery capability is not available/);
+  assert.match(result.host_delivery.warning, /send_message_to_thread/);
   assert.match(shared, /Cross-Lane Requests/);
   assert.match(shared, /product-planning \| development \| 请开始实现 v0\.2。 \| manual_handoff_required \| manual_handoff_required/);
   assert.equal(state.requests[0].host_delivery.status, "manual_handoff_required");
@@ -1375,7 +1380,7 @@ test("init --adapter creates host adapter state after workspace initialization",
   assert.equal(fs.existsSync(path.join(dir, ".cursor", "skills")), true);
 });
 
-test("multiagent launch creates and binds Codex threads with launch message", () => {
+test("multiagent launch no longer creates Codex threads from CLI", () => {
   const dir = tempDir();
   const inputPath = path.join(tempDir(), "codex-input.jsonl");
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
@@ -1387,91 +1392,108 @@ test("multiagent launch creates and binds Codex threads with launch message", ()
   const result = JSON.parse(launch.stdout);
   const registry = fs.readFileSync(path.join(dir, "_系统", "协作", "agent-lanes.md"), "utf8");
   const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
-  const input = fs.readFileSync(inputPath, "utf8");
 
   assert.equal(launch.status, 0);
-  assert.equal(result.launches[0].thread_id, "launched-thread-1");
-  assert.match(registry, /codex:launched-thread-1/);
-  assert.equal(state.lanes.development.thread_id, "launched-thread-1");
-  assert.match(input, /"method":"thread\/start"/);
-  assert.match(input, new RegExp(`"cwd":"${dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`));
-  assert.match(input, /"sandbox":"workspace-write"/);
-  assert.match(input, /"approvalPolicy":"on-request"/);
-  assert.match(input, /StarWork MultiAgent Launch/);
+  assert.equal(result.launches[0].launch_status, "manual_handoff_required");
+  assert.equal(result.launches[0].binding_status, "unbound");
+  assert.match(result.launches[0].instructions, /create_thread/);
+  assert.match(result.launches[0].message, /StarWork MultiAgent Launch/);
+  assert.match(registry, /\| development \| 功能开发 \| unbound \|/);
+  assert.equal(state.lanes.development?.thread_id, undefined);
+  assert.equal(fs.existsSync(inputPath), false);
 });
 
-test("multiagent launch names each batch-created Codex thread by lane role", () => {
+test("multiagent launch message uses short lane role names", () => {
   const dir = tempDir();
-  const inputPath = path.join(tempDir(), "codex-input.jsonl");
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
   runCommand(["multiagent", "init", "--target", dir, "--yes"]);
-  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
-  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划：负责路线图和验收标准", "--write", "product/planning/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "只负责根据 SPEC 实现 CLI 变更", "--write", "product/cli/**", "--target", dir, "--yes"]);
 
-  const fakeCodex = fakeCodexBin({ inputPath });
+  const launchMessage = runCommand([
+    "multiagent", "message", "launch", "product-planning",
+    "--target", dir,
+    "--json"
+  ]);
   const launch = runCommand([
     "multiagent", "launch",
     "--lanes", "product-planning,development",
     "--target", dir,
     "--json",
-    "--yes",
-    "--timeout", "1000"
-  ], { env: fakeCodex.env });
-  const result = JSON.parse(launch.stdout);
-  const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
-  const input = fs.readFileSync(inputPath, "utf8");
+    "--yes"
+  ]);
+  const messageResult = JSON.parse(launchMessage.stdout);
+  const launchResult = JSON.parse(launch.stdout);
 
+  assert.equal(launchMessage.status, 0);
+  assert.equal(messageResult.session_name, "产品规划 Agent");
   assert.equal(launch.status, 0);
-  assert.equal(result.launches[0].session_name, "产品规划 Agent");
-  assert.equal(result.launches[0].rename_status, "ok");
-  assert.equal(result.launches[0].binding_status, "bound");
-  assert.equal(result.launches[1].session_name, "功能开发 Agent");
-  assert.equal(result.launches[1].rename_status, "ok");
-  assert.equal(result.launches[1].binding_status, "bound");
-  assert.equal(state.lanes["product-planning"].session_name, "产品规划 Agent");
-  assert.equal(state.lanes.development.session_name, "功能开发 Agent");
-  assert.match(input, /"name":"产品规划 Agent"/);
-  assert.match(input, /"name":"功能开发 Agent"/);
-  assert.doesNotMatch(result.launches[0].session_name, new RegExp(path.basename(dir)));
+  assert.equal(launchResult.launches[0].session_name, "产品规划 Agent");
+  assert.equal(launchResult.launches[1].session_name, "Development Agent");
+  assert.equal(launchResult.launches[0].rename_status, "requires_starworkMultiagent_tool");
+  assert.equal(launchResult.launches[0].binding_status, "unbound");
+  assert.doesNotMatch(launchResult.launches[0].session_name, /：|负责/);
 });
 
-test("multiagent launch warns when host session rename fails after creation", () => {
+test("multiagent launch does not call fake codex app-server even when available", () => {
   const dir = tempDir();
+  const inputPath = path.join(tempDir(), "codex-input.jsonl");
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
   runCommand(["multiagent", "init", "--target", dir, "--yes"]);
   runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
 
-  const fakeCodex = fakeCodexBin({ failThreadNameSet: true });
+  const fakeCodex = fakeCodexBin({ inputPath, failThreadNameSet: true });
   const launch = runCommand(["multiagent", "launch", "development", "--target", dir, "--json", "--yes", "--timeout", "1000"], { env: fakeCodex.env });
   const result = JSON.parse(launch.stdout);
   const registry = fs.readFileSync(path.join(dir, "_系统", "协作", "agent-lanes.md"), "utf8");
 
   assert.equal(launch.status, 0);
-  assert.equal(result.launches[0].binding_status, "bound");
-  assert.equal(result.launches[0].rename_status, "warning");
-  assert.match(result.launches[0].rename_warning, /rename failed/);
-  assert.match(registry, /codex:launched-thread-1/);
-});
-
-test("multiagent launch does not bind when launch message delivery fails", () => {
-  const dir = tempDir();
-  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
-  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
-  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
-
-  const fakeCodex = fakeCodexBin({ failTurnStart: true });
-  const launch = runCommand(["multiagent", "launch", "development", "--target", dir, "--json", "--yes", "--timeout", "1000"], { env: fakeCodex.env });
-  const result = JSON.parse(launch.stdout);
-  const registry = fs.readFileSync(path.join(dir, "_系统", "协作", "agent-lanes.md"), "utf8");
-  const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
-
-  assert.equal(launch.status, 0);
-  assert.equal(result.launches[0].status, "failed");
-  assert.equal(result.launches[0].created_thread_id, "launched-thread-1");
-  assert.equal(result.launches[0].thread_id, undefined);
   assert.equal(result.launches[0].binding_status, "unbound");
+  assert.equal(result.launches[0].rename_status, "requires_starworkMultiagent_tool");
   assert.match(registry, /\| development \| 功能开发 \| unbound \|/);
-  assert.equal(state.lanes.development?.thread_id, undefined);
+  assert.equal(fs.existsSync(inputPath), false);
+});
+
+test("multiagent message instruct and request record support Skill direct-tool flow", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+
+  const message = runCommand([
+    "multiagent", "message", "instruct", "development",
+    "--from", "product-planning",
+    "--message", "请开始实现 v0.7。",
+    "--target", dir,
+    "--json"
+  ]);
+  const messageResult = JSON.parse(message.stdout);
+  const record = runCommand([
+    "multiagent", "request", "record",
+    "--from", "product-planning",
+    "--to", "development",
+    "--message", "请开始实现 v0.7。",
+    "--host-delivery", "delivered",
+    "--delivery-tool", "send_message_to_thread",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ]);
+  const recordResult = JSON.parse(record.stdout);
+  const shared = fs.readFileSync(path.join(dir, "_系统", "协作", "shared.md"), "utf8");
+  const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
+
+  assert.equal(message.status, 0);
+  assert.equal(messageResult.type, "instruction");
+  assert.equal(messageResult.to_lane, "development");
+  assert.match(messageResult.message, /STARWORK:MULTIAGENT_MESSAGE v1/);
+  assert.equal(record.status, 0);
+  assert.equal(recordResult.host_delivery.status, "delivered");
+  assert.equal(recordResult.host_delivery.delivery_tool, "send_message_to_thread");
+  assert.match(shared, /product-planning \| development \| 请开始实现 v0\.7。 \| delivered \| delivered/);
+  assert.equal(state.requests[0].host_delivery.status, "delivered");
+  assert.equal(state.requests[0].host_delivery.delivery_tool, "send_message_to_thread");
 });
 
 test("multiagent launch refuses non-StarWork targets without sidecar initialization", () => {
@@ -1499,23 +1521,23 @@ test("multiagent write commands stop while host agent docs are pending merge", (
   assert.match(result.stderr, /starworkInit/);
 });
 
-test("multiagent launch binds when final verification read times out after completion", () => {
+test("multiagent launch keeps lane unbound instead of using legacy final verification", () => {
   const dir = tempDir();
+  const inputPath = path.join(tempDir(), "codex-input.jsonl");
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
   runCommand(["multiagent", "init", "--target", dir, "--yes"]);
   runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
 
-  const fakeCodex = fakeCodexBin({ omitFinalRead: true });
+  const fakeCodex = fakeCodexBin({ inputPath, omitFinalRead: true });
   const launch = runCommand(["multiagent", "launch", "development", "--target", dir, "--json", "--yes", "--timeout", "1000"], { env: fakeCodex.env });
   const result = JSON.parse(launch.stdout);
   const registry = fs.readFileSync(path.join(dir, "_系统", "协作", "agent-lanes.md"), "utf8");
 
   assert.equal(launch.status, 0);
-  assert.equal(result.launches[0].status, "completed");
-  assert.equal(result.launches[0].thread_id, "launched-thread-1");
-  assert.equal(result.launches[0].verified_by_thread_read, false);
-  assert.match(result.launches[0].verification_warning, /response 4/);
-  assert.match(registry, /codex:launched-thread-1/);
+  assert.equal(result.launches[0].status, "manual_handoff_required");
+  assert.equal(result.launches[0].binding_status, "unbound");
+  assert.match(registry, /\| development \| 功能开发 \| unbound \|/);
+  assert.equal(fs.existsSync(inputPath), false);
 });
 
 test("multiagent status infers workspace for legacy registries", () => {
