@@ -4,6 +4,8 @@
 |---|---|---|---|---|---|---|---|
 | 2026-06-01-personal-task-board | 个人任务管理看板 | 用户想法 | ideas | inbox | product-planning | - | 2026-06-01 |
 | 2026-06-01-agent-lane-dashboard | Agent Lane 集中管理与任务分发看板 | 用户想法 | ideas | inbox | product-planning | - | 2026-06-01 |
+| 2026-06-10-ai-consultant-review | 外部 AI 顾问评审报告：定位、Core 设计、执行回路、商业化与迭代节奏 | 外部顾问评审 | feedback | inbox | product-planning | - | 2026-06-10 |
+| 2026-06-10-ai-consultant-structure-and-strategy | 外部 AI 顾问深度建议：工作台结构、记忆分层与宿主生存战略 | 外部顾问评审 | feedback | inbox | product-planning | - | 2026-06-10 |
 
 ## 字段说明
 
