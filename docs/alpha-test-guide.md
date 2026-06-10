@@ -36,7 +36,7 @@ npx @jennie-shawn/starwork --help
 npx skills add jennie-shawn/StarWork -g -a codex -y
 ```
 
-说明：这是一条短命令，只安装 StarWork 系统级 Skills。`starworkSpawn`、`starworkAudit` 和 `neat-freak` 不应被全局安装；前两个会在 `starwork init --type hub` 时进入项目中心，`neat-freak` 会在单项目初始化时进入项目。
+说明：这是一条短命令，只安装 StarWork 全局系统 Skills：L0 主入口 + L1 专家 Skills。`starworkSpawn`、`starworkAudit`、`neat-freak` 和 `starworkKnowledgeProject` 不应被全局安装；前三个是 Kit 自带 Skill，会随对应工作台写入，`starworkKnowledgeProject` 会在项目开启知识库能力后写入当前项目。
 
 安装前可先查看仓库会安装哪些 Skills：
 
@@ -46,12 +46,13 @@ npx skills add jennie-shawn/StarWork -l
 
 预期只看到：
 
+- `starwork`
 - `starworkInit`
 - `starworkDoctor`
-- `starworkMultiagent`
 - `starworkKnowledge`
+- `starworkMultiagent`
 
-不应看到 `starworkKnowledgeProject`。它是项目开启知识库后才写入当前项目的业务 Skill，不是全局系统 Skill。
+不应看到 `starworkSpawn`、`starworkAudit`、`neat-freak` 或 `starworkKnowledgeProject`。它们分别属于 L2 Kit 自带 Skill 或 L3 Capability 项目内 Skill，不是全局系统 Skill。
 
 安装后验证：
 

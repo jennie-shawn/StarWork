@@ -2,7 +2,7 @@
 
 本文件面向正在帮助用户安装 StarWork 的 AI Agent。
 
-你的任务只有一个：把 StarWork CLI 和 StarWork Skills 安装好，并确认它们可用。不要在安装阶段创建工作区，不要替用户初始化项目，也不要做额外测试目录。
+你的任务只有一个：把 StarWork CLI、`starwork` 主入口和 StarWork 专家 Skills 安装好，并确认它们可用。不要在安装阶段创建工作区，不要替用户初始化项目，也不要做额外测试目录。
 
 ## 你需要完成什么
 
@@ -71,12 +71,13 @@ npx skills add jennie-shawn/StarWork -g -a codex -y
 npx skills ls -g -a codex --json
 ```
 
-确认能看到 StarWork 系统 Skills：
+确认能看到 StarWork 主入口和专家 Skills：
 
+- `starwork`
 - `starworkInit`
 - `starworkDoctor`
-- `starworkMultiagent`
 - `starworkKnowledge`
+- `starworkMultiagent`
 
 ## 完成后怎么汇报
 
@@ -87,9 +88,9 @@ StarWork 已经装好了。
 
 我已经确认两件事：
 1. StarWork 命令可以正常运行。
-2. 当前 AI 工具已经安装好 StarWork Skills。
+2. 当前 AI 工具已经安装好 StarWork 主入口和专家 Skills。
 
-现在你可以让 AI 帮你使用 StarWork 了。
+现在你可以直接说“帮我用 StarWork”，AI 会从主入口判断下一步。
 ```
 
 如果安装失败，不要把完整报错直接甩给用户。先用一句话说明卡在哪里，再给一个明确的下一步建议：

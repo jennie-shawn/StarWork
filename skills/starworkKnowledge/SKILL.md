@@ -1,6 +1,6 @@
 ---
 name: starworkKnowledge
-description: 'Help users create, inspect, and maintain a local StarWork project knowledge base by calling `starwork knowledge` first, then organizing long-term project knowledge safely.'
+description: 'Create, inspect, and maintain a local StarWork project knowledge base with `starwork knowledge`, focused on long-term stable project knowledge.'
 ---
 
 # starworkKnowledge
@@ -8,6 +8,10 @@ description: 'Help users create, inspect, and maintain a local StarWork project 
 使用这个 skill，帮助用户开启和维护“项目知识库”。
 
 项目知识库不是资料夹。它用于让 AI 长期整理当前项目里会反复用到的稳定理解。原始资料仍放在参考资料区，草稿和成果仍按工作台规则进入输出区。
+
+## 主入口边界
+
+如果用户只是询问产品总览、起步路径、安装入口或该用哪个 StarWork 能力，回到 `starwork` 主入口。普通资料整理、README 整理和阶段收尾不属于本 skill；只有长期稳定知识沉淀、知识库开启和知识库维护才使用 `starworkKnowledge`。
 
 ## 开启知识库的第一屏
 

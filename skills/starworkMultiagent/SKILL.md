@@ -1,6 +1,6 @@
 ---
 name: starworkMultiagent
-description: 'Design and maintain StarWork Agent Lanes with `starwork multiagent`, and in Codex App directly use standard session tools for thread creation, messaging, reading, title, pin, and archive actions.'
+description: 'Design and maintain StarWork Agent Lanes, multi-agent roles, lane bindings, cross-session messages, and Codex standard session tool workflows.'
 ---
 
 # starworkMultiagent
@@ -10,6 +10,10 @@ description: 'Design and maintain StarWork Agent Lanes with `starwork multiagent
 `starworkMultiagent` 不是 `starwork multiagent` 命令本身。Skill 负责判断用户意图、确认 lane 语义和写入边界，并在 Codex App 中直接调用标准会话控制工具。CLI 只负责 StarWork 文件状态、消息模板和记录辅助。
 
 不要把职责写死为前端、后端、测试。lane ID、职责和写入范围必须来自当前项目语境。
+
+## 主入口边界
+
+如果用户只是询问产品总览、起步路径、安装入口或该用哪个 StarWork 能力，回到 `starwork` 主入口。用户明确说多 Agent、Agent Lanes、lane、跨会话消息、开发 Agent、产品 Agent、验收 Agent 或 Codex 会话控制时，继续直接使用 `starworkMultiagent`。
 
 ## 初始化多 Agent 的第一屏
 

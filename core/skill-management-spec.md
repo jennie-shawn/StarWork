@@ -52,12 +52,16 @@ StarWork 的 Skill 机制不是一个简单的安装动作，而是一套 Agent 
 
 ## Skill 分类
 
+v0.2 在系统 Skill 中增加 L0 主入口 Skill。主入口负责产品解释、安装引导和模糊意图路由；专家 Skill 继续保留直接触发能力。
+
 | 类型 | 示例 | 主要位置 | 作用 | 是否默认进项目 |
 |---|---|---|---|---|
-| 系统 Skill | `starworkInit`、`starworkDoctor` | 用户全局 Agent Skill 环境 | 让 Agent 会操作 StarWork | 否 |
+| L0 主入口 Skill | `starwork` | 用户全局 Agent Skill 环境 | 解释 StarWork、引导安装、判断下一步能力 | 否 |
+| L1 系统专家 Skill | `starworkInit`、`starworkDoctor`、`starworkKnowledge`、`starworkMultiagent` | 用户全局 Agent Skill 环境 | 让 Agent 会操作明确 StarWork 能力 | 否 |
 | Kit 自带 Skill | `starworkSpawn`、`starworkAudit`、`neat-freak` | 产品源码 `kit-skills/`，工作台内写入 `skills/` 或 `.agents/skills/` | 配合某种工作区形态使用 | 按 Kit 默认规则进入 |
 | Pack 自带 Skill | 内容创作者审稿、发布检查等 | Pack 的 `skills/` 声明或随 Pack 写入 | 配合某个场景 Pack 使用 | 用户确认后进入 |
 | Hub 托管 Skill | 用户收藏的写作、复盘、会议、整理 Skill | Hub `skills/` | 用户跨项目复用的能力库 | 按规则或用户选择分发 |
+| L3 Capability 项目内 Skill | `starworkKnowledgeProject` | Capability 源码和项目 `.agents/skills/` | 能力开启后维护当前项目 | 是，本项目拥有 |
 | 项目本地 Skill | 某项目专用工作流 | Satellite 或单项目 `.agents/skills/` | 只服务当前项目 | 是，本项目拥有 |
 
 ## 存放位置
@@ -75,6 +79,16 @@ npx skills add ...
 StarWork 只把它视为“Agent 已学会 StarWork 操作方式”，不把这些 Skill 复制进工作区。
 
 系统 Skill 的源码位于产品仓库 `skills/`。该目录会被 `npx skills add jennie-shawn/StarWork` 扫描，因此只能放全局系统级 Skill，不能放 Kit 自带 Skill。
+
+v0.2 全局系统 Skill 清单：
+
+- `starwork`：L0 主入口。
+- `starworkInit`：初始化和接入专家。
+- `starworkDoctor`：诊断和升级方案专家。
+- `starworkKnowledge`：项目知识库专家。
+- `starworkMultiagent`：多 Agent 和跨会话专家。
+
+`starworkSpawn`、`starworkAudit`、`neat-freak` 和 `starworkKnowledgeProject` 不在全局清单中。
 
 ### 2. Kit 自带 Skill 声明
 

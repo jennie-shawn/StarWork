@@ -28,6 +28,7 @@
 - `knowledge-base/`：项目本地知识库能力。
 - `multiagent/`：多 AI 会话职责分工、跨会话指令和宿主会话编排能力。
 - `project-structure/`：当前 StarWork 产品工作台结构重整。
+- `skill-management/`：StarWork Skill 主入口、专家 Skill、Kit Skill 和 Capability Skill 的分层调用与分发机制。
 
 ## 使用规则
 

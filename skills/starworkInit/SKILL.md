@@ -1,6 +1,6 @@
 ---
 name: starworkInit
-description: 'Plan friendly StarWork init flows: choose project or hub, zh/en language, customization needs, and how to run and verify `starwork init`.'
+description: 'Create or connect StarWork project workbenches and project centers: choose project/hub, language, target path, dry-run, write, and doctor verification.'
 ---
 
 # starworkInit
@@ -13,6 +13,10 @@ description: 'Plan friendly StarWork init flows: choose project or hub, zh/en la
 - 使用中文工作台，还是英文工作台
 - 是否需要定制目录和 Agent 规则
 - 最终应该如何 dry-run、确认执行和检查
+
+## 主入口边界
+
+如果用户只是询问产品总览、起步路径、安装入口或该用哪个 StarWork 能力，回到 `starwork` 主入口。`starworkInit` 只处理已经指向“创建、接入、初始化项目工作台或项目中心”的请求。
 
 除非用户还在讨论阶段，否则不要停在蓝图或建议。用户明确说“创建、初始化、生成、改造成工作台”时，必须继续运行 CLI：先 `starwork init --dry-run`，得到用户确认后再 `starwork init --yes`，最后 `starwork doctor` 验证。
 

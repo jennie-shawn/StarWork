@@ -49,7 +49,7 @@ StarWork 不是另一个笔记软件，也不是自动替你写完整项目的�
 把下面这段话发给 Codex、Claude Code、Cursor 或你正在使用的 AI 工具：
 
 ```text
-请帮我把当前项目接入 StarWork。
+请用 `starwork` 主入口帮我开始使用 StarWork。
 
 请先阅读 StarWork 引导文档，理解 StarWork 是什么：
 https://raw.githubusercontent.com/jennie-shawn/StarWork/main/README.md
@@ -57,7 +57,7 @@ https://raw.githubusercontent.com/jennie-shawn/StarWork/main/README.md
 如果本机还没有安装 StarWork CLI 或 Skills，请先按这份 Agent 安装指南完成安装：
 https://raw.githubusercontent.com/jennie-shawn/StarWork/main/docs/agent-install-guide.md
 
-请先说明 StarWork 是什么、能帮我做什么、接下来会做哪几步。
+请先说明 StarWork 是什么、能帮我做什么、接下来我应该走哪个能力。
 然后先预览将要写入的文件，不要直接写入。
 等我确认后，再正式初始化并运行健康检查。
 ```
@@ -126,7 +126,7 @@ StarWork 的基础能力是“让 AI 读懂并安全接手项目”。在此基�
 
 ## 给 AI 工具安装 StarWork Skills
 
-如果你希望 AI 更懂 StarWork 的使用流程，可以安装 StarWork Skills。
+如果你希望 AI 更懂 StarWork 的使用流程，可以安装 StarWork Skills。安装后，普通请求先交给 `starwork` 主入口；明确的知识库、多智能体、诊断或初始化场景，也可以直接点名对应专家能力。
 
 当前默认面向 Codex：
 
@@ -134,8 +134,9 @@ StarWork 的基础能力是“让 AI 读懂并安全接手项目”。在此基�
 npx skills add jennie-shawn/StarWork -g -a codex -y
 ```
 
-安装后，AI 可以更自然地帮你：
+安装后，AI 会拥有一个 StarWork 主入口和几个专家 Skills，可以更自然地帮你：
 
+- 判断你现在应该走哪个 StarWork 能力。
 - 创建或接入项目工作台。
 - 诊断旧目录能否升级为 StarWork 工作台。
 - 开启和维护项目知识库。

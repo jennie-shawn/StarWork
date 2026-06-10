@@ -1,6 +1,6 @@
 ---
 name: starworkDoctor
-description: 'Diagnose StarWork workspaces, legacy templates, or Project Center-like repos from `starwork doctor --json`; explain structure issues and draft safe `starwork upgrade --blueprint` plans.'
+description: 'Diagnose StarWork workspaces, legacy templates, and project-center-like repos from `starwork doctor --json`; explain issues and draft safe upgrade plans.'
 ---
 
 # starworkDoctor
@@ -16,6 +16,10 @@ description: 'Diagnose StarWork workspaces, legacy templates, or Project Center-
 - 当前目录缺少哪些 Core 必需结构
 - 应该如何整理、补齐或升级，且不破坏用户历史文件
 - 用户确认升级语义后，生成可 dry-run 的 `upgrade-blueprint.json` 和配套规则文件
+
+## 主入口边界
+
+如果用户只是询问产品总览、起步路径、安装入口或该用哪个 StarWork 能力，回到 `starwork` 主入口。`starworkDoctor` 只处理诊断、doctor 结果解释、旧目录整理和升级方案设计。
 
 历史上独立的 `starworkUpgrade` 系统 Skill 已取消；旧模板升级、旧宿主规则提炼和 upgrade blueprint 设计都由 `starworkDoctor` 承接。不要重新引导用户安装或调用独立 `starworkUpgrade` Skill。
 

@@ -5,6 +5,7 @@
 功能规划、版本 SPEC、讨论沉淀、参考资料和验收材料已经迁入 `product/planning/`，不再继续平铺到 `product/docs/`。
 
 - [product-direction.md](product-direction.md)：StarWork 产品方向、四层结构和关键约束
+- [ai-consultant-brief.md](ai-consultant-brief.md)：给外部 AI 顾问快速了解 StarWork 产品、当前状态和目录结构的简报
 - [agent-install-guide.md](agent-install-guide.md)：面向用户 Agent 的 StarWork CLI 与 Skills 安装指导
 - [alpha-test-guide.md](alpha-test-guide.md)：StarWork A 测 CLI 与 Skills 安装、测试和反馈指南
 - [cli-skill-registry.html](cli-skill-registry.html)：当前 CLI 与 StarWork 自研 Skill 的能力注册表、分发边界和配合链路

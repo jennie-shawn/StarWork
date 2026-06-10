@@ -461,7 +461,7 @@
     <section class="section">
       <div class="section-header">
         <h2>当前总览</h2>
-        <p class="section-note">截至 alpha.20，StarWork 已有 10 个可用 CLI 命令和 7 个自研 Skill。`update` 和 `starwork skill` 仍是未来命令，不在当前可用列表里。新增或调整命令、skill、Kit 分发范围、npm 版本时必须同步维护本页。</p>
+        <p class="section-note">截至 alpha.20，StarWork 已有 10 个可用 CLI 命令和 9 个 StarWork 自研 Skill，其中 5 个全局系统 Skill、3 个 Kit 自带 Skill、1 个 Capability 项目内 Skill。Skill 已分为 L0 主入口、L1 系统专家、L2 Kit 自带和 L3 Capability 项目内能力；`update` 和 `starwork skill` 仍是未来命令，不在当前可用列表里。新增或调整命令、skill、Kit 分发范围、npm 版本时必须同步维护本页。</p>
       </div>
       <div class="grid-3">
         <article class="panel">
@@ -477,7 +477,7 @@
         <article class="panel">
           <span class="badge">状态</span>
           <h3>alpha.20</h3>
-          <p>当前 npm latest 为 <code>@jennie-shawn/starwork@0.1.0-alpha.20</code>。已收敛为 Project Kit 与 项目中心 Kit 两类结构，补齐 项目中心 侧 <code>audit</code> / <code>repair</code> 链路，修正系统级 Skill 与 Kit 自带 Skill 的分发边界，新增可选项目知识库命令组 <code>starwork knowledge</code>，完成 MultiAgent v0.5 agent docs draft / pending merge 流程，并完成 Host Adapter v0.2：Cursor 仅做 transcript 只读摘要，Trae 仅保留人工操作入口，<code>manual_handoff_required</code> 会直接输出可复制交付消息。</p>
+          <p>当前 npm latest 为 <code>@jennie-shawn/starwork@0.1.0-alpha.20</code>。已收敛为 Project Kit 与 项目中心 Kit 两类结构，补齐 项目中心 侧 <code>audit</code> / <code>repair</code> 链路，新增 L0 主入口 <code>starwork</code> 并保留 L1 系统专家 Skill，修正系统级 Skill 与 Kit 自带 Skill 的分发边界，新增可选项目知识库命令组 <code>starwork knowledge</code>，完成 MultiAgent v0.7 Codex 标准会话工具主路径，并完成 Host Adapter v0.2：Cursor 仅做 transcript 只读摘要，Trae 仅保留人工操作入口，<code>manual_handoff_required</code> 会直接输出可复制交付消息。</p>
         </article>
       </div>
     </section>
@@ -604,8 +604,17 @@
         </thead>
         <tbody>
           <tr>
+            <td><strong><code>starwork</code></strong></td>
+            <td>L0 主入口，全局系统 Skill。</td>
+            <td>用户询问 StarWork 产品、安装、怎么开始，或不知道该用哪个能力。</td>
+            <td>解释产品；引导安装；判断请求应进入初始化、诊断、知识库、多 Agent、项目中心还是收尾整理。</td>
+            <td>下一步建议、专家 Skill 路由、安装验证步骤。</td>
+            <td>按场景路由到 <code>starwork init</code>、<code>doctor</code>、<code>knowledge</code>、<code>multiagent</code> 等。</td>
+            <td><span class="status done">已实现</span></td>
+          </tr>
+          <tr>
             <td><strong><code>starworkInit</code></strong></td>
-            <td>初始化设计助手。</td>
+            <td>L1 系统专家：初始化设计助手。</td>
             <td>用户想从 0 建工作台，但还没确定工作台类型、语言或目录偏好。</td>
             <td>分支式采访；判断是 项目中心 还是普通项目；判断语言；生成初始化建议或 init blueprint；用户确认创建时继续执行 dry-run、写入和 doctor 验证。</td>
             <td>初始化建议、<code>init-blueprint.json</code>、rules、dry-run / yes / doctor 执行结果。</td>
@@ -614,7 +623,7 @@
           </tr>
           <tr>
             <td><strong><code>starworkSpawn</code></strong></td>
-            <td>项目中心 Kit 自带的项目定制单设计助手。</td>
+            <td>L2 Kit 自带：项目中心项目定制单设计助手。</td>
             <td>用户已有项目中心，要创建一个新项目，并希望项目目录、规则或托管的 AI 使用说明可定制。</td>
             <td>采访项目类型和工作方式；生成项目创建方案；整理项目规则和初始文件。</td>
             <td><code>blueprint.json</code>、rules、初始文件、spawn dry-run 命令。</td>
@@ -622,8 +631,17 @@
             <td><span class="status done">已实现</span></td>
           </tr>
           <tr>
+            <td><strong><code>starworkAudit</code></strong></td>
+            <td>L2 Kit 自带：项目中心巡检助手。</td>
+            <td>项目中心需要巡检项目登记、共享资源、项目工作台连接状态，或生成修复方案。</td>
+            <td>解释项目中心 audit 结果；识别项目登记和共享资源风险；生成可确认的 repair blueprint。</td>
+            <td>巡检解释、风险摘要、修复建议、<code>repair-blueprint.json</code>。</td>
+            <td><code>starwork audit</code> / <code>starwork repair --blueprint</code></td>
+            <td><span class="status done">已实现</span></td>
+          </tr>
+          <tr>
             <td><strong><code>neat-freak</code></strong></td>
-            <td>单项目 Kit 自带的整理收尾助手。</td>
+            <td>L2 Kit 自带：单项目整理收尾助手。</td>
             <td>单项目工作台需要阶段性清理、项目记忆整理、收尾归档。</td>
             <td>读取工作区规则和当前工作；检查产品事实、过程记录和当前任务是否归位；输出清理报告。</td>
             <td>清理报告、必要的当前工作记录更新建议。</td>
@@ -632,7 +650,7 @@
           </tr>
           <tr>
             <td><strong><code>starworkDoctor</code></strong></td>
-            <td>工作区诊断助手。</td>
+            <td>L1 系统专家：工作区诊断助手。</td>
             <td>用户要理解 doctor 输出、判断旧目录如何整理成 StarWork 工作台；或想无损生成升级方案。</td>
             <td>读取 doctor JSON；解释目录清单和线索；建立目录角色映射；识别历史模板或 项目中心-like 旧主库；判断目录分工是否清楚；提出整理建议；用户确认后生成升级方案和规则文件。</td>
             <td>诊断报告、目录角色映射、缺失和风险、确认问题、<code>upgrade-blueprint.json</code>、rules、dry-run 命令。</td>
@@ -641,7 +659,7 @@
           </tr>
           <tr>
             <td><strong><code>starworkMultiagent</code></strong></td>
-            <td>多 AI 协作命令包装助手。</td>
+            <td>L1 系统专家：多 AI 协作命令包装助手。</td>
             <td>用户想把当前会话登记为常用智能体、管理 AI 职责位、绑定或释放 session、查看分工、登记共享输出、读取其他 lane 状态、向其他 lane 发指令或创建 lane thread。</td>
             <td>判断用户语义；确认 lane ID、职责、写入范围、session、跨会话指令内容和回报方式；把请求翻译成 <code>multiagent init/add/bind/read/instruct/launch/status/share</code> 命令组合。</td>
             <td>multiagent dry-run 命令、确认后的执行命令、当前分工解释、Codex host observation 解释、过程材料放置建议。</td>
@@ -650,11 +668,20 @@
           </tr>
           <tr>
             <td><strong><code>starworkKnowledge</code></strong></td>
-            <td>项目知识库整理助手。</td>
+            <td>L1 系统专家：项目知识库整理助手。</td>
             <td>用户想开启知识库、整理资料、回答并沉淀长期知识、检查知识库是否混乱，或从旧知识目录整理到新结构。</td>
             <td>先调用 <code>starwork knowledge</code> 创建或检查结构；判断哪些内容值得长期沉淀；维护 <code>pages/</code>、<code>synthesis/</code>、<code>index.md</code> 和 <code>log.md</code>；需要旧目录整理时生成 blueprint。项目开启知识库后，CLI 会把项目内业务 Skill <code>starworkKnowledgeProject</code> 安装到当前项目，它不属于全局系统 Skill。</td>
             <td>知识库维护建议、主题页、综合判断、来源索引、维护记录、<code>starwork.knowledge</code> blueprint。</td>
             <td><code>starwork knowledge</code></td>
+            <td><span class="status done">已实现</span></td>
+          </tr>
+          <tr>
+            <td><strong><code>starworkKnowledgeProject</code></strong></td>
+            <td>L3 Capability 项目内：知识库维护助手。</td>
+            <td>当前项目已经开启知识库能力，需要在项目内长期维护主题页、综合判断和来源索引。</td>
+            <td>按项目知识库规则整理稳定知识；维护主题页、综合判断、索引和维护记录；不作为全局系统 Skill 分发。</td>
+            <td><code>pages/</code>、<code>synthesis/</code>、<code>index.md</code>、<code>log.md</code> 更新建议或执行结果。</td>
+            <td><code>starwork knowledge</code> 能力开启后写入当前项目</td>
             <td><span class="status done">已实现</span></td>
           </tr>
         </tbody>

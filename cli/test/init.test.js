@@ -142,6 +142,10 @@ function writeCursorTranscriptFixture(projectsDir, sessionId, lines, projectKey 
   return transcript;
 }
 
+function skillDescription(skillText) {
+  return skillText.match(/^description:\s*['"]?([\s\S]*?)['"]?\n---/m)?.[1] || "";
+}
+
 test("prints version and product-oriented help", () => {
   const version = runCommand(["--version"]);
   assert.equal(version.status, 0);
@@ -152,6 +156,99 @@ test("prints version and product-oriented help", () => {
   assert.match(help.stdout, new RegExp(`StarWork CLI ${packageJson.version}`));
   assert.match(help.stdout, /常用开始/);
   assert.match(help.stdout, /starwork init --help/);
+});
+
+test("skill management v0.2 exposes main router and scoped skill layers", () => {
+  const systemSkillNames = fs.readdirSync(path.join(root, "skills"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  const kitSkillNames = fs.readdirSync(path.join(root, "kit-skills"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  const capabilitySkillPath = path.join(root, "core", "capabilities", "knowledge", "skills", "starworkKnowledgeProject", "SKILL.md");
+  const mainSkill = fs.readFileSync(path.join(root, "skills", "starwork", "SKILL.md"), "utf8");
+  const routing = fs.readFileSync(path.join(root, "skills", "starwork", "references", "routing.md"), "utf8");
+  const install = fs.readFileSync(path.join(root, "skills", "starwork", "references", "install.md"), "utf8");
+
+  assert.deepEqual(systemSkillNames, ["starwork", "starworkDoctor", "starworkInit", "starworkKnowledge", "starworkMultiagent"]);
+  assert.deepEqual(kitSkillNames, ["neat-freak", "starworkAudit", "starworkSpawn"]);
+  assert.equal(fs.existsSync(capabilitySkillPath), true);
+  assert.match(mainSkill, /StarWork 是给 AI 协作准备的项目工作台/);
+  assert.match(mainSkill, /references\/routing\.md/);
+  assert.match(mainSkill, /references\/install\.md/);
+  assert.match(mainSkill, /starworkInit/);
+  assert.match(mainSkill, /starworkDoctor/);
+  assert.match(mainSkill, /starworkKnowledge/);
+  assert.match(mainSkill, /starworkMultiagent/);
+  assert.doesNotMatch(mainSkill, /set_thread_title|create_thread|pages\/|synthesis\/|upgrade blueprint/);
+  assert.match(routing, /L0 主入口/);
+  assert.match(routing, /多 Agent[\s\S]*starworkMultiagent/);
+  assert.match(routing, /从项目中心创建项目[\s\S]*starworkSpawn/);
+  assert.match(install, /npx skills add jennie-shawn\/StarWork -g -a codex -y/);
+  assert.match(install, /starwork[\s\S]*starworkInit[\s\S]*starworkDoctor[\s\S]*starworkKnowledge[\s\S]*starworkMultiagent/);
+  assert.doesNotMatch(install, /全局安装[\s\S]*(starworkSpawn|starworkAudit|neat-freak|starworkKnowledgeProject)/);
+});
+
+test("specialist skill descriptions avoid fuzzy StarWork entrypoints", () => {
+  const specialists = ["starworkInit", "starworkDoctor", "starworkKnowledge", "starworkMultiagent"];
+  const fuzzyEntryPattern = /StarWork 是什么|怎么开始|安装 StarWork|帮我用 StarWork|能做什么/;
+
+  for (const name of specialists) {
+    const skill = fs.readFileSync(path.join(root, "skills", name, "SKILL.md"), "utf8");
+    assert.doesNotMatch(skillDescription(skill), fuzzyEntryPattern, `${name} description should not claim fuzzy entrypoints`);
+    assert.match(skill, /模糊|主入口|starwork` 主入口/, `${name} should point fuzzy requests back to starwork`);
+  }
+
+  const multiagent = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "SKILL.md"), "utf8");
+  assert.match(skillDescription(multiagent), /多 Agent|Agent Lanes|lane|跨会话|Codex/);
+  assert.match(multiagent, /多 Agent 分工/);
+  assert.match(multiagent, /lane/);
+  assert.match(multiagent, /跨会话/);
+  assert.match(multiagent, /Codex 标准/);
+});
+
+test("public docs describe main StarWork skill and keep kit skills out of global install", () => {
+  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  const installGuide = fs.readFileSync(path.join(root, "docs", "agent-install-guide.md"), "utf8");
+  const alphaGuide = fs.readFileSync(path.join(root, "docs", "alpha-test-guide.md"), "utf8");
+  const skillsReadme = fs.readFileSync(path.join(root, "skills", "README.md"), "utf8");
+  const managementSpec = fs.readFileSync(path.join(root, "core", "skill-management-spec.md"), "utf8");
+  const registry = fs.readFileSync(path.join(root, "docs", "cli-skill-registry.html"), "utf8");
+  const alphaExpectedSkills = alphaGuide.match(/预期只看到：\n\n([\s\S]*?)\n\n不应看到/)?.[1] || "";
+
+  assert.match(readme, /StarWork 主入口/);
+  assert.match(readme, /`starwork` 主入口/);
+  assert.doesNotMatch(readme, /全局安装[\s\S]*(starworkSpawn|starworkAudit|neat-freak|starworkKnowledgeProject)/);
+  assert.match(installGuide, /StarWork 主入口和专家 Skills/);
+  assert.match(installGuide, /`starwork`/);
+  assert.match(installGuide, /`starworkInit`/);
+  assert.match(installGuide, /`starworkDoctor`/);
+  assert.match(installGuide, /`starworkKnowledge`/);
+  assert.match(installGuide, /`starworkMultiagent`/);
+  assert.doesNotMatch(installGuide, /确认能看到[\s\S]*(starworkSpawn|starworkAudit|neat-freak|starworkKnowledgeProject)/);
+  assert.match(alphaGuide, /L0 主入口 \+ L1 专家 Skills/);
+  assert.match(alphaGuide, /`starwork`/);
+  assert.match(alphaGuide, /`starworkInit`/);
+  assert.match(alphaGuide, /`starworkDoctor`/);
+  assert.match(alphaGuide, /`starworkKnowledge`/);
+  assert.match(alphaGuide, /`starworkMultiagent`/);
+  assert.doesNotMatch(alphaExpectedSkills, /starworkSpawn|starworkAudit|neat-freak|starworkKnowledgeProject/);
+  assert.match(skillsReadme, /L0 主入口/);
+  assert.match(skillsReadme, /L1 系统专家/);
+  assert.match(skillsReadme, /L2 Kit 自带/);
+  assert.match(skillsReadme, /L3 Capability 项目内/);
+  assert.match(managementSpec, /L0 主入口 Skill/);
+  assert.match(managementSpec, /starwork/);
+  assert.match(registry, /10 个可用 CLI 命令和 9 个 StarWork 自研 Skill/);
+  assert.match(registry, /5 个全局系统 Skill、3 个 Kit 自带 Skill、1 个 Capability 项目内 Skill/);
+  assert.match(registry, /starwork<\/code>/);
+  assert.match(registry, /L0 主入口/);
+  assert.match(registry, /starworkAudit<\/code>/);
+  assert.match(registry, /L2 Kit 自带/);
+  assert.match(registry, /starworkKnowledgeProject<\/code>/);
+  assert.match(registry, /L3 Capability 项目内/);
 });
 
 test("starworkMultiagent skill uses Codex standard session tools directly", () => {
