@@ -8,7 +8,7 @@
 
 | ID | 标题 | 类型 | 优先级 | 状态 | 负责人 | 来源 | 详情 | 下一步 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| ISSUE-020 | Codex App 中 multiagent instruct 未使用原生线程消息而降级为人工转交 | cli / skill / adapter / workflow | P1 | new | development lane | GitHub Issue #8 / 用户反馈 | [ISSUE-020.md](ISSUE-020.md) | 复核 Codex App 已绑定 lane 的真实投递链路，区分直接送达、本地记录和人工转交状态。 |
+| ISSUE-020 | Codex App 中 multiagent instruct 未使用原生线程消息而降级为人工转交 | cli / skill / adapter / workflow | P1 | closed | development lane | GitHub Issue #8 / 用户反馈 | [ISSUE-020.md](ISSUE-020.md) | 已关闭：MultiAgent v0.8 复验通过，Codex App 正常路径由 Skill 直接调用标准线程工具，CLI 只做项目事实源记录。 |
 | ISSUE-019 | doctor 应检查必需 Kit Skills 并给出安全修复指引 | cli / core / kit-pack / skill | P1 | closed | development lane | GitHub Issue #7 | [ISSUE-019.md](ISSUE-019.md) | 已关闭：Workspace Doctor v0.1 复验通过，Hub Kit required skills 覆盖 `starworkSpawn` / `starworkAudit`，普通 doctor warn，strict fail。 |
 | ISSUE-018 | doctor 应尊重 preserve-names Hub 的 Skill 注册表路径 | cli / core / kit-pack | P1 | closed | development lane | GitHub Issue #6 | [ISSUE-018.md](ISSUE-018.md) | 已关闭：Workspace Doctor v0.1 复验通过，preserve-names Hub 优先使用 `core_role_mapping` 中的 `skills/` 路径。 |
 | ISSUE-017 | MultiAgent launch 生成的会话缺少会话控制工具 | skill / cli / adapter / workflow | P1 | closed | development lane | 用户反馈 / 测试发现 | [ISSUE-017.md](ISSUE-017.md) | 已关闭：v0.7 复验通过，Codex 场景由 starworkMultiagent 直接调用标准工具，CLI 只做状态和模板辅助。 |

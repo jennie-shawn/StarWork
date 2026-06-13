@@ -19,9 +19,9 @@ StarWork 当前已经实现的 multiagent 不是“启动多个模型”，而�
 
 - `product/core/agent-lanes-spec.md` 定义 lane registry、session binding、write scope、worklog、lane workspace、shared context。
 - `product/cli/src/cli.js` 已实现 `starwork multiagent init/add/bind/release/status/share`。
-- `starwork multiagent bind` 支持 `--session-name`，可以在绑定 lane 后 best-effort 同步 Codex 宿主会话名。
-- Codex 会话命名增强通过 `codex app-server --listen stdio://` 调用 `thread/name/set`，失败只 warning，不回滚 lane binding。
-- `product/skills/starworkMultiagent/SKILL.md` 把自然语言“登记当前会话为常用智能体”转换为 `init/add/bind/share` 等安全命令，写入类命令先 dry-run。
+- `product/skills/starworkMultiagent/SKILL.md` 把自然语言“登记当前会话为常用智能体”“创建 Agent 团队”“发送跨 lane 指令”转换为安全的 Skill 流程。
+- Codex App 正常路径中，Skill 直接调用 `create_thread`、`send_message_to_thread`、`read_thread`、`set_thread_title`、`set_thread_pinned`、`set_thread_archived`。
+- CLI 只记录 StarWork 项目事实源，例如 lane、binding、shared outputs 和 `request record`。
 
 这意味着 StarWork 的关键价值不是替代 Codex 会话管理，而是让不同宿主里的会话获得稳定职责、写入边界、共享索引和可交接上下文。
 
@@ -179,7 +179,7 @@ CLI 仍叫 `multiagent bind`，但用户教学语言应偏产品化。
 | Adapter 能力 | Codex 当前可行性 | 是否进入 Core |
 |---|---|---|
 | session id detection | 部分可行，`codex:<thread-id>` | Core 需要 session 字符串，不强制自动识别 |
-| rename session | 已在本项目实现 `thread/name/set` | Adapter 增强 |
+| rename session | Codex App 正常路径使用 `set_thread_title` | Skill 标准线程工具 |
 | list sessions | 运行时已暴露 `list_threads` | Adapter 增强 |
 | read session summary | 运行时已暴露 `read_thread` | Adapter 增强 |
 | continue session | 运行时已暴露 `send_message_to_thread` | Adapter 增强 |
@@ -242,7 +242,7 @@ Codex 新会话能力 = 让这些职责位在宿主工具里更容易被命名�
 ### P0：课程前必须讲清楚
 
 - StarWork 的事实源在项目内，不在 Codex 私有状态里。
-- `--session-name` 是显示增强，不是绑定事实源。
+- Codex 会话标题、置顶和归档是 Skill 调用标准线程工具后的宿主显示动作，不是绑定事实源。
 - lane workspace 放过程材料，正式产物仍进 `product/docs/` 等项目正式目录。
 - `shared.md` 只登记索引，不搬运文件。
 

@@ -2,31 +2,31 @@
 
 ## 状态
 
-- 版本：v0.1 draft
+- 版本：v0.8 accepted implementation note
 - 所属模块：StarWork Skills
 - Skill 名称：`starworkMultiagent`
 - 相关命令：`starwork multiagent`
 - 相关 Core 能力：Agent Lanes
-- 实现状态：已实现第一版
-- 目标：帮助 Agent 把用户关于常用智能体、会话职责、多 Agent 分工和跨 lane 输出共享的自然语言请求，转换成安全的 `starwork multiagent` 命令组合
+- 实现状态：已按 Codex 标准线程工具边界收敛
+- 目标：帮助 Agent 把用户关于常用智能体、会话职责、多 Agent 分工、跨 lane 消息和共享输出的自然语言请求，转换成安全的 StarWork 协作流程
 
 ## 一句话定义
 
-`starworkMultiagent` 是 StarWork 多 Agent 协作设计和命令包装 skill。
+`starworkMultiagent` 是 StarWork 多 Agent 协作设计与 Codex App 线程控制 skill。
 
-它不是 `starwork multiagent` 命令本身，而是命令执行前的 AI 判断层：
+它不是 `starwork multiagent` 命令本身。Skill 在 Codex App 正常路径中直接调用标准线程工具；CLI 只记录 StarWork 项目事实源。
 
 ```text
-用户说“把当前会话登记成负责 X 的常用智能体”
+用户说“让开发 lane 开始修复 issue”
   ↓
-starworkMultiagent 判断 lane、职责、写入范围和 session
+starworkMultiagent 读取 StarWork binding
   ↓
-生成 init / add / bind / share 等 dry-run 命令
+Skill 组装 STARWORK:MULTIAGENT_MESSAGE
   ↓
-用户确认后交给 starwork multiagent 执行
+send_message_to_thread 投递到目标 Codex thread
+  ↓
+multiagent request record 记录真实投递状态
 ```
-
-CLI 保持工程语义；Skill 提供用户语义。
 
 ## 事实源
 
@@ -34,20 +34,23 @@ Agent Lanes 协议事实源是：
 
 ```text
 product/core/agent-lanes-spec.md
+product/planning/features/multiagent/specs/v0.8-skill-cli-minimal-boundary.md
 ```
 
-本 SPEC 只规定 skill 如何判断、追问和调用 CLI，避免重复维护协议。
+本 SPEC 只规定 skill 如何判断、追问、调用标准线程工具和记录 CLI 状态，避免重复维护协议。
 
 ## 设计边界
 
 `starworkMultiagent` 应该做：
 
-- 判断用户是在初始化协作层、登记当前会话、增加 lane、绑定会话、释放会话、查看状态，还是登记共享输出。
-- 采访 lane ID、职责、写入范围、session ID、可选宿主会话显示名称、共享输出受众。
-- 判断过程材料应进入 lane workspace，还是应晋升到项目正式输出目录。
-- 生成可 dry-run 的 `starwork multiagent` 命令。
-- 在用户确认后执行写入类命令。
-- 用 `status --json` 解释当前协作状态。
+- 判断用户是在初始化协作层、登记当前会话、增加 lane、绑定会话、释放会话、查看状态、发送跨 lane 指令，还是登记共享输出。
+- 采访 lane ID、职责、写入范围、真实 Codex thread id、共享输出受众。
+- 在 Codex App 中直接调用 `create_thread`、`send_message_to_thread`、`read_thread`、`list_threads`、`set_thread_title`、`set_thread_pinned`、`set_thread_archived`。
+- Skill 自己组装 `STARWORK:MULTIAGENT_MESSAGE v1`。
+- 用 `multiagent status --target <path> --json` 读取绑定。
+- 用 `multiagent bind` 记录真实 thread 绑定。
+- 用 `multiagent request record` 记录真实投递结果。
+- 用 `multiagent share` 登记共享输出索引。
 
 `starworkMultiagent` 不应该做：
 
@@ -57,136 +60,79 @@ product/core/agent-lanes-spec.md
 - 替用户决定项目一定需要多少 lane。
 - 把 lane workspace 当成项目正式输出目录。
 - 搬运或复制共享输出文件。
+- 在 Codex App 正常路径中把会话创建、消息投递、读取、命名、置顶或归档交给 CLI 伪装完成。
+- 在标准工具不可见或失败时宣称已自动送达。
 
-## 用户语义与 CLI 映射
+## 用户语义与主流程
 
-| 用户语义 | Skill 判断 | CLI |
+| 用户语义 | Skill 判断 | 主流程 |
 |---|---|---|
-| “把当前会话创建为一个常用智能体，负责 X” | 最常见入口；必要时初始化协作层，创建 lane 并绑定 session | `init` + `add` + `bind` |
-| “初始化 multiagent / Agent Lanes” | 创建协议文件和可选空 lane | `init` |
-| “新增一个负责 X 的 Agent” | 创建稳定职责位，当前不一定绑定 session | `add` |
-| “把当前 Codex 绑定到 review” | 将当前具体会话绑定到已有 lane | `bind` |
-| “释放这个职责位” | 解除当前 session 绑定 | `release` |
-| “看看当前分工” | 只读查看协作状态 | `status --json` |
-| “这个输出给 writing 和 review 看” | 登记共享输出索引 | `share` |
+| “把当前会话创建为一个常用智能体，负责 X” | 登记当前会话为一个稳定职责位 | 必要时 `init` / `add`，标准工具处理宿主显示动作，再 `bind` |
+| “初始化 multiagent / Agent Lanes” | 创建协议文件和可选空 lane | `multiagent init` |
+| “新增一个负责 X 的 Agent” | 创建稳定职责位，当前不一定绑定 session | `multiagent add` |
+| “把当前 Codex 绑定到 review” | 将当前具体会话绑定到已有 lane | `multiagent bind` |
+| “释放这个职责位” | 解除当前 session 绑定 | `set_thread_archived` 可选，再 `multiagent release` |
+| “看看当前分工” | 只读查看协作状态 | `multiagent status --target <path> --json` |
+| “这个输出给 writing 和 review 看” | 登记共享输出索引 | `multiagent share` |
+| “让开发 lane 开始开发” | 结构化跨会话指令 | `status` 读取绑定，Skill 组装消息，`send_message_to_thread` 投递，`request record` 记录 |
+| “看看开发 lane 做到哪了” | 宿主观察加 StarWork 状态汇总 | `status` 读取绑定，再 `read_thread` / `list_threads` |
+| “创建产品、开发、验收三个智能体” | 创建并绑定可工作的独立会话 | 必要时 `doctor` / `init` / `add`，再 `create_thread` / `set_thread_title` / `set_thread_pinned` / `bind` |
 
-## 常见入口：登记当前会话为常用智能体
+## Skill-owned Message
 
-这是 skill 的核心体验，不要求用户理解 `init`、`add` 和 `bind` 的区别。
+Skill 直接渲染完整消息，不向 CLI 索要消息模板。
+
+Instruction Message 必须包含：
+
+- `STARWORK:MULTIAGENT_MESSAGE v1` 包装。
+- `message_type: instruction`。
+- `request_id`、`from_lane`、`to_lane`、`created_at`、`recorded_in`。
+- 用户指令正文。
+- write scope、安全边界和当前工作区。
+- 完成后回报要求。
+
+Launch Message 使用同一包装，但正文应描述 lane 职责、写入范围、当前工作区、启动后的第一步和回报方式。
+
+## 常见入口：创建 Agent 团队
+
+“创建 Agent 团队”不是只创建 lane。完整成功标准是：每个目标职责都有 lane、每个 lane 已绑定可工作的独立 session，或者输出中明确说明哪些 lane 未完成以及阻塞原因。
 
 流程：
 
-1. 读取 `AGENTS.md` 和当前工作区状态。
-2. 检查 `_系统/协作/agent-lanes.md` 是否存在。
-3. 若不存在，先生成：
+1. `starwork doctor --target <path> --json` 确认工作台健康；如需启用协作层，使用 `multiagent init`。
+2. 对缺失 lane 使用 `multiagent add`，先 dry-run，用户确认后写入。
+3. Skill 为每个 lane 组装 Launch Message。
+4. 用 `create_thread` 创建独立 Codex thread。
+5. 用 `set_thread_title` 设置短标题，格式固定 `<职责名> Agent`。
+6. 用户要求置顶时，用 `set_thread_pinned`。
+7. `create_thread` 返回 thread id 后，用 `multiagent bind` 记录绑定。
+8. 任一标准工具失败时，输出 `manual_handoff_required`，给出完整可复制 Launch Message，并明确尚未自动创建或绑定。
+
+## 常见入口：发送跨 lane 指令
+
+流程：
+
+1. 用 `multiagent status --target <path> --json` 读取目标 lane binding。
+2. 未绑定时，先协助用户绑定已有会话或创建新会话。
+3. Skill 组装 Instruction Message。
+4. 用 `send_message_to_thread` 投递。
+5. 成功后运行：
 
 ```bash
-starwork multiagent init --target <path> --dry-run
+starwork multiagent request record --from <from-lane> --to <to-lane> --message "<text>" --host-delivery delivered_via_codex_thread_tool --delivery-tool send_message_to_thread --target <path> --yes
 ```
 
-4. 确认 lane ID、职责、写入范围和 session ID。
-   默认过程工作区为 `_系统/协作/lanes/<lane-id>/workspace/`。
-5. 若 lane 不存在，生成：
+6. 如果标准工具失败，输出 `manual_handoff_required` 和完整消息；如果只是补记已经发生的人工动作，使用 `recorded_only`。
 
-```bash
-starwork multiagent add <lane> --purpose "<text>" --write "<path-globs>" --target <path> --dry-run
-```
+## `request record` 状态语义
 
-6. 生成绑定命令：
+`--host-delivery` 支持：
 
-```bash
-starwork multiagent bind <lane> --session <agent:session-id> --session-name "<display-name>" --target <path> --dry-run
-```
-
-7. 用户确认后用 `--yes` 执行。
-8. 执行后运行：
-
-```bash
-starwork multiagent status --target <path> --json
-```
-
-并总结当前分工。
-
-## 子命令判断边界
-
-### `init`
-
-`init` 初始化协议文件，不等于“创建一个智能体”。
-
-适合：
-
-- 用户明确要求启用 Agent Lanes。
-- 用户一次性给出多个初始 lane。
-- skill 发现登记当前会话前缺少协作层。
-
-不适合：
-
-- lane 已存在时重复初始化。
-- 用作修改 lane 职责或绑定 session。
-
-### `add`
-
-`add` 新增稳定职责位。
-
-必须有：
-
-- `lane-id`
-- `purpose`
-- `write_scope`
-
-如果用户只说“负责 X”，但没有写入范围，skill 应追问或给出保守建议并等待确认。
-
-### `bind`
-
-`bind` 将具体 session 绑定到 lane。
-
-优先使用真实 session ID；无法识别时要求用户提供 `--session <agent:session-id>`。若目标 lane 已绑定其他 session，默认不覆盖，先确认。
-
-如果用户希望把宿主工具中的会话标题也改成该 Agent 的职责名称，skill 可以加入 `--session-name <name>`。这只是宿主显示增强，不是 StarWork 事实源；必须在 dry-run 中让用户看到，并说明失败不会影响绑定。
-
-推荐命名格式：
-
-```text
-<项目或产品名> <职责> Agent
-```
-
-例如：
-
-```text
-StarWork 新功能预研 Agent
-StarWork CLI 维护 Agent
-```
-
-### `release`
-
-`release` 释放绑定，不删除 lane。
-
-执行前提醒用户更新对应 worklog，避免下一个会话接不上。
-
-### `status`
-
-`status` 是只读命令，可以直接执行。
-
-skill 应解释：
-
-- lane 是否完整。
-- 哪些 lane 处于 `unbound`。
-- 当前 session 是否可识别。
-- shared outputs / requests 是否需要关注。
-
-### `share`
-
-`share` 只登记共享索引。
-
-必须确认：
-
-- from lane
-- title
-- relative path
-- audience lanes
-- status
-
-不移动、不复制原文件。
+- `delivered_via_codex_thread_tool`：Codex App 标准线程工具真实投递成功。
+- `recorded_only`：仅记录事实，不表示自动送达。
+- `manual_handoff_required`：需要用户复制消息到目标会话。
+- `failed`：投递或记录失败。
+- `delivered`：历史兼容值；Codex App 正常路径不要新写入该状态。
 
 ## Lane Workspace 与正式输出
 
@@ -194,6 +140,7 @@ skill 应解释：
 
 ```text
 _系统/协作/lanes/<lane-id>/workspace/
+_system/collaboration/lanes/<lane-id>/workspace/
 ```
 
 它用于：
@@ -211,72 +158,24 @@ _系统/协作/lanes/<lane-id>/workspace/
 - 发布稿、确认稿、版本记录。
 - 可被整个项目长期引用的稳定成果。
 
-推荐流转：
-
-```text
-lane workspace 产生过程材料
-  -> 如需其他 lane 读取，登记 shared.md
-  -> 如被确认有项目价值，晋升到正式输出目录
-  -> 晋升后以正式输出目录为准
-```
-
-skill 判断放置位置时遵循：
-
-- 用户说“草稿、笔记、临时分析、先整理一下”，优先建议 lane workspace。
-- 用户说“最终版、发布、确认稿、产品文档、正式沉淀”，优先建议项目正式输出目录。
-- workspace 内容需要其他 lane 读取时，建议生成 `starwork multiagent share ... --path "_系统/协作/lanes/<lane-id>/workspace/<file>"`。
-
-## 输出结构
-
-讨论阶段：
-
-```markdown
-## Multiagent 建议
-
-- 目标：
-- lane：
-- 职责：
-- 写入范围：
-- 当前会话：
-- dry-run 命令：
-
-## 待确认
-
-- ...
-```
-
-执行阶段：
-
-```markdown
-## 已执行
-
-- ...
-
-## 当前分工
-
-- ...
-
-## 下一步
-
-- ...
-```
+workspace 内容需要其他 lane 读取时，建议生成 `starwork multiagent share ... --path "_系统/协作/lanes/<lane-id>/workspace/<file>"`。
 
 ## 安全约束
 
-- 写入类命令默认先 dry-run。
+- 写入类 CLI 命令默认先 dry-run。
 - 用户明确要求执行或确认后，才使用 `--yes`。
 - 只读 `status` 可以直接运行。
 - 不创建默认 lane 模板。
 - 不静默覆盖已有绑定。
-- 不在用户未确认时猜测并写入宿主会话名。
 - 不绕过 StarWork 工作区边界。
 - 不修改 `matters/registry.md`。
 - 不把 lane workspace 当成项目正式事实源。
+- 标准线程工具不可见或失败时，不调用 CLI 子命令伪装自动投递或自动创建。
 
 ## 验收标准
 
-- 给定“请把当前会话创建为一个负责资料整理的常用智能体”，skill 能解释为“登记当前会话为常用智能体”，并生成必要的 `init`、`add`、`bind` 命令。
-- 给定“我想让三个 Agent 分别负责资料、写作、审校”，skill 生成项目自定义 lane 建议，不输出固定开发模板。
-- 给定“把当前 Codex 绑定到 review”，skill 要求或使用 session ID，并生成 `starwork multiagent bind review ...`。
-- 给定“把当前会话登记成 StarWork CLI 维护 Agent”，skill 生成包含 `--session-name "StarWork CLI 维护 Agent"` 的 dry-run，并说明这是宿主会话显示增强。
+- 给定“让开发 lane 开始实现”，skill 用 `multiagent status --target <path> --json` 查绑定，自己组装 `STARWORK:MULTIAGENT_MESSAGE v1`，用 `send_message_to_thread` 投递，再用 `multiagent request record` 写入 `delivered_via_codex_thread_tool`。
+- 给定“创建产品、开发、验收三个智能体”，skill 用 `create_thread` 建会话，用 `set_thread_title` 设置 `<职责名> Agent`，必要时用 `set_thread_pinned`，再用 `multiagent bind` 记录。
+- 给定“看看开发 lane 做到哪了”，skill 用 `multiagent status --target <path> --json` 查绑定，再用 `read_thread` 或 `list_threads` 观察。
+- 给定标准线程工具不可见或失败，skill 输出 `manual_handoff_required` 和完整可复制消息，并说明尚未自动送达。
 - 给定“这个输出给 writing 和 review 看”，skill 生成 `starwork multiagent share ...`，不移动原文件。

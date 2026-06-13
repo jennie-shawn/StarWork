@@ -143,7 +143,13 @@ const AGENT_DOCS_PLAN_SCHEMA = "starwork.agent_docs_plan.v0.1";
 const AGENT_DOCS_DRAFT_DIR = path.join(".starwork", "drafts");
 const LEGACY_AGENT_DOC_SIDECARS = ["AGENTS.starwork.md", "AGENTS.starwork-new.md", "README.starwork-new.md", "CLAUDE.starwork.md"];
 const MANUAL_HANDOFF_STATUS = "manual_handoff_required";
-const HOST_DELIVERY_STATUSES = new Set(["delivered", MANUAL_HANDOFF_STATUS, "failed"]);
+const HOST_DELIVERY_STATUSES = new Set([
+  "delivered",
+  "delivered_via_codex_thread_tool",
+  "recorded_only",
+  MANUAL_HANDOFF_STATUS,
+  "failed"
+]);
 
 const KIT_BUNDLED_SKILLS = {
   hub: [
@@ -10027,7 +10033,7 @@ Subcommands:
   starwork multiagent bind research --session codex:manual-research-1 --session-name "Research Agent" --target ./my-workspace --yes
   starwork multiagent status --host --target ./my-workspace --json
   starwork multiagent message instruct development --from product-planning --message "请根据 SPEC 开始实现。" --target ./my-workspace --json
-  starwork multiagent request record --from product-planning --to development --message "请根据 SPEC 开始实现。" --host-delivery delivered --delivery-tool send_message_to_thread --target ./my-workspace --yes
+  starwork multiagent request record --from product-planning --to development --message "请根据 SPEC 开始实现。" --host-delivery delivered_via_codex_thread_tool --delivery-tool send_message_to_thread --target ./my-workspace --yes
 `);
 }
 
@@ -10264,7 +10270,7 @@ Options:
   --from <lane-id>
   --to <lane-id>
   --message <text>
-  --host-delivery <delivered|manual_handoff_required|failed>
+  --host-delivery <delivered_via_codex_thread_tool|recorded_only|manual_handoff_required|failed>
   --delivery-tool <tool-name>
   --id <request-id>
   --json

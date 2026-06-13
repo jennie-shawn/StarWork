@@ -258,7 +258,10 @@ test("starworkMultiagent skill uses Codex standard session tools directly", () =
   assert.doesNotMatch(skill, /Codex app-server|app-server/);
   assert.doesNotMatch(skill, /Claude Code \|/);
   assert.doesNotMatch(skill, /multiagent launch --lanes/);
-  assert.doesNotMatch(skill, /starwork multiagent instruct/);
+  assert.doesNotMatch(skill, /starwork multiagent instruct|starwork multiagent launch/);
+  assert.doesNotMatch(skill, /multiagent message instruct|multiagent message launch/);
+  assert.doesNotMatch(skill, /multiagent read --host codex|multiagent status --host codex/);
+  assert.doesNotMatch(skill, /--session-name|--pin/);
   assert.doesNotMatch(skill, /launch_status|binding_status|host_action_required|host-action complete/);
   assert.doesNotMatch(skill, /thread\/start|turn\/start|thread\/resume|thread\/name\/set|thread\/read|thread\/list/);
   assert.match(skill, /<职责名> Agent/);
@@ -266,13 +269,15 @@ test("starworkMultiagent skill uses Codex standard session tools directly", () =
   assert.match(skill, /send_message_to_thread/);
   assert.match(skill, /read_thread/);
   assert.match(skill, /set_thread_title/);
-  assert.match(skill, /session_name` 是唯一的默认标题建议/);
-  assert.match(skill, /set_thread_title\(threadId, session_name\)/);
-  assert.match(skill, /不要从 `purpose`、Launch Message 或用户使用场景长句自行拼标题/);
   assert.match(skill, /set_thread_pinned/);
   assert.match(skill, /set_thread_archived/);
-  assert.match(skill, /multiagent message launch/);
+  assert.match(skill, /multiagent status --target/);
+  assert.match(skill, /multiagent add/);
+  assert.match(skill, /multiagent bind/);
+  assert.match(skill, /multiagent share/);
   assert.match(skill, /multiagent request record/);
+  assert.match(skill, /delivered_via_codex_thread_tool/);
+  assert.match(skill, /STARWORK:MULTIAGENT_MESSAGE v1/);
   assert.match(skill, /manual_handoff_required/);
   assert.match(skill, /pending_merge/);
 });
@@ -1773,27 +1778,20 @@ test("multiagent launch does not call fake codex app-server even when available"
   assert.equal(fs.existsSync(inputPath), false);
 });
 
-test("multiagent message instruct and request record support Skill direct-tool flow", () => {
+test("multiagent request record supports Codex thread-tool delivery status", () => {
   const dir = tempDir();
   runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
   runCommand(["multiagent", "init", "--target", dir, "--yes"]);
   runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
   runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
 
-  const message = runCommand([
-    "multiagent", "message", "instruct", "development",
-    "--from", "product-planning",
-    "--message", "请开始实现 v0.7。",
-    "--target", dir,
-    "--json"
-  ]);
-  const messageResult = JSON.parse(message.stdout);
+  const message = "<!-- STARWORK:MULTIAGENT_MESSAGE v1 -->\n\n请开始实现 v0.8。\n\n<!-- /STARWORK:MULTIAGENT_MESSAGE -->";
   const record = runCommand([
     "multiagent", "request", "record",
     "--from", "product-planning",
     "--to", "development",
-    "--message", "请开始实现 v0.7。",
-    "--host-delivery", "delivered",
+    "--message", message,
+    "--host-delivery", "delivered_via_codex_thread_tool",
     "--delivery-tool", "send_message_to_thread",
     "--target", dir,
     "--json",
@@ -1803,16 +1801,37 @@ test("multiagent message instruct and request record support Skill direct-tool f
   const shared = fs.readFileSync(path.join(dir, "_系统", "协作", "shared.md"), "utf8");
   const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
 
-  assert.equal(message.status, 0);
-  assert.equal(messageResult.type, "instruction");
-  assert.equal(messageResult.to_lane, "development");
-  assert.match(messageResult.message, /STARWORK:MULTIAGENT_MESSAGE v1/);
   assert.equal(record.status, 0);
-  assert.equal(recordResult.host_delivery.status, "delivered");
+  assert.equal(recordResult.host_delivery.status, "delivered_via_codex_thread_tool");
   assert.equal(recordResult.host_delivery.delivery_tool, "send_message_to_thread");
-  assert.match(shared, /product-planning \| development \| 请开始实现 v0\.7。 \| delivered \| delivered/);
-  assert.equal(state.requests[0].host_delivery.status, "delivered");
+  assert.match(shared, /product-planning \| development \| .*请开始实现 v0\.8.* \| delivered_via_codex_thread_tool \| delivered_via_codex_thread_tool/);
+  assert.equal(state.requests[0].host_delivery.status, "delivered_via_codex_thread_tool");
   assert.equal(state.requests[0].host_delivery.delivery_tool, "send_message_to_thread");
+});
+
+test("multiagent request record accepts recorded-only Codex boundary status", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+
+  const record = runCommand([
+    "multiagent", "request", "record",
+    "--from", "product-planning",
+    "--to", "development",
+    "--message", "只记录，不代表自动送达。",
+    "--host-delivery", "recorded_only",
+    "--delivery-tool", "manual",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ]);
+  const recordResult = JSON.parse(record.stdout);
+
+  assert.equal(record.status, 0);
+  assert.equal(recordResult.host_delivery.status, "recorded_only");
+  assert.equal(recordResult.host_delivery.delivery_tool, "manual");
 });
 
 test("multiagent launch refuses non-StarWork targets without sidecar initialization", () => {

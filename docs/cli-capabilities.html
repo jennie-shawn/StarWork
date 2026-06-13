@@ -665,20 +665,20 @@ node cli/bin/starwork.js adapt claude --target ./workspace --yes</pre>
             <h3><code>multiagent</code></h3>
             <span class="badge">协作</span>
           </div>
-          <p>为同一项目建立自定义 AI 职责位，绑定具体会话，登记跨 lane 可读输出，并按宿主能力自动交付或降级为人工交付。</p>
+          <p>为同一项目建立自定义 AI 职责位，绑定具体会话，登记跨 lane 可读输出，并记录由 Skill 或人工完成的交付状态。</p>
           <ul>
             <li>不内置固定职责，lane 由项目场景定义。</li>
             <li>使用 <code>_系统/协作/agent-lanes.md</code> 作为分工索引。</li>
             <li>使用 <code>_系统/协作/shared.md</code> 登记跨 lane 共享输出。</li>
             <li>使用 <code>.starwork/agent-lanes/state.json</code> 记录宿主 metadata 和 delivery state。</li>
-            <li>Codex 支持自动读取、发送和 launch；Claude Code 支持 resume 命令和 transcript 摘要。</li>
+            <li>Codex App 的创建、读取和发送由 <code>starworkMultiagent</code> 直接调用标准线程工具；CLI 只记录项目事实源。</li>
             <li>Cursor / Trae 默认返回 <code>manual_handoff_required</code>，不伪装自动送达。</li>
-            <li>支持 <code>status --host</code>、<code>read</code>、<code>instruct</code>、<code>handoff</code>、<code>continue</code>、<code>launch</code> 和 <code>bind --pin</code>。</li>
+            <li>支持 <code>init</code>、<code>add</code>、<code>bind</code>、<code>release</code>、<code>status</code>、<code>share</code>、<code>request record</code>，以及非 Codex 宿主的人工交接辅助。</li>
             <li>不写入任务系统或锁机制，不依赖宿主前端是否即时刷新。</li>
           </ul>
           <pre>node cli/bin/starwork.js multiagent init --lanes research,writing,review --target ./workspace --yes
 node cli/bin/starwork.js multiagent status --host --target ./workspace --json
-node cli/bin/starwork.js multiagent instruct development --from product-planning --message "请根据 SPEC 开始实现。" --target ./workspace --dry-run
+node cli/bin/starwork.js multiagent request record --from product-planning --to development --message "请根据 SPEC 开始实现。" --host-delivery recorded_only --delivery-tool manual --target ./workspace --dry-run
 node cli/bin/starwork.js multiagent handoff review --from research --message "请手动验收。" --target ./workspace --dry-run</pre>
         </article>
 

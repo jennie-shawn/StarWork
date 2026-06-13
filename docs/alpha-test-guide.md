@@ -188,9 +188,9 @@ starwork spawn \
 starwork doctor --target ~/Desktop/starwork-alpha-project
 ```
 
-### 4. 可选：验证 MultiAgent 会话创建与跨会话交付
+### 4. 可选：验证 MultiAgent 职责位与 Codex 标准会话工具
 
-这一步适合希望测试多个 Agent 职责位、独立会话创建和跨会话交付降级的用户。
+这一步适合希望测试多个 Agent 职责位、独立会话创建和跨会话交付的用户。Codex App 正常路径由 `starworkMultiagent` Skill 直接调用标准线程工具；CLI 只记录项目内事实源。
 
 先初始化项目内的职责位：
 
@@ -201,41 +201,33 @@ starwork multiagent init \
   --yes
 ```
 
-为 product-planning 和 development 职责位批量创建独立会话并发送启动消息：
+为 product-planning 和 development 职责位创建独立 Codex 会话时，请在 Codex App 中让 `starworkMultiagent` 继续执行“创建 Agent 团队”。预期流程是：
+
+- Skill 组装 Launch Message。
+- Skill 调用 `create_thread` 创建目标会话。
+- Skill 调用 `set_thread_title`，标题格式为 `<职责名> Agent`。
+- 如用户要求置顶，Skill 调用 `set_thread_pinned`。
+- 创建成功后，Skill 用 `starwork multiagent bind` 记录 `codex:<thread-id>`。
+
+检查：
 
 ```bash
-starwork multiagent launch \
-  --lanes product-planning,development \
-  --target ~/Desktop/starwork-alpha-project \
-  --json \
-  --yes
-```
-
-检查 JSON 中每个 lane 的 `binding_status`。只有 `bound` 表示该 Agent 已创建并绑定可工作的独立会话；`rename_status` 为 `warning` 时，说明宿主会话自动命名失败，需要按返回信息处理。
-
-向 development 职责位发送一条跨会话指令：
-
-```bash
-starwork multiagent instruct development \
-  --from product-planning \
-  --message "请读取当前项目入口，并用一句话汇报你看到的工作台状态。" \
-  --target ~/Desktop/starwork-alpha-project \
-  --json \
-  --yes
-```
-
-当前 CLI 只有在运行时发现宿主标准后台投递能力时才会返回 `delivered`。如果返回 `manual_handoff_required`，表示已生成可复制交付消息，需要用户手动发给目标会话；这不是失败。
-
-读取目标职责位当前可观察状态：
-
-```bash
-starwork multiagent read development \
-  --turns 3 \
+starwork multiagent status \
   --target ~/Desktop/starwork-alpha-project \
   --json
 ```
 
-预期：`launch` 成功时返回 `completed`；`instruct` 会根据 CLI 运行时宿主路由返回 `delivered`、`manual_handoff_required`、`needs_adapt`、`unbound` 等状态。`delivered` 只表示消息已投递，不表示目标任务完成；`manual_handoff_required` 表示需要手动复制交付消息。
+只有 lane 绑定了真实 `codex:<thread-id>`，才表示该 Agent 已创建并绑定可工作的独立会话。
+
+向 development 职责位发送一条跨会话指令：
+
+在 Codex App 中让 `starworkMultiagent` 执行“让 development lane 读取当前项目入口，并用一句话汇报工作台状态”。预期流程是：Skill 读取 `multiagent status --target ~/Desktop/starwork-alpha-project --json`，自己组装 `STARWORK:MULTIAGENT_MESSAGE`，调用 `send_message_to_thread`，再用 `starwork multiagent request record` 写入 `delivered_via_codex_thread_tool`。
+
+读取目标职责位当前可观察状态：
+
+在 Codex App 中让 `starworkMultiagent` 执行“看看 development lane 做到哪了”。预期流程是：Skill 读取 `multiagent status --target ~/Desktop/starwork-alpha-project --json`，再调用 `read_thread` 或 `list_threads` 观察 Codex 会话。
+
+预期：标准工具成功时，StarWork request 记录为 `delivered_via_codex_thread_tool`。如果标准工具不可见或调用失败，Skill 应输出 `manual_handoff_required` 和完整可复制消息，并明确尚未自动送达。
 
 ### 5. 可选：验证 Host Adapter
 
@@ -280,12 +272,11 @@ starwork multiagent bind development \
   --target ~/Desktop/starwork-alpha-project \
   --yes
 
-starwork multiagent instruct development \
+starwork multiagent handoff development \
   --from product-planning \
   --message "请读取当前项目入口，并用一句话汇报你看到的工作台状态。" \
   --target ~/Desktop/starwork-alpha-project \
-  --json \
-  --yes
+  --json
 ```
 
 预期：Trae 目标应返回 `manual_handoff_required`，表示已经生成可复制交付消息，但没有自动送达。
@@ -325,15 +316,9 @@ starwork multiagent status \
 starwork multiagent continue development \
   --target ~/Desktop/starwork-alpha-project \
   --json
-
-starwork multiagent launch development \
-  --host trae \
-  --target ~/Desktop/starwork-alpha-project \
-  --json \
-  --yes
 ```
 
-预期：绑定为 `trae:<id>` 或显式 `--host trae` 时，`read/status/continue/launch` 均返回人工操作或 unsupported 语义；StarWork 不读取 Trae `database.db`、`state.vscdb` 或其他私有会话存储。
+预期：绑定为 `trae:<id>` 时，`read/status/continue` 均返回人工操作或 unsupported 语义；StarWork 不读取 Trae `database.db`、`state.vscdb` 或其他私有会话存储。
 
 测试 Claude Code 继续命令：
 
@@ -363,9 +348,9 @@ Cursor / Trae 写入 Skill 目录后，宿主 UI 是否立即发现需要继续�
 - `doctor` / `starworkDoctor` 对历史模板或类似项目中心的旧工作区的说明是否能看懂。
 - 历史模板升级后生成的 `AGENTS.md` 是否简洁、清楚，是否保留了用户原有规则里的有效内容。
 - 系统 skills 是否能被 Codex 识别和调用：`starworkInit`、`starworkDoctor`、`starworkMultiagent`、`starworkKnowledge`。
-- `starworkMultiagent` 是否能把“登记当前会话为常用智能体”正确转换成 `starwork multiagent init/add/bind` 建议。
-- `starwork multiagent bind --session-name` 是否能正确同步 Codex 宿主会话名；失败时是否能看懂 warning。
-- `starwork multiagent launch/instruct/read` 是否能清楚区分会话创建、宿主观察、标准投递和人工交付；`manual_handoff_required` / `needs_adapt` / `unbound` 是否容易理解。
+- `starworkMultiagent` 是否能把“登记当前会话为常用智能体”正确转换成 `starwork multiagent init/add/bind` 建议，并由标准线程工具处理 Codex 宿主动作。
+- Codex App 中创建 Agent 团队时，是否由 Skill 调用 `create_thread`、`set_thread_title`、`set_thread_pinned`，再用 `starwork multiagent bind` 记录真实 thread。
+- Codex App 中跨会话投递时，是否由 Skill 调用 `send_message_to_thread`，再用 `starwork multiagent request record` 写入 `delivered_via_codex_thread_tool`；`manual_handoff_required` / `needs_adapt` / `unbound` 是否容易理解。
 - `starwork adapt --capabilities` 是否能帮助 Agent 判断不同宿主能力，而不是把内部字段甩给用户。
 - `starwork doctor --host <host>` 是否能区分“工作台结构问题”和“宿主入口 / Skill 目录问题”。
 - Cursor / Trae 在写入 `.cursor/skills/` / `.trae/skills/` 后是否需要重启、刷新窗口或重新打开项目。

@@ -6,11 +6,11 @@
 | --- | --- |
 | 类型 | cli / skill / adapter / workflow |
 | 优先级 | P1 |
-| 状态 | new |
+| 状态 | closed |
 | 来源 | GitHub Issue #8 / 用户反馈 |
 | 发现日期 | 2026-06-12 |
 | 关联 GitHub Issue | <https://github.com/jennie-shawn/StarWork/issues/8> |
-| 关联 SPEC | 无 |
+| 关联 SPEC | `product/planning/features/multiagent/specs/v0.8-skill-cli-minimal-boundary.md` |
 | 关联验收 | `ISSUE-008` / `ISSUE-011` / `ISSUE-017` |
 | 负责人 | development lane |
 
@@ -76,20 +76,21 @@ codex standard background delivery capability is not available in this CLI runti
 
 ## 分流结果
 
-- 是否转 SPEC：暂不转，先作为 Codex App multiagent delivery 缺陷处理；如需重新定义 CLI / Skill 职责边界，再补 SPEC。
+- 是否转 SPEC：已转入 `product/planning/features/multiagent/specs/v0.8-skill-cli-minimal-boundary.md`。
 - 是否转 GitHub：已有关联 GitHub Issue #8。
 - 是否转开发 lane：需要。
 - 是否需要用户补信息：暂不需要，GitHub issue 已包含复现命令、环境、绑定状态和预期行为。
 
+## 处理记录
+
+- 2026-06-13：已转入 MultiAgent v0.8 SPEC：`product/planning/features/multiagent/specs/v0.8-skill-cli-minimal-boundary.md`。
+- 2026-06-13：development lane 完成实现并回传复验。`starworkMultiagent` Codex App 正常路径已改为 Skill 直接组装 `STARWORK:MULTIAGENT_MESSAGE v1`，并直接调用 `create_thread`、`send_message_to_thread`、`read_thread`、`list_threads`、`set_thread_title`、`set_thread_pinned`、`set_thread_archived`；CLI 仅用于 `status --target`、`bind`、`request record`、`share` 等项目事实源记录。
+- 2026-06-13：产品复验通过。Skill 禁止项扫描无 `starwork multiagent instruct` / `launch` / `multiagent message instruct` / `message launch` / `multiagent read --host codex` / `multiagent status --host codex` / `--session-name` / `--pin` 命中；允许项扫描覆盖标准线程工具和必要 CLI 账本命令。
+- 2026-06-13：验证通过：`node --check product/cli/src/cli.js`、`node --check product/cli/test/init.test.js`、`git -C product diff --check`、目标回归测试 111/111、`npm test` 111/111；临时工作台 smoke 确认 `request record --host-delivery delivered_via_codex_thread_tool` 可正常 dry-run。
+
 ## 下一步
 
-development lane 需要复核 Codex App 下 multiagent instruct 的真实投递链路：
-
-1. 明确 CLI 与 `starworkMultiagent` Skill 的职责边界：CLI 负责记录，Codex App Skill / integration 负责调用宿主线程工具。
-2. 当目标 lane 已绑定 `codex:<threadId>` 且宿主线程工具可用时，应直接投递到目标线程。
-3. 投递状态需要区分 `delivered_via_codex_thread_tool`、`recorded_only`、`manual_handoff_required`。
-4. 如果宿主线程工具不可用，输出必须说明缺少的具体能力和下一步处理建议。
-5. 补充 Codex App 已绑定 lane 的回归验收，避免“已记录但仍需人工转交”的半成功状态被误认为完成。
+已关闭。后续若要支持 Cursor / Trae / Claude Code 等其他宿主的真实自动投递，应另立 Host Adapter 能力设计，不回退到 Codex CLI 旧路径。
 
 ## 验收方式
 

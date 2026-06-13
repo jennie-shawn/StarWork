@@ -566,8 +566,8 @@
           <tr>
             <td><strong><code>starwork multiagent</code></strong></td>
             <td>管理同一项目内多个 AI 会话的职责位协作。</td>
-            <td>初始化 Agent Lanes；新增自定义 lane；维护 lane worklog；绑定或释放 session；Codex 可自动 launch / instruct；Claude Code 可绑定环境会话、读取 transcript 摘要并输出 resume 命令；Cursor / Trae 默认生成 manual handoff。</td>
-            <td><code>init</code>、<code>add</code>、<code>bind --pin</code>、<code>release</code>、<code>status --host</code>、<code>read</code>、<code>instruct</code>、<code>handoff</code>、<code>continue</code>、<code>launch</code>、<code>share</code></td>
+            <td>初始化 Agent Lanes；新增自定义 lane；维护 lane worklog；绑定或释放 session；记录由 Skill 或人工完成的 request delivery；Cursor / Trae 默认生成 manual handoff。</td>
+            <td><code>init</code>、<code>add</code>、<code>bind</code>、<code>release</code>、<code>status</code>、<code>share</code>、<code>request record</code>，以及非 Codex 宿主的人工交接辅助。</td>
             <td><code>_系统/协作/agent-lanes.md</code>、<code>_系统/协作/shared.md</code>、<code>.starwork/agent-lanes/state.json</code> 和 lane <code>worklog.md</code>。</td>
             <td>不内置固定职责；不做自动调度、文件锁或并发冲突仲裁；不把 Cursor / Trae 的人工交付说成自动送达。</td>
             <td><span class="status done">已实现</span></td>
@@ -750,7 +750,8 @@ starwork pack install content-creator --target ./my-workspace --dry-run</pre>
         <div>
           <h3>多 AI 协作</h3>
           <pre>starwork multiagent init --lanes research,writing,review --target ./my-workspace --yes
-starwork multiagent bind research --session codex:manual-research-1 --session-name "Research Agent" --target ./my-workspace --yes
+starwork multiagent bind research --session codex:manual-research-1 --target ./my-workspace --yes
+starwork multiagent request record --from research --to review --message "请手动验收这份输出。" --host-delivery recorded_only --delivery-tool manual --target ./my-workspace --dry-run
 starwork multiagent handoff review --from research --message "请手动验收这份输出。" --target ./my-workspace --dry-run
 starwork multiagent continue research --target ./my-workspace --json
 starwork multiagent share research --title "Source notes draft" --path notes/source-notes.md --audience writing,review --target ./my-workspace --yes</pre>

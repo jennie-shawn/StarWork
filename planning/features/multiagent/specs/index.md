@@ -8,3 +8,4 @@
 | v0.5 | AI 入口文档由 Skill 生成与整合 | ready-for-development | `v0.5-skill-owned-agent-docs.md` |
 | v0.6 | Launch 会话控制能力与短标题修复 | ready-for-development | `v0.6-launch-session-control-capability.md` |
 | v0.7 | Codex Skill 直调标准工具 | ready-for-development | `v0.7-codex-standard-session-tools.md` |
+| v0.8 | Skill / CLI 最小边界 | accepted | `v0.8-skill-cli-minimal-boundary.md` |
