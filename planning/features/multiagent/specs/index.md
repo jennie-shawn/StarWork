@@ -9,3 +9,4 @@
 | v0.6 | Launch 会话控制能力与短标题修复 | ready-for-development | `v0.6-launch-session-control-capability.md` |
 | v0.7 | Codex Skill 直调标准工具 | ready-for-development | `v0.7-codex-standard-session-tools.md` |
 | v0.8 | Skill / CLI 最小边界 | accepted | `v0.8-skill-cli-minimal-boundary.md` |
+| v0.9 | 友好引导体验 | accepted | `v0.9-friendly-onboarding.md` |

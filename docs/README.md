@@ -7,6 +7,10 @@
 - [product-direction.md](product-direction.md)：StarWork 产品方向、四层结构和关键约束
 - [ai-consultant-brief.md](ai-consultant-brief.md)：给外部 AI 顾问快速了解 StarWork 产品、当前状态和目录结构的简报
 - [agent-install-guide.md](agent-install-guide.md)：面向用户 Agent 的 StarWork CLI 与 Skills 安装指导
+- [starwork-multiagent-install-guide.md](starwork-multiagent-install-guide.md)：仅安装 StarWork MultiAgent Skill、配套 CLI 和最小必要 Skills 的说明，含可复制给 AI 的安装提示词
+- [multiagent-ai-install-playbook.md](multiagent-ai-install-playbook.md)：面向 AI 助手读取的 StarWork MultiAgent 安装执行说明，强调友好沟通、宿主自适应和安装边界
+- [multiagent-user-guide.md](multiagent-user-guide.md)：面向普通用户的 StarWork MultiAgent 使用说明，包含场景案例和可复制给 AI 的引导提示词
+- [multiagent-skill-friendly-onboarding-requirements.md](multiagent-skill-friendly-onboarding-requirements.md)：面向产品设计的 MultiAgent Skill 友好引导改进建议
 - [alpha-test-guide.md](alpha-test-guide.md)：StarWork A 测 CLI 与 Skills 安装、测试和反馈指南
 - [issue-feedback-tracking-guide.md](issue-feedback-tracking-guide.md)：Issue 反馈与跟踪机制搭建指南，供用户项目和 Agent 模仿构建
 - [cli-skill-registry.html](cli-skill-registry.html)：当前 CLI 与 StarWork 自研 Skill 的能力注册表、分发边界和配合链路

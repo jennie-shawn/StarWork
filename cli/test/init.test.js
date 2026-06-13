@@ -146,6 +146,15 @@ function skillDescription(skillText) {
   return skillText.match(/^description:\s*['"]?([\s\S]*?)['"]?\n---/m)?.[1] || "";
 }
 
+function markdownSection(markdown, heading) {
+  const marker = `## ${heading}\n`;
+  const start = markdown.indexOf(marker);
+  if (start === -1) return "";
+  const bodyStart = start + marker.length;
+  const next = markdown.indexOf("\n## ", bodyStart);
+  return markdown.slice(bodyStart, next === -1 ? undefined : next);
+}
+
 test("prints version and product-oriented help", () => {
   const version = runCommand(["--version"]);
   assert.equal(version.status, 0);
@@ -282,6 +291,69 @@ test("starworkMultiagent skill uses Codex standard session tools directly", () =
   assert.match(skill, /pending_merge/);
 });
 
+test("starworkMultiagent skill presents friendly onboarding before internal workflow", () => {
+  const skill = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "SKILL.md"), "utf8");
+  const firstScreen = markdownSection(skill, "创建 AI 团队的第一屏");
+  const questionSection = markdownSection(skill, "自然追问");
+  const previewSection = markdownSection(skill, "预览与确认");
+  const fallbackSection = markdownSection(skill, "降级与安全接入");
+
+  assert.notEqual(firstScreen.trim(), "");
+  assert.match(firstScreen, /AI 岗位/);
+  assert.match(firstScreen, /负责什么/);
+  assert.match(firstScreen, /可以整理或修改哪些内容/);
+  assert.match(firstScreen, /交接/);
+  assert.match(firstScreen, /先检查当前项目是否准备好/);
+  assert.match(firstScreen, /先预览/);
+  assert.match(firstScreen, /确认后/);
+  assert.doesNotMatch(firstScreen, /lane|write_scope|binding|thread|CLI|doctor|multiagent init|multiagent add/);
+
+  assert.match(questionSection, /这个项目主要想完成什么/);
+  assert.match(questionSection, /希望哪些事情交给不同 AI 分开做/);
+  assert.match(questionSection, /哪些文件或内容不希望 AI 主动修改/);
+  assert.doesNotMatch(questionSection, /请输入 lane id|write_scope 怎么填|session id/);
+
+  assert.match(previewSection, /AI 岗位[\s\S]*负责什么[\s\S]*可以整理或修改的范围[\s\S]*交接方式/);
+  assert.match(previewSection, /如果这个方案没问题，我再创建这些协作记录/);
+  assert.match(previewSection, /下面是预览，还不会真正写入/);
+  assert.match(previewSection, /这次只写入了协作记录，没有改你的业务内容/);
+
+  assert.match(fallbackSection, /我还不能确认这个目录已经适合开启多 AI 分工/);
+  assert.match(fallbackSection, /当前这个 AI 工具暂时不能自动把消息送到另一个会话/);
+  assert.match(fallbackSection, /还没有自动送达/);
+  assert.doesNotMatch(fallbackSection, /已通知|已发送成功/);
+  assert.match(skill, /岗位已创建/);
+  assert.match(skill, /会话已绑定/);
+  assert.match(skill, /消息已送达/);
+  assert.match(skill, /目标任务已完成/);
+  assert.match(skill, /你可以这样开始/);
+  assert.match(skill, /这些只是参考/);
+  assert.match(skill, /不会直接套模板/);
+});
+
+test("multiagent user docs describe friendly onboarding instead of command-first workflow", () => {
+  const userGuide = fs.readFileSync(path.join(root, "docs", "multiagent-user-guide.md"), "utf8");
+  const alphaGuide = fs.readFileSync(path.join(root, "docs", "alpha-test-guide.md"), "utf8");
+  const registry = fs.readFileSync(path.join(root, "docs", "cli-skill-registry.html"), "utf8");
+  const planningSkill = fs.readFileSync(path.join(root, "planning", "features", "multiagent", "skill.md"), "utf8");
+
+  assert.match(userGuide, /安装完成后，第一句话怎么说/);
+  assert.match(userGuide, /请先只做检查和方案设计，不要直接写入/);
+  assert.match(userGuide, /AI 岗位/);
+  assert.match(userGuide, /先预览/);
+  assert.match(userGuide, /等我确认/);
+  assert.match(alphaGuide, /v0\.9 友好引导体验/);
+  assert.match(alphaGuide, /第一屏不出现内部词/);
+  assert.match(alphaGuide, /AI 岗位/);
+  assert.match(registry, /AI 岗位|职责位/);
+  assert.match(registry, /先预览/);
+  assert.match(registry, /交接消息/);
+  assert.doesNotMatch(registry, /翻译成 <code>multiagent init\/add\/bind\/read\/instruct\/launch\/status\/share<\/code> 命令组合/);
+  assert.match(planningSkill, /v0\.9/);
+  assert.match(planningSkill, /AI 岗位/);
+  assert.match(planningSkill, /v0\.8 调用边界/);
+});
+
 test("starworkInit skill keeps existing projects in agent-docs draft mode", () => {
   const skill = fs.readFileSync(path.join(root, "skills", "starworkInit", "SKILL.md"), "utf8");
 
@@ -305,9 +377,9 @@ test("init-family skills start with user-facing capability framing", () => {
   assert.match(knowledge, /项目知识库是让 AI 长期记住项目稳定理解的地方/);
   assert.match(knowledge, /不是原始资料文件夹/);
   assert.match(knowledge, /先检查当前项目是否已经有知识库/);
-  assert.match(multiagent, /多 Agent 分工是把一个项目里的不同 AI 会话按职责分开协作/);
-  assert.match(multiagent, /先设计职责/);
-  assert.match(multiagent, /再创建或绑定会话/);
+  assert.match(multiagent, /帮你把这个项目拆成几个清楚的 AI 岗位/);
+  assert.match(multiagent, /先检查当前项目是否准备好/);
+  assert.match(multiagent, /等你确认后再正式创建/);
   assert.match(doctor, /诊断是先看清当前目录的事实/);
   assert.match(doctor, /升级是无损补齐 StarWork 工作台规则/);
   assert.match(doctor, /不会移动、删除或覆盖你的历史文件/);

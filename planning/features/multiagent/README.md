@@ -13,7 +13,7 @@ StarWork MultiAgent 是同一项目内多个 AI 会话的职责分工、边界�
 
 ## 当前状态
 
-MultiAgent 已从 Codex 单宿主编排升级为 runtime host routing，并进入 `0.1.0-alpha.20` A 测口径。当前最新已验收版本是 v0.8：收紧 `starworkMultiagent` Skill / CLI 最小边界，确保 Codex App 正常路径由 Skill 直接调用标准线程工具，CLI 只做 StarWork 项目事实源记录。
+MultiAgent 已从 Codex 单宿主编排升级为 runtime host routing，并进入 `0.1.0-alpha.20` A 测口径。当前最新已验收版本是 v0.9：在 v0.8 标准线程工具边界上，把 `starworkMultiagent` 首次使用体验改成面向普通用户的“AI 岗位”引导，先解释、再检查、再设计、先预览、确认后执行；Codex App 正常路径仍由 Skill 直接调用标准线程工具，CLI 只做 StarWork 项目事实源记录。
 
 - Codex：保留已验证的多会话 `launch/read/instruct` 主链路。
 - Cursor：通过 Host Adapter v0.2 支持 `agent-transcripts/<uuid>/<uuid>.jsonl` 只读摘要和 `cursor agent status` 安全探测；不做跨 IDE 会话自动投递。
@@ -31,6 +31,7 @@ MultiAgent 已从 Codex 单宿主编排升级为 runtime host routing，并进�
 - [v0.5 AI 入口文档由 Skill 生成与整合 SPEC](specs/v0.5-skill-owned-agent-docs.md)
 - [v0.7 Codex Skill 直调标准工具 SPEC](specs/v0.7-codex-standard-session-tools.md)
 - [v0.8 Skill / CLI 最小边界 SPEC](specs/v0.8-skill-cli-minimal-boundary.md)
+- [v0.9 友好引导体验 SPEC](specs/v0.9-friendly-onboarding.md)
 - [v0.2 验收报告](acceptance/2026-06-01-v0.2-acceptance-report.md)
 - [Cursor / Trae / Claude Code 兼容性与适配计划](references/host-compatibility-and-adaptation.md)
 - [CLI 设计](cli.md)

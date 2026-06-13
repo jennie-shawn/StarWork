@@ -192,6 +192,24 @@ starwork doctor --target ~/Desktop/starwork-alpha-project
 
 这一步适合希望测试多个 Agent 职责位、独立会话创建和跨会话交付的用户。Codex App 正常路径由 `starworkMultiagent` Skill 直接调用标准线程工具；CLI 只记录项目内事实源。
 
+#### v0.9 友好引导体验
+
+在 Codex App 中先对 `starworkMultiagent` 说：
+
+```text
+请帮我创建一个 AI 团队。先不要写入，只帮我看看这个项目适合怎么分工。
+```
+
+预期：
+
+- 第一屏不出现内部词，例如 `lane`、`write_scope`、`binding`、`thread`、`CLI`、`doctor`、`multiagent init`、`multiagent add`。
+- 第一屏用“AI 岗位”解释流程，并说明每个岗位“负责什么 / 可以整理或修改哪些内容 / 怎么交接”。
+- 第一屏说明会先检查、再设计、先预览、确认后再正式创建。
+- 如果信息不够，优先问项目目标、希望哪些事情交给不同 AI 分开做、哪些文件或内容不希望 AI 主动修改。
+- 创建或调整岗位前，应显示“AI 岗位 / 负责什么 / 可以整理或修改的范围 / 交接方式”的表格，并出现“如果这个方案没问题，我再创建这些协作记录。”
+- 写入前应说明“下面是预览，还不会真正写入”；写入后应说明“这次只写入了协作记录，没有改你的业务内容”。
+- 自动线程工具不可用时，应解释为当前 AI 工具能力差异，输出完整可复制交接消息，并明确还没有自动送达。
+
 先初始化项目内的职责位：
 
 ```bash
@@ -355,6 +373,7 @@ Cursor / Trae 写入 Skill 目录后，宿主 UI 是否立即发现需要继续�
 - `starwork doctor --host <host>` 是否能区分“工作台结构问题”和“宿主入口 / Skill 目录问题”。
 - Cursor / Trae 在写入 `.cursor/skills/` / `.trae/skills/` 后是否需要重启、刷新窗口或重新打开项目。
 - 返回 `manual_handoff_required` 时，用户是否能理解“已生成交付消息，不等于已自动送达”。
+- v0.9 友好引导体验是否能让新用户理解“AI 岗位 / 先预览 / 确认后创建”，而不是被内部命令和字段吓退。
 - 项目中心自带的 `starworkSpawn`、`starworkAudit` 与项目工作台自带的 `neat-freak` 是否能在对应工作台内被发现。
 
 ## 发布前检查
