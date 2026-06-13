@@ -3971,6 +3971,25 @@ function getHubStatePathsForLanguage(language = "en") {
   };
 }
 
+function resolveWorkspaceRolePath(state, role, fallbackPath) {
+  const mappings = state?.upgrade?.core_role_mapping;
+  if (Array.isArray(mappings)) {
+    const mapping = mappings.find((item) => item?.role === role && item.path);
+    if (mapping) {
+      return {
+        role,
+        path: normalizeSafeRelativePath(mapping.path, `upgrade core_role_mapping.${role}`),
+        source: "upgrade.core_role_mapping"
+      };
+    }
+  }
+  return {
+    role,
+    path: normalizeRelativePath(fallbackPath),
+    source: "default"
+  };
+}
+
 function checkPackInstallations(result, workspaceRoot, state) {
   if (!Array.isArray(state.packs)) return;
   for (const installedPack of state.packs) {
@@ -4071,6 +4090,7 @@ function checkUpgradeRoleMappings(result, workspaceRoot, state) {
 
 function checkSkillInstallations(result, workspaceRoot, state) {
   const manifestPath = path.join(workspaceRoot, ".starwork", "skills.json");
+  let manifestSkills = [];
   const skills = {
     project_manifest: {
       exists: fs.existsSync(manifestPath),
@@ -4078,6 +4098,7 @@ function checkSkillInstallations(result, workspaceRoot, state) {
       count: 0
     },
     registry: null,
+    required: [],
     mounts: []
   };
   result.skills = skills;
@@ -4099,7 +4120,7 @@ function checkSkillInstallations(result, workspaceRoot, state) {
       } else {
         addCheck(result, "skills.project_manifest.schema", "fail", "项目 Skill 清单 schema 不正确。", ".starwork/skills.json");
       }
-      const manifestSkills = Array.isArray(manifest.skills) ? manifest.skills : [];
+      manifestSkills = Array.isArray(manifest.skills) ? manifest.skills : [];
       skills.project_manifest.count = manifestSkills.length;
       for (const skill of manifestSkills) {
         if (!skill?.id) {
@@ -4128,40 +4149,135 @@ function checkSkillInstallations(result, workspaceRoot, state) {
 
   if (state.workspace_type === "hub") {
     const hubPaths = getHubPaths(state);
-    const registryRelativePath = path.join(hubPaths.formalSkills, "registry.json");
+    const skillsRoot = resolveWorkspaceRolePath(state, "skills", hubPaths.formalSkills);
+    const registryRelativePath = path.join(skillsRoot.path, "registry.json");
     const registryPath = path.join(workspaceRoot, registryRelativePath);
     skills.registry = {
       exists: fs.existsSync(registryPath),
       path: registryRelativePath,
+      path_source: skillsRoot.source,
+      role: skillsRoot.role,
       count: 0
     };
     if (!skills.registry.exists) {
       addCheck(result, "skills.registry.exists", "warn", "项目中心缺少托管 Skill 注册表。", registryRelativePath);
-      return;
-    }
-    addCheck(result, "skills.registry.exists", "pass", "Project Center skill registry exists", registryRelativePath);
-    let registry;
-    try {
-      registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
-    } catch (error) {
-      addCheck(result, "skills.registry.parse", "fail", `无法解析项目中心 Skill registry：${error.message}`, registryRelativePath);
-      return;
-    }
-    if (registry.schema === "starwork.skill_registry.v0.1") {
-      addCheck(result, "skills.registry.schema", "pass", "Project Center skill registry schema is valid", registryRelativePath);
     } else {
-      addCheck(result, "skills.registry.schema", "fail", "项目中心 Skill registry schema 不正确。", registryRelativePath);
-    }
-    const registrySkills = Array.isArray(registry.skills) ? registry.skills : [];
-    skills.registry.count = registrySkills.length;
-    for (const skill of registrySkills) {
-      if (!skill?.id) {
-        addCheck(result, "skills.registry.id.exists", "fail", "项目中心 Skill registry 中存在缺少 id 的条目。", registryRelativePath);
-        continue;
+      addCheck(result, "skills.registry.exists", "pass", "Project Center skill registry exists", registryRelativePath);
+      let registry;
+      try {
+        registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+      } catch (error) {
+        addCheck(result, "skills.registry.parse", "fail", `无法解析项目中心 Skill registry：${error.message}`, registryRelativePath);
+        registry = null;
       }
-      checkPathExists(result, workspaceRoot, path.join(hubPaths.formalSkills, skill.id), "skills.registry.source.exists", `Project Center skill source exists: ${skill.id}`, `项目中心托管 Skill 缺少目录：${path.join(hubPaths.formalSkills, skill.id)}`);
+      if (registry) {
+        if (registry.schema === "starwork.skill_registry.v0.1") {
+          addCheck(result, "skills.registry.schema", "pass", "Project Center skill registry schema is valid", registryRelativePath);
+        } else {
+          addCheck(result, "skills.registry.schema", "fail", "项目中心 Skill registry schema 不正确。", registryRelativePath);
+        }
+        const registrySkills = Array.isArray(registry.skills) ? registry.skills : [];
+        skills.registry.count = registrySkills.length;
+        for (const skill of registrySkills) {
+          if (!skill?.id) {
+            addCheck(result, "skills.registry.id.exists", "fail", "项目中心 Skill registry 中存在缺少 id 的条目。", registryRelativePath);
+            continue;
+          }
+          checkPathExists(result, workspaceRoot, path.join(skillsRoot.path, skill.id), "skills.registry.source.exists", `Project Center skill source exists: ${skill.id}`, `项目中心托管 Skill 缺少目录：${path.join(skillsRoot.path, skill.id)}`);
+        }
+      }
     }
   }
+
+  checkRequiredSkillInstallations(result, workspaceRoot, state, manifestSkills);
+}
+
+function collectRequiredSkills(state) {
+  if (state.workspace_type === "hub" && state.kit === "hub") {
+    return (KIT_BUNDLED_SKILLS.hub || []).map((skill) => ({
+      ...skill,
+      required_by: "kit:hub"
+    }));
+  }
+  return [];
+}
+
+function checkRequiredSkillInstallations(result, workspaceRoot, state, manifestSkills) {
+  const requiredSkills = collectRequiredSkills(state);
+  if (!requiredSkills.length) return;
+
+  const hubPaths = getHubPaths(state);
+  const skillsRoot = resolveWorkspaceRolePath(state, "skills", hubPaths.formalSkills);
+  const manifestIds = new Set(manifestSkills.map((skill) => skill?.id).filter(Boolean));
+  const reports = [];
+
+  for (const required of requiredSkills) {
+    const sourcePath = path.join(skillsRoot.path, required.id);
+    const skillFilePath = path.join(sourcePath, "SKILL.md");
+    const sourceExists = fs.existsSync(path.join(workspaceRoot, skillFilePath));
+    const frontmatter = sourceExists
+      ? parseSkillFrontmatter(fs.readFileSync(path.join(workspaceRoot, skillFilePath), "utf8"))
+      : {};
+    const frontmatterOk = sourceExists && Boolean(frontmatter.name) && Boolean(frontmatter.description);
+    const mounts = (required.install || [])
+      .filter((install) => install.agent !== "hub")
+      .map((install) => {
+        const mountPath = normalizeRelativePath(install.path);
+        return {
+          agent: install.agent,
+          path: mountPath,
+          status: fs.existsSync(path.join(workspaceRoot, mountPath)) ? "ok" : "missing"
+        };
+      });
+    const manifestStatus = manifestIds.has(required.id) ? "ok" : "missing";
+    const missingMount = mounts.some((mount) => mount.status !== "ok");
+    let status = "ok";
+    if (!sourceExists) {
+      status = "missing_source";
+    } else if (!frontmatterOk) {
+      status = "invalid_frontmatter";
+    } else if (manifestStatus !== "ok") {
+      status = "missing_manifest";
+    } else if (missingMount) {
+      status = "missing_mount";
+    }
+
+    const report = {
+      id: required.id,
+      required_by: required.required_by,
+      status,
+      source: {
+        path: sourcePath,
+        status: sourceExists ? "ok" : "missing",
+        path_source: skillsRoot.source
+      },
+      manifest: {
+        path: ".starwork/skills.json",
+        status: manifestStatus
+      },
+      mounts,
+      frontmatter: {
+        path: skillFilePath,
+        status: frontmatterOk ? "ok" : (sourceExists ? "invalid" : "missing")
+      },
+      repair_hint: "这是 Hub Kit 自带 Skill。请重新运行受控的 StarWork Hub Kit 安装/同步流程，或按文档补齐项目中心内的 Kit Skill；不要把它安装成全局系统 Skill。"
+    };
+    reports.push(report);
+
+    if (status === "ok") {
+      addCheck(result, `skills.required.${slugifyCheckId(required.id)}`, "pass", `Hub required Skill is installed: ${required.id}`, sourcePath);
+    } else {
+      const missingMounts = mounts.filter((mount) => mount.status !== "ok").map((mount) => mount.path);
+      const details = [
+        `应在项目中心内存在：${sourcePath}`,
+        `应登记在：.starwork/skills.json`,
+        ...missingMounts.map((mountPath) => `应挂载给宿主：${mountPath}`)
+      ].join("；");
+      addCheck(result, `skills.required.${slugifyCheckId(required.id)}`, "warn", `缺少 Hub 自带 Skill：${required.id}。${details}。建议：重新运行受控的 StarWork Hub Kit 安装/同步流程，或按文档补齐项目中心内的 Kit Skill。不要把它安装成全局系统 Skill。`, sourcePath);
+    }
+  }
+
+  result.skills.required = reports;
 }
 
 function checkPathExists(result, workspaceRoot, relativePath, id, passMessage, failMessage) {
@@ -4886,7 +5002,9 @@ function friendlyCheckLevel(level) {
 }
 
 function friendlyDoctorMessage(message) {
-  return String(message || "")
+  const text = String(message || "");
+  if (text.includes("缺少 Hub 自带 Skill")) return text;
+  return text
     .replace(/这是一个可升级的历史模板工作区，但缺少 \.starwork\/workspace\.json。/g, "这个目录像旧版工作区，但还缺少 StarWork 工作台身份证（.starwork/workspace.json）。")
     .replace(/检测到历史模板升级候选，置信度：(?:high|medium|low)。/g, "这个目录像旧版工作区，可以进一步判断如何整理。")
     .replace(/检测到主库 \/ Hub 候选，置信度：(?:high|medium|low)。/g, "这个目录像项目中心，可以进一步判断如何接入 StarWork。")

@@ -29,6 +29,7 @@
 - `multiagent/`：多 AI 会话职责分工、跨会话指令和宿主会话编排能力。
 - `project-structure/`：当前 StarWork 产品工作台结构重整。
 - `skill-management/`：StarWork Skill 主入口、专家 Skill、Kit Skill 和 Capability Skill 的分层调用与分发机制。
+- `workspace-doctor/`：`starwork doctor` 的工作台健康检查、路径诊断、Kit 必需能力检查和安全修复指引。
 
 ## 使用规则
 

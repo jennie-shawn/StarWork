@@ -8,6 +8,7 @@
 - [ai-consultant-brief.md](ai-consultant-brief.md)：给外部 AI 顾问快速了解 StarWork 产品、当前状态和目录结构的简报
 - [agent-install-guide.md](agent-install-guide.md)：面向用户 Agent 的 StarWork CLI 与 Skills 安装指导
 - [alpha-test-guide.md](alpha-test-guide.md)：StarWork A 测 CLI 与 Skills 安装、测试和反馈指南
+- [issue-feedback-tracking-guide.md](issue-feedback-tracking-guide.md)：Issue 反馈与跟踪机制搭建指南，供用户项目和 Agent 模仿构建
 - [cli-skill-registry.html](cli-skill-registry.html)：当前 CLI 与 StarWork 自研 Skill 的能力注册表、分发边界和配合链路
 - [m2.6-alpha-core-flows-optimization-spec.md](m2.6-alpha-core-flows-optimization-spec.md)：M2.6 A 测核心链路优化规格，覆盖安装、init、doctor/upgrade、项目中心 管理和 multiagent
 - [m2.6-project-init-feedback/README.md](m2.6-project-init-feedback/README.md)：单项目初始化反馈专项 SPEC 索引，包含 5 个可独立实现和验收的反馈项

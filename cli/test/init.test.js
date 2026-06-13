@@ -850,6 +850,67 @@ test("creates a hub workspace with hub management pack", () => {
   assert.equal(fs.existsSync(path.join(dir, ".incoming", "README.md")), true);
 });
 
+test("doctor reports hub required kit skills and passes strict when complete", () => {
+  const dir = tempDir();
+  runInit(["--type", "hub", "--target", dir, "--yes"]);
+
+  const doctor = runDoctor(["--target", dir, "--strict", "--json"]);
+  const report = JSON.parse(doctor.stdout);
+  const required = report.skills.required || [];
+
+  assert.equal(doctor.status, 0);
+  assert.equal(report.strict_ok, true);
+  assert.deepEqual(required.map((skill) => skill.id).sort(), ["starworkAudit", "starworkSpawn"]);
+  for (const skill of required) {
+    assert.equal(skill.required_by, "kit:hub");
+    assert.equal(skill.status, "ok");
+    assert.equal(skill.source.status, "ok");
+    assert.equal(skill.manifest.status, "ok");
+    assert(skill.mounts.some((mount) => mount.agent === "codex" && mount.status === "ok"));
+    assert(skill.mounts.some((mount) => mount.agent === "claude" && mount.status === "ok"));
+    assert.equal(skill.frontmatter.status, "ok");
+  }
+});
+
+test("doctor warns about missing hub required kit skills and fails strict", () => {
+  const dir = tempDir();
+  runInit(["--type", "hub", "--target", dir, "--yes"]);
+  fs.writeFileSync(path.join(dir, ".starwork", "skills.json"), `${JSON.stringify({
+    schema: "starwork.project_skills.v0.1",
+    skills: []
+  }, null, 2)}\n`, "utf8");
+  for (const skillId of ["starworkSpawn", "starworkAudit"]) {
+    fs.rmSync(path.join(dir, "技能", skillId), { recursive: true, force: true });
+    fs.rmSync(path.join(dir, ".agents", "skills", skillId), { recursive: true, force: true });
+    fs.rmSync(path.join(dir, ".claude", "skills", skillId), { recursive: true, force: true });
+  }
+
+  const doctor = runDoctor(["--target", dir, "--json"]);
+  const report = JSON.parse(doctor.stdout);
+  const spawn = report.skills.required.find((skill) => skill.id === "starworkSpawn");
+  const text = runDoctor(["--target", dir]);
+  const strict = runDoctor(["--target", dir, "--strict", "--json"]);
+  const strictReport = JSON.parse(strict.stdout);
+
+  assert.equal(doctor.status, 0);
+  assert.equal(report.ok, true);
+  assert.equal(spawn.required_by, "kit:hub");
+  assert.notEqual(spawn.status, "ok");
+  assert.equal(spawn.source.path, "技能/starworkSpawn");
+  assert.equal(spawn.source.status, "missing");
+  assert.equal(spawn.manifest.status, "missing");
+  assert(spawn.mounts.some((mount) => mount.path === ".agents/skills/starworkSpawn" && mount.status === "missing"));
+  assert(spawn.mounts.some((mount) => mount.path === ".claude/skills/starworkSpawn" && mount.status === "missing"));
+  assert.match(spawn.repair_hint, /Hub Kit 自带 Skill/);
+  assert.doesNotMatch(spawn.repair_hint, /全局安装/);
+  assert.equal(text.status, 0);
+  assert.match(text.stdout, /缺少 Hub 自带 Skill：starworkSpawn/);
+  assert.match(text.stdout, /不要把它安装成全局系统 Skill/);
+  assert.equal(strict.status, 1);
+  assert.equal(strictReport.ok, true);
+  assert.equal(strictReport.strict_ok, false);
+});
+
 test("does not overwrite existing user files", () => {
   const dir = tempDir();
   fs.writeFileSync(path.join(dir, "README.md"), "# Existing\n", "utf8");
@@ -930,10 +991,16 @@ test("doctor passes on a hub workspace", () => {
   const dir = tempDir();
   runInit(["--type", "hub", "--target", dir, "--yes"]);
 
-  const result = runDoctor(["--target", dir]);
+  const result = runDoctor(["--target", dir, "--json"]);
+  const report = JSON.parse(result.stdout);
+  const text = runDoctor(["--target", dir]);
 
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /这个工作台结构完整，可以继续使用/);
+  assert.equal(report.ok, true);
+  assert.equal(report.skills.registry.path, "技能/registry.json");
+  assert.equal(report.skills.registry.path_source, "default");
+  assert.equal(text.status, 0);
+  assert.match(text.stdout, /这个工作台结构完整，可以继续使用/);
 });
 
 test("doctor warns when hub rules mention old hub paths", () => {
@@ -2437,6 +2504,12 @@ test("upgrade applies a hub preserve-names blueprint", () => {
   fs.writeFileSync(path.join(dir, "README.md"), "# Main Repository\n", "utf8");
   fs.writeFileSync(path.join(dir, "AGENTS.md"), "# Existing Hub Rules\n\nKeep me.\n", "utf8");
   fs.writeFileSync(path.join(dir, "projects", "registry.json"), "[]\n", "utf8");
+  fs.writeFileSync(path.join(dir, "skills", "registry.json"), `${JSON.stringify({
+    schema: "starwork.skill_registry.v0.1",
+    owner: "hub",
+    updated_at: "2026-06-13T00:00:00.000Z",
+    skills: []
+  }, null, 2)}\n`, "utf8");
   fs.writeFileSync(path.join(blueprintDir, "rules", "hub-boundaries.md"), "项目登记：{{paths.formal_source}}\n跨项目协调：{{paths.business_work_area}}\n", "utf8");
   fs.writeFileSync(path.join(blueprintDir, "upgrade-blueprint.json"), `${JSON.stringify({
     schema: "starwork.upgrade_blueprint.v0.1",
@@ -2501,6 +2574,9 @@ test("upgrade applies a hub preserve-names blueprint", () => {
   assert.equal(fs.existsSync(path.join(dir, ".starwork", "rules", "upgrade.hub_boundaries.md")), true);
   assert.equal(doctor.status, 0);
   assert.equal(report.ok, true);
+  assert.equal(report.skills.registry.path, "skills/registry.json");
+  assert.equal(report.skills.registry.path_source, "upgrade.core_role_mapping");
+  assert(!report.checks.some((check) => check.id === "skills.registry.exists" && check.level === "warn"));
   assert(report.checks.some((check) => check.id === "upgrade.role_mapping.exists" && check.level === "pass"));
 });
 
