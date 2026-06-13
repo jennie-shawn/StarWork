@@ -146,6 +146,7 @@ const MANUAL_HANDOFF_STATUS = "manual_handoff_required";
 const HOST_DELIVERY_STATUSES = new Set([
   "delivered",
   "delivered_via_codex_thread_tool",
+  "delivered_via_claude_code_session_tool",
   "recorded_only",
   MANUAL_HANDOFF_STATUS,
   "failed"
@@ -10270,7 +10271,7 @@ Options:
   --from <lane-id>
   --to <lane-id>
   --message <text>
-  --host-delivery <delivered_via_codex_thread_tool|recorded_only|manual_handoff_required|failed>
+  --host-delivery <delivered_via_codex_thread_tool|delivered_via_claude_code_session_tool|recorded_only|manual_handoff_required|failed>
   --delivery-tool <tool-name>
   --id <request-id>
   --json

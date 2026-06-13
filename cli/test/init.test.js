@@ -286,6 +286,9 @@ test("starworkMultiagent skill uses Codex standard session tools directly", () =
   assert.match(skill, /multiagent share/);
   assert.match(skill, /multiagent request record/);
   assert.match(skill, /delivered_via_codex_thread_tool/);
+  assert.match(skill, /delivered_via_claude_code_session_tool/);
+  assert.match(skill, /mcp__ccd_session_mgmt__send_message/);
+  assert.match(skill, /mcp__ccd_session_mgmt__search_session_transcripts/);
   assert.match(skill, /STARWORK:MULTIAGENT_MESSAGE v1/);
   assert.match(skill, /manual_handoff_required/);
   assert.match(skill, /pending_merge/);
@@ -1879,6 +1882,36 @@ test("multiagent request record supports Codex thread-tool delivery status", () 
   assert.match(shared, /product-planning \| development \| .*请开始实现 v0\.8.* \| delivered_via_codex_thread_tool \| delivered_via_codex_thread_tool/);
   assert.equal(state.requests[0].host_delivery.status, "delivered_via_codex_thread_tool");
   assert.equal(state.requests[0].host_delivery.delivery_tool, "send_message_to_thread");
+});
+
+test("multiagent request record supports Claude Code Desktop session-tool delivery status", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "product-planning", "--purpose", "产品规划", "--write", "product/planning/**", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "add", "development", "--purpose", "功能开发", "--write", "product/cli/**", "--target", dir, "--yes"]);
+
+  const record = runCommand([
+    "multiagent", "request", "record",
+    "--from", "product-planning",
+    "--to", "development",
+    "--message", "请开始实现 Claude Code Desktop 投递。",
+    "--host-delivery", "delivered_via_claude_code_session_tool",
+    "--delivery-tool", "ccd_session_mgmt_send_message",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ]);
+  const recordResult = JSON.parse(record.stdout);
+  const shared = fs.readFileSync(path.join(dir, "_系统", "协作", "shared.md"), "utf8");
+  const state = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
+
+  assert.equal(record.status, 0);
+  assert.equal(recordResult.host_delivery.status, "delivered_via_claude_code_session_tool");
+  assert.equal(recordResult.host_delivery.delivery_tool, "ccd_session_mgmt_send_message");
+  assert.match(shared, /product-planning \| development \| 请开始实现 Claude Code Desktop 投递。 \| delivered_via_claude_code_session_tool \| delivered_via_claude_code_session_tool/);
+  assert.equal(state.requests[0].host_delivery.status, "delivered_via_claude_code_session_tool");
+  assert.equal(state.requests[0].host_delivery.delivery_tool, "ccd_session_mgmt_send_message");
 });
 
 test("multiagent request record accepts recorded-only Codex boundary status", () => {

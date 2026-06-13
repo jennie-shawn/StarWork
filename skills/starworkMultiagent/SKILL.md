@@ -210,6 +210,35 @@ starwork doctor --target <path> --json
 
 如果这些工具没有出现在当前可用工具列表里，先用工具发现能力查找。仍不可见或调用失败时，不要宣称已创建、已发送或已改名；输出 `manual_handoff_required`，并展示完整可复制的 `STARWORK:MULTIAGENT_MESSAGE`。
 
+## 宿主路由
+
+任何依赖宿主能力的动作（发送、读取、列出、创建、改名、置顶、归档）执行前，先确定**目标会话**属于哪个宿主，再选对应工具表：
+
+- 从目标 lane 的 `current_session` 前缀判断宿主：`codex:<id>` → Codex（用上面的「Codex 标准工具」）；`claude-code:<id>` → Claude Code 桌面端（用下面的「Claude Code Desktop 标准工具」）。
+- 选定工具后，**调用前先确认该工具此刻出现在你的可用工具列表里**（必要时用工具发现能力查找）。前缀只说明目标会话属于哪个宿主，不代表你当前环境一定能调用它。
+- 如果你当前不在该宿主里、或对应工具不可见，**不要调用另一个宿主的工具，也不要假装已自动完成**：改为输出 `manual_handoff_required`，展示完整可复制 `STARWORK:MULTIAGENT_MESSAGE`，并说明尚未自动送达。
+- 某宿主某场景在工具表里标注「无」时，同样走人工 handoff，不要用别的能力凑。
+
+## Claude Code Desktop 标准工具
+
+目标会话是 `claude-code:<id>` 且你正运行在 Claude Code 桌面端时，以下动作由 Skill 直接调用标准工具：
+
+| 场景 | 标准工具 | 注意 |
+|---|---|---|
+| 向 lane 会话发送指令 | `mcp__ccd_session_mgmt__send_message` | 参数是 `(session_id, message)`，不是 Codex 的 `(threadId, prompt)`；会弹用户确认；仅在有人值守会话可用；`session_id` 不能是当前会话 |
+| 搜索或确认历史会话 | `mcp__ccd_session_mgmt__list_sessions` / `mcp__ccd_session_mgmt__search_session_transcripts` | 只读 |
+| 读取 lane 会话状态 | `mcp__ccd_session_mgmt__search_session_transcripts` | 宿主观察，不替代 lane worklog |
+| 归档会话 | `mcp__ccd_session_mgmt__archive_session` | 会弹用户确认 |
+| 创建 lane 会话 / 设置标题 / 置顶 | 无对应标准工具 | 走人工 handoff：请用户在 Claude Code 里手动新建或改名会话，拿到 session id 后再用 `multiagent bind` 记录 |
+
+发送成功后，用 CLI 记录真实投递状态：
+
+```bash
+starwork multiagent request record --from <from-lane> --to <to-lane> --message "<text>" --host-delivery delivered_via_claude_code_session_tool --delivery-tool ccd_session_mgmt_send_message --target <path> --yes
+```
+
+成功时可以说“已投递到目标会话，并已记录到 StarWork”，不要说“目标任务已完成”。工具不可见、用户拒绝确认或调用失败时，输出 `manual_handoff_required`，展示完整 Instruction Message，并说明尚未自动送达；不得改用 CLI 模拟自动投递。
+
 ## 判断用户意图
 
 优先把用户话语归到一个入口，不要一开始讲 CLI 子命令。
@@ -374,7 +403,9 @@ starwork multiagent release <lane> --target <path> --yes
 
 ## 非 Codex 宿主
 
-Cursor、Trae、Claude Code 的策略按各自 Host Adapter 文档执行。在没有等价标准会话工具前，不要宣称可以自动创建、发送、改名、置顶或归档；使用人工 handoff 或只读 transcript 摘要。
+Claude Code 桌面端的标准工具见上文「宿主路由」与「Claude Code Desktop 标准工具」：发送、列出、读取、归档可由 Skill 直接调用；创建、改名、置顶无标准工具，走人工 handoff。
+
+Cursor、Trae 以及 Claude Code 终端 CLI 在没有等价标准会话工具前，不要宣称可以自动创建、发送、改名、置顶或归档；使用人工 handoff 或只读 transcript 摘要。具体策略按各自 Host Adapter 文档执行。
 
 ## Lane Workspace 与正式输出
 
