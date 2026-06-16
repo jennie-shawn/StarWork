@@ -194,6 +194,33 @@ starwork doctor --target <path> --json
 
 如果 `starwork doctor --target <path> --host <host> --json` 或 `.starwork/adapters.json` 显示 `rules_entry_status: pending_merge`，也必须停止多 Agent 写入。这表示 AI 入口文档还只是 `.starwork/drafts/` 草稿，先切回 `starworkInit` 整合最终 `AGENTS.md` / 宿主规则入口；完成并重新 doctor 后，才能继续创建或绑定团队。
 
+## 当前会话 ID 校验
+
+在任何会话控制或跨会话操作前，必须先确认**当前会话 ID**，不能凭记忆、旧 worklog、旧 binding 或刚才看到的历史 thread id 推断当前会话。
+
+适用动作包括：
+
+- 把“当前会话”绑定到某个 lane。
+- 给“当前会话”改名、置顶、归档或释放绑定。
+- 从当前 lane 向其他 lane 投递消息。
+- 根据当前会话身份记录 `from_lane`、`request record` 或 handoff response。
+- 判断某个目标会话是否就是当前会话，避免把消息发回自己。
+
+确认顺序：
+
+1. 如果当前输入是 `<codex_delegation>`，优先读取 `source_thread_id`，把它当作当前来源会话 ID。
+2. 如果宿主工具或运行环境显式提供 current thread / current session metadata，使用该值。
+3. 如果只能通过 `list_threads` / `read_thread` 看到历史会话摘要，不能把相似标题、最近更新时间或 lane binding 当作当前会话证明。
+4. 如果仍无法确认当前会话 ID，必须停止当前会话绑定、改名、置顶、归档、释放和以当前会话为来源的投递记录，向用户说明“我还不能确认当前会话 ID”，并请用户提供或确认 `codex:<thread-id>` / 对应宿主 session id。
+
+校验规则：
+
+- 操作“当前会话”前，必须把确认到的 current session id 与 StarWork 中目标 lane 的 `current_session` 对比。
+- 如果 current session id 与目标 lane binding 不一致，不得直接改名、绑定、覆盖或发送；先向用户说明两者不一致，请用户确认要以哪个会话为准。
+- 向目标 lane 发送消息前，如果目标 `current_session` 与当前会话 ID 相同，必须停止并提醒用户这会变成给自己发消息；除非用户明确要求在同一会话内记录，否则不要调用 `send_message_to_thread`。
+- `multiagent bind` 只能记录已经确认的真实 session id；不得把旧 worklog 里的 thread id、另一个 lane 的 thread id 或推测出来的 id 写入 binding。
+- 每次因会话 ID 不确定而降级时，输出 `manual_handoff_required` 或询问用户确认，不得假装已自动送达或已绑定。
+
 ## Codex 标准工具
 
 在 Codex App 中，以下动作由 Skill 直接调用标准工具：
@@ -321,7 +348,7 @@ starwork multiagent bind <lane> --session codex:<threadId> --target <path> --yes
 
 把当前会话登记为某个 lane 时：
 
-1. 如果当前上下文能获得当前 thread id，直接使用；否则询问用户提供 `codex:<thread-id>`。
+1. 先执行“当前会话 ID 校验”。只有已确认 current session id 时，才能继续；否则询问用户提供或确认 `codex:<thread-id>` / 对应宿主 session id。
 2. 如果 lane 不存在，先用 CLI `multiagent add` 建立职责和写入范围。
 3. 如用户要求改名，先直接调用 `set_thread_title`。
 4. 如用户要求置顶，直接调用 `set_thread_pinned`。

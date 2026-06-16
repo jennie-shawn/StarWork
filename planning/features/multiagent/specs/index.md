@@ -10,3 +10,4 @@
 | v0.7 | Codex Skill 直调标准工具 | ready-for-development | `v0.7-codex-standard-session-tools.md` |
 | v0.8 | Skill / CLI 最小边界 | accepted | `v0.8-skill-cli-minimal-boundary.md` |
 | v0.9 | 友好引导体验 | accepted | `v0.9-friendly-onboarding.md` |
+| v0.10 | 升级 / 迁移兼容 | ready-for-development | `v0.10-upgrade-migration-compatibility.md` |

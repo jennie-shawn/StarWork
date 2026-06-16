@@ -615,9 +615,9 @@
           <tr>
             <td><strong><code>starworkInit</code></strong></td>
             <td>L1 系统专家：初始化设计助手。</td>
-            <td>用户想从 0 建工作台，但还没确定工作台类型、语言或目录偏好。</td>
-            <td>分支式采访；判断是 项目中心 还是普通项目；判断语言；生成初始化建议或 init blueprint；用户确认创建时继续执行 dry-run、写入和 doctor 验证。</td>
-            <td>初始化建议、<code>init-blueprint.json</code>、rules、dry-run / yes / doctor 执行结果。</td>
+            <td>用户想从 0 建工作台，或从 MultiAgent 入口回流，需要先安全接入项目、补齐 AI 协作入口和写入边界。</td>
+            <td>先解释多 AI 协作前为什么要确认项目、当前任务和可整理范围；默认只问目标目录、新建/已有、语言和主要 AI 工具；已有项目先预览并生成待整合草稿，不直接覆盖业务代码或已有 AI 规则文件。</td>
+            <td>初始化建议、MultiAgent 安全接入口径、<code>init-blueprint.json</code>、rules、dry-run / yes / doctor 执行结果、AI 入口待整合说明。</td>
             <td><code>starwork init</code> / <code>starwork init --blueprint</code></td>
             <td><span class="status done">已实现</span></td>
           </tr>
@@ -651,9 +651,9 @@
           <tr>
             <td><strong><code>starworkDoctor</code></strong></td>
             <td>L1 系统专家：工作区诊断助手。</td>
-            <td>用户要理解 doctor 输出、判断旧目录如何整理成 StarWork 工作台；或想无损生成升级方案。</td>
-            <td>读取 doctor JSON；解释目录清单和线索；建立目录角色映射；识别历史模板或 项目中心-like 旧主库；判断目录分工是否清楚；提出整理建议；用户确认后生成升级方案和规则文件。</td>
-            <td>诊断报告、目录角色映射、缺失和风险、确认问题、<code>upgrade-blueprint.json</code>、rules、dry-run 命令。</td>
+            <td>用户要理解 doctor 输出、判断旧目录如何整理成 StarWork 工作台，或想先确认项目是否适合开启多 AI 协作。</td>
+            <td>读取 doctor JSON；先给 MultiAgent preflight 结论：多 AI 协作准备度、这次是否会改文件、下一步建议；再解释目录清单、线索和用户影响；用户明确确认升级时才生成升级方案和规则文件。</td>
+            <td>诊断报告、多 AI 协作准备度、目录角色映射、缺失和用户影响、确认问题、<code>upgrade-blueprint.json</code>、rules、dry-run 命令。</td>
             <td><code>starwork doctor</code> / <code>starwork upgrade --blueprint</code></td>
             <td><span class="status done">已实现</span></td>
           </tr>

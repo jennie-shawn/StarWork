@@ -8,6 +8,8 @@
 
 | ID | 标题 | 类型 | 优先级 | 状态 | 负责人 | 来源 | 详情 | 下一步 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ISSUE-023 | Init / Doctor 缺少面向 MultiAgent-only 用户的友好起步 | skill / cli / docs / onboarding / workflow | P1 | closed | product-lead lane | product-mainflow review / 运营 Agent 优化建议 | [ISSUE-023.md](ISSUE-023.md) | 已关闭：Mainflow v0.1 复验通过，Init / Doctor 已承接 MultiAgent-only 用户友好起步体验。 |
+| ISSUE-022 | MultiAgent 升级后文件结构变化需要兼容已有用户 | cli / skill / core / upgrade / workflow | P1 | ready-for-development | product-lead lane | 用户反馈 / 产品风险 | [ISSUE-022.md](ISSUE-022.md) | 已晋升 MultiAgent v0.10 升级 / 迁移兼容 SPEC；等待用户确认后通知 development 实现。 |
 | ISSUE-021 | starworkMultiagent 首次使用引导过于工程化 | skill / product / docs / onboarding | P1 | closed | development lane | 运营 Agent 优化建议 | [ISSUE-021.md](ISSUE-021.md) | 已关闭：MultiAgent v0.9 复验通过，Skill 第一屏、自然追问、预览确认、降级话术、成功状态分层和 v0.8 禁止项扫描均通过。 |
 | ISSUE-020 | Codex App 中 multiagent instruct 未使用原生线程消息而降级为人工转交 | cli / skill / adapter / workflow | P1 | closed | development lane | GitHub Issue #8 / 用户反馈 | [ISSUE-020.md](ISSUE-020.md) | 已关闭：MultiAgent v0.8 复验通过，Codex App 正常路径由 Skill 直接调用标准线程工具，CLI 只做项目事实源记录。 |
 | ISSUE-019 | doctor 应检查必需 Kit Skills 并给出安全修复指引 | cli / core / kit-pack / skill | P1 | closed | development lane | GitHub Issue #7 | [ISSUE-019.md](ISSUE-019.md) | 已关闭：Workspace Doctor v0.1 复验通过，Hub Kit required skills 覆盖 `starworkSpawn` / `starworkAudit`，普通 doctor warn，strict fail。 |

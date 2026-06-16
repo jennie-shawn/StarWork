@@ -280,6 +280,10 @@ test("starworkMultiagent skill uses Codex standard session tools directly", () =
   assert.match(skill, /set_thread_title/);
   assert.match(skill, /set_thread_pinned/);
   assert.match(skill, /set_thread_archived/);
+  assert.match(skill, /当前会话 ID 校验/);
+  assert.match(skill, /source_thread_id/);
+  assert.match(skill, /不能凭记忆、旧 worklog、旧 binding/);
+  assert.match(skill, /给自己发消息/);
   assert.match(skill, /multiagent status --target/);
   assert.match(skill, /multiagent add/);
   assert.match(skill, /multiagent bind/);
@@ -368,6 +372,51 @@ test("starworkInit skill keeps existing projects in agent-docs draft mode", () =
   assert.match(skill, /已有非空项目/);
   assert.match(skill, /每次只问一个问题/);
   assert.doesNotMatch(skill, /starwork init --type project --pack general --language zh --adapter codex --target <path> --yes/);
+});
+
+test("mainflow skills guide MultiAgent-only users through init and doctor preflight", () => {
+  const initSkill = fs.readFileSync(path.join(root, "skills", "starworkInit", "SKILL.md"), "utf8");
+  const doctorSkill = fs.readFileSync(path.join(root, "skills", "starworkDoctor", "SKILL.md"), "utf8");
+  const initSpec = fs.readFileSync(path.join(root, "skills", "starworkInit-spec.md"), "utf8");
+  const doctorSpec = fs.readFileSync(path.join(root, "skills", "starworkDoctor-spec.md"), "utf8");
+  const alphaGuide = fs.readFileSync(path.join(root, "docs", "alpha-test-guide.md"), "utf8");
+  const userGuide = fs.readFileSync(path.join(root, "docs", "multiagent-user-guide.md"), "utf8");
+  const registry = fs.readFileSync(path.join(root, "docs", "cli-skill-registry.html"), "utf8");
+  const initFirstScreen = markdownSection(initSkill, "MultiAgent-only 回流第一屏");
+  const doctorPreflight = markdownSection(doctorSkill, "MultiAgent preflight 第一屏");
+
+  assert.match(initFirstScreen, /多 AI 协作/);
+  assert.match(initFirstScreen, /项目是什么/);
+  assert.match(initFirstScreen, /当前正在推进什么/);
+  assert.match(initFirstScreen, /哪些内容能整理/);
+  assert.match(initFirstScreen, /确认前不会改业务内容/);
+  assert.match(initFirstScreen, /不会覆盖已有 AI 规则文件/);
+  assert.doesNotMatch(initFirstScreen, /adapter profile|host_native_dirs|rules_entry_status|workspace schema/);
+
+  assert.match(initSkill, /默认只问最小必要信息/);
+  assert.match(initSkill, /目标目录/);
+  assert.match(initSkill, /新建还是已有项目/);
+  assert.match(initSkill, /工作台语言/);
+  assert.match(initSkill, /主要使用的 AI 工具/);
+  assert.match(initSkill, /保留你的业务代码/);
+  assert.match(initSkill, /不直接覆盖已有 AGENTS\.md、README\.md、CLAUDE\.md/);
+  assert.match(initSkill, /工作台骨架已经写入，但 AI 入口还没有最终生效/);
+
+  assert.match(doctorPreflight, /多 AI 协作准备度/);
+  assert.match(doctorPreflight, /这次只是检查/);
+  assert.match(doctorPreflight, /不会改项目文件/);
+  assert.match(doctorPreflight, /下一步/);
+  assert.match(doctorPreflight, /另一个 AI/);
+  assert.match(doctorPreflight, /草稿和确认版/);
+  assert.match(doctorPreflight, /不自动 repair、upgrade 或写入文件/);
+  assert.doesNotMatch(doctorPreflight, /adapter profile|host_native_dirs|rules_entry_status|workspace schema/);
+
+  assert.match(initSpec, /MultiAgent-only 回流体验/);
+  assert.match(doctorSpec, /MultiAgent preflight/);
+  assert.match(alphaGuide, /Mainflow v0\.1/);
+  assert.match(userGuide, /如果 AI 先带你去接入或检查项目/);
+  assert.match(registry, /MultiAgent 安全接入口径/);
+  assert.match(registry, /多 AI 协作准备度/);
 });
 
 test("init-family skills start with user-facing capability framing", () => {
