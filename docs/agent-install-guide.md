@@ -57,13 +57,15 @@ npx @jennie-shawn/starwork@latest --help
 
 ## Step 3：安装或更新 Skills
 
-给 Codex 安装 StarWork 系统 Skills：
+给 Codex 安装 StarWork stable 系统 Skills：
 
 ```bash
-npx skills add jennie-shawn/StarWork -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --full-depth -g -a codex -y
 ```
 
 如果用户使用的不是 Codex，把 `-a codex` 换成对应 Agent 名称。
+
+这条命令安装普通 stable / latest Skill 目录。Workflow next 内测用户需要另按内测说明安装 `product/skills-next/`，不要把无目录说明的 GitHub 仓库命令当作 workflow next 来源。
 
 验证本机已安装的全局 Skills：
 
@@ -128,5 +130,5 @@ npm ls -g --depth=0 | grep starwork
 重新运行：
 
 ```bash
-npx skills add jennie-shawn/StarWork -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --full-depth -g -a codex -y
 ```

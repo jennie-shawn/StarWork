@@ -1,0 +1,7 @@
+interface:
+  display_name: "StarWork Multiagent"
+  short_description: "登记多 Agent 职责位和会话绑定"
+  default_prompt: "Use $starworkMultiagent to register this session as a StarWork Agent Lane or manage multiagent collaboration state."
+
+policy:
+  allow_implicit_invocation: true

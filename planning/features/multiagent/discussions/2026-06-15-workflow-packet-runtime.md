@@ -2,13 +2,23 @@
 
 日期：2026-06-15
 
-状态：discussion accepted，尚未进入正式 SPEC。
+状态：revised accepted，尚未进入正式 SPEC。
 
 负责人：product-multiagent lane
 
 原始草案：`_系统/协作/lanes/product-multiagent/workspace/drafts/2026-06-15-workflow-packet-runtime-spec.md`
 
-product-lead 验收判断：核心判断成立，尤其是“Workflow Definition 是静态剧本，Workflow Packet 是运行时传棒”。但本文仍有待拍板问题，且验收标准也写明“第一版进入正式 SPEC 前应满足”。因此本轮晋升为 MultiAgent discussion，不作为可开发 SPEC，也不通知 development。
+product-lead 初次验收判断：核心判断成立，尤其是“Workflow Definition 是静态剧本，Workflow Packet 是运行时传棒”。但本文仍有待拍板问题，且验收标准也写明“第一版进入正式 SPEC 前应满足”。因此本轮晋升为 MultiAgent discussion，不作为可开发 SPEC，也不通知 development。
+
+2026-06-16 追加复核：本文需要退回 product-multiagent 修订。当前版本的 `Skill 行为要求` 只描述 workflow 运行入口，没有定义 workflow 构建 / 设计入口 Skill；同时 message 示例和“完整 Packet”要求存在过度冗长风险，需要补充 compact packet / reference packet / full packet 的分层策略和验收标准。
+
+2026-06-16 修订验收：product-multiagent 已补充 Workflow Builder Entry Skill 和 Workflow Packet Token Budget 两份草案，product-lead 复核通过。正式口径补充如下：
+
+- Workflow Builder 负责定义剧本，Workflow Runner 负责把剧本编译成当前节点任务卡。
+- 默认跨 lane 投递使用 `compact + reference` packet，不复制完整 Workflow Definition。
+- `full` packet 仅用于目标 Agent 无法访问项目文件、manual handoff 必须完整自包含或用户明确要求。
+- 固定规则、Rehydrate checklist、delivery status 定义和通用禁止事项应放在 Skill / lane rules / workflow definition 中，不在每条 message 里重复。
+- 默认 instruction message 建议不超过 2,000 中文字符；默认 response 不超过 1,500 中文字符；full packet 不超过 4,000 中文字符，超出预算必须改用路径引用或生成文件。
 
 ## 1. 核心判断
 
@@ -212,6 +222,8 @@ workflow_packet:
 现有 `STARWORK:MULTIAGENT_MESSAGE v1` 是传输外壳。
 
 Workflow Packet 应嵌入到 message 中，而不是另起一套投递格式。
+
+第一版默认嵌入的是 compact + reference packet，而不是完整 Workflow Definition。完整定义应通过路径引用。
 
 ### 4.5 Return Contract
 
@@ -529,6 +541,19 @@ _系统/协作/shared.md
 
 ## 10. Skill 行为要求
 
+### 10.0 Builder / Runner 子模式
+
+第一版不新增独立 `starworkWorkflow` Skill，由 `starworkMultiagent` 承担 workflow 入口，但必须区分两个子模式：
+
+| 子模式 | 用户意图 | 行为 |
+| --- | --- | --- |
+| Workflow Builder | 设计 / 修改 / 预览 workflow | 采访、生成草案、预览、校验、保存，不真实投递 |
+| Workflow Runner | 进入 / 启动 / 执行 workflow | 读取已确认定义，生成 instance 和当前节点 packet，可能投递 |
+
+Builder 不得创建 workflow instance、不得调用 `send_message_to_thread`、不得记录 delivery status，也不得说“流程已开始”。
+
+Runner 不得重新设计 workflow，不得在未确认 draft 上默认启动，也不得跳过 gate。
+
 ### 10.1 触发 workflow
 
 当用户说“进入某个流程循环”时，`starworkMultiagent` 应：
@@ -546,7 +571,7 @@ _系统/协作/shared.md
 Skill 投递时必须：
 
 - 使用现有 `STARWORK:MULTIAGENT_MESSAGE v1` 外壳。
-- 带完整 Workflow Packet。
+- 默认带 compact + reference Workflow Packet。
 - 带当前节点 return contract。
 - 带 stop / gate 说明。
 - 成功投递后用 `request record` 记录 delivery status。
@@ -556,7 +581,7 @@ Skill 投递时必须：
 如果无法自动投递：
 
 - 输出 `manual_handoff_required`。
-- 展示完整 Workflow Packet message。
+- 默认展示 compact + reference packet message；只有目标 Agent 无法访问项目文件、manual handoff 必须完整自包含或用户明确要求时，才展示 full packet。
 - 明确还没有自动送达。
 
 ### 10.4 目标 lane 未绑定
@@ -583,6 +608,45 @@ CLI 不做：
 - 不后台推进 workflow。
 - 不判断目标节点是否完成。
 - 不替代 Skill 调用宿主线程工具。
+
+## 11.5 Packet Token Budget
+
+默认策略：
+
+```text
+Builder 可以写长 definition。
+Runner 不复制长 definition。
+Runner 只发送 compact packet + definition path。
+```
+
+### Packet mode
+
+| mode | 使用场景 | 规则 |
+| --- | --- | --- |
+| `compact` | 默认跨 lane 投递 | 只包含当前 node 的最小必要字段 |
+| `reference` | 默认引用层 | 引用 workflow_definition_path、workflow_version、node_id、input_paths、return_contract_keys |
+| `full` | 目标 Agent 无法访问项目文件、manual handoff 必须自包含或用户明确要求 | 仍只包含当前节点必要上下文，不复制无关历史 |
+
+### 不应每次重复
+
+- 完整 Workflow Definition；
+- 完整 Rehydrate checklist；
+- delivery status 定义表；
+- StarWork MultiAgent 总原则；
+- 通用禁止事项长解释；
+- lane 全部 write_scope 表；
+- 所有历史节点；
+- 所有候选 next nodes 的长说明。
+
+这些内容应放在 `starworkMultiagent` Skill、lane rules、Workflow Definition 文件、lane worklog 或 shared request 中。
+
+### 长度预算
+
+- 默认 workflow instruction：建议不超过 2,000 中文字符，理想长度 800 到 1,500 中文字符。
+- 默认 workflow response：建议不超过 1,500 中文字符。
+- full packet：建议不超过 4,000 中文字符，超过时必须改为“摘要 + 路径引用 + 文件路径”。
+
+生成 message 前，Skill 应估算长度。超过预算时，把长内容落到文件路径，只在 message 中引用。
 
 ## 12. Stop / Gate 规则
 
@@ -697,6 +761,10 @@ next_transition:
 8. `manual_handoff_required` 时仍能完整复制 Packet。
 9. delivery status 和 node status 分离。
 10. 不改变 v0.8 Skill / CLI 最小边界。
+11. 默认模板是 compact + reference，不复制完整 Workflow Definition。
+12. Rehydrate checklist、delivery status 定义和通用禁止事项不在每条 message 中完整展开。
+13. Return Contract 使用短字段名。
+14. Message 有长度预算：默认 instruction ≤ 2,000 中文字符，默认 response ≤ 1,500 中文字符，full packet ≤ 4,000 中文字符。
 
 ## 15. 待拍板问题
 

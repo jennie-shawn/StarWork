@@ -902,6 +902,10 @@ async function lanesCommand(argv) {
     await lanesStatus(argv.slice(1));
     return;
   }
+  if (subcommand === "upgrade") {
+    await lanesUpgrade(argv.slice(1));
+    return;
+  }
   if (subcommand === "read") {
     await lanesRead(argv.slice(1));
     return;
@@ -946,6 +950,7 @@ async function lanesInit(argv) {
   }
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
   assertAgentDocsReadyForMultiagent(workspaceRoot);
+  assertMultiagentWritable(workspaceRoot);
   const lanes = parseLaneList(options.lanes || "").map((id) => ({
     lane: id,
     purpose: "待补充",
@@ -978,6 +983,7 @@ async function lanesAdd(argv) {
   }
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
   assertAgentDocsReadyForMultiagent(workspaceRoot);
+  assertMultiagentWritable(workspaceRoot);
   const registry = readLanesRegistry(workspaceRoot);
   const collaboration = getCollaborationPaths(readWorkspaceState(workspaceRoot));
   if (registry.lanes.some((lane) => lane.lane === laneId)) {
@@ -1012,6 +1018,7 @@ async function lanesBind(argv) {
   const laneId = normalizeLaneId(options._?.[0], "lane");
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
   assertAgentDocsReadyForMultiagent(workspaceRoot);
+  assertMultiagentWritable(workspaceRoot);
   const registry = readLanesRegistry(workspaceRoot);
   const lane = findLaneOrThrow(registry.lanes, laneId);
   const session = resolveLaneSession(options);
@@ -1098,6 +1105,7 @@ async function lanesRelease(argv) {
   }
   const laneId = normalizeLaneId(options._?.[0], "lane");
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  assertMultiagentWritable(workspaceRoot);
   const registry = readLanesRegistry(workspaceRoot);
   const lane = findLaneOrThrow(registry.lanes, laneId);
   const nextLanes = registry.lanes.map((item) => item.lane === laneId ? { ...item, current_session: "unbound" } : item);
@@ -1118,8 +1126,9 @@ async function lanesStatus(argv) {
     return;
   }
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
-  const registry = readLanesRegistry(workspaceRoot);
-  const shared = readSharedContext(workspaceRoot);
+  const compatibilityReport = inspectMultiagentCompatibility(workspaceRoot);
+  const registry = { lanes: compatibilityReport.lanes };
+  const shared = compatibilityReport.shared;
   if (options.host) {
     const report = await collectLanesHostStatus(workspaceRoot, registry, { load: Boolean(options.load), transcript: options.transcript });
     if (options.json) {
@@ -1135,7 +1144,10 @@ async function lanesStatus(argv) {
       workspace_root: workspaceRoot,
       lanes: registry.lanes,
       shared_outputs: shared.outputs,
-      cross_lane_requests: shared.requests
+      cross_lane_requests: shared.requests,
+      multiagent: {
+        compatibility: compatibilityReport.compatibility
+      }
     }, null, 2));
     return;
   }
@@ -1161,6 +1173,35 @@ async function lanesStatus(argv) {
     console.log("");
     console.log("待处理协作请求：");
     openRequests.forEach((request) => console.log(`- ${request.from} -> ${request.to}: ${request.request} (${request.status})`));
+  }
+  printMultiagentCompatibilitySummary(compatibilityReport);
+}
+
+async function lanesUpgrade(argv) {
+  const options = parseArgs(argv);
+  if (options.help) {
+    printLanesUpgradeHelp();
+    return;
+  }
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  const plan = buildMultiagentMigrationPlan(workspaceRoot);
+  if (options.json) {
+    console.log(JSON.stringify(renderMultiagentMigrationPlanJson(plan), null, 2));
+  } else {
+    printMultiagentMigrationPlan(plan, options.dryRun || !options.yes);
+  }
+  if (options.dryRun || (!options.yes && !options.dryRun)) {
+    return;
+  }
+  if (!plan.safeToApply) {
+    throw new Error("检测到冲突或无法安全迁移的旧结构，不能执行 --yes。请先人工处理冲突。");
+  }
+  await confirmOrThrow(options, "是否执行 MultiAgent 结构迁移？");
+  applyMultiagentMigrationPlan(plan);
+  if (!options.json) {
+    console.log("");
+    console.log("MultiAgent 结构迁移已完成。");
+    console.log(`迁移报告：${plan.reportPath}`);
   }
 }
 
@@ -1283,6 +1324,7 @@ async function lanesInstruct(argv) {
   const fromLane = normalizeLaneId(options.from || "user", "from lane");
   if (!options.message) throw new Error("multiagent instruct 需要 --message <text>。");
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  assertMultiagentWritable(workspaceRoot);
   const state = readWorkspaceState(workspaceRoot);
   const collaboration = getCollaborationPaths(state);
   const registry = readLanesRegistry(workspaceRoot);
@@ -1626,6 +1668,7 @@ async function lanesRequestRecord(argv) {
   const hostDelivery = normalizeHostDeliveryStatus(options.hostDelivery || options.status || "");
   const deliveryTool = normalizeMarkdownCell(options.deliveryTool || "manual");
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  assertMultiagentWritable(workspaceRoot);
   const state = readWorkspaceState(workspaceRoot);
   const collaboration = getCollaborationPaths(state);
   const registry = readLanesRegistry(workspaceRoot);
@@ -1707,6 +1750,7 @@ async function lanesShare(argv) {
     throw new Error("multiagent share 需要 --audience <lane-list>。");
   }
   const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  assertMultiagentWritable(workspaceRoot);
   const state = readWorkspaceState(workspaceRoot);
   const collaboration = getCollaborationPaths(state);
   const registry = readLanesRegistry(workspaceRoot);
@@ -1891,6 +1935,7 @@ function collectDoctorResult(targetDir, options = {}) {
   checkAgentRuleReferences(result, workspaceRoot);
   checkAgentDocsDraftState(result, workspaceRoot);
   checkHostAdapters(result, workspaceRoot, state, options);
+  checkMultiagentCompatibility(result, workspaceRoot);
   result.ok = result.summary.fail === 0;
   result.strict_ok = result.ok;
   result.exitCode = result.ok ? 0 : 1;
@@ -1911,6 +1956,7 @@ function createDoctorResult(targetDir) {
     workspace: null,
     skills: null,
     upgrade: null,
+    multiagent: null,
     knowledge: null,
     inventory: null,
     signals: null,
@@ -4895,6 +4941,32 @@ function addLegacyChecks(result, legacy) {
   }
 }
 
+function checkMultiagentCompatibility(result, workspaceRoot) {
+  const report = inspectMultiagentCompatibility(workspaceRoot);
+  result.multiagent = {
+    status: report.compatibility.status === "current" ? "pass" : "warn",
+    lanes_count: report.lanes.length,
+    compatibility: report.compatibility
+  };
+  if (report.compatibility.status === "current") {
+    if (report.lanes.length) {
+      addCheck(result, "multiagent.compatibility.current", "pass", "MultiAgent 协作记录为当前结构。", ".starwork/agent-lanes/state.json");
+    } else {
+      addCheck(result, "multiagent.compatibility.not_enabled", "info", "当前工作台尚未启用 MultiAgent；这不是结构问题。");
+    }
+    return;
+  }
+  if (report.compatibility.status === "blocked_conflict") {
+    addCheck(result, "multiagent.compatibility.conflict", "warn", `检测到旧版 MultiAgent 协作记录存在冲突：${report.conflicts.join("；")}`, ".starwork/agent-lanes/state.json");
+    return;
+  }
+  if (report.compatibility.status === "unknown_partial") {
+    addCheck(result, "multiagent.compatibility.partial", "warn", "检测到部分旧版 MultiAgent 协作记录，但机器状态可能损坏；可以读取可见 AI 岗位，写入前需要人工确认。", ".starwork/agent-lanes/state.json");
+    return;
+  }
+  addCheck(result, "multiagent.compatibility.migration_required", "warn", `检测到旧版 MultiAgent 协作记录，目前可以读取已有 AI 岗位；写入新岗位、绑定会话或记录交接前，请先预览迁移：${report.compatibility.migration.dry_run_command}`, ".starwork/agent-lanes/state.json");
+}
+
 function addCheck(result, id, level, message, checkPath) {
   result.summary[level] += 1;
   result.checks.push({
@@ -7438,6 +7510,440 @@ function readSharedContext(workspaceRoot) {
     })),
     agreements: parseMarkdownTableSection(content, "## Shared Agreements", ["agreement", "owner", "status", "link"])
   };
+}
+
+function inspectMultiagentCompatibility(workspaceRoot) {
+  const workspaceState = readWorkspaceState(workspaceRoot);
+  const collaboration = getCollaborationPaths(workspaceState);
+  const stateInfo = readAgentLanesStateRaw(workspaceRoot);
+  const currentRegistry = readLanesRegistryTolerant(workspaceRoot, collaboration.registry, "current_language_markdown");
+  const currentShared = readSharedContextTolerant(workspaceRoot, collaboration.shared, "current_language_markdown");
+  const alternate = getAlternateCollaborationPaths(collaboration.root);
+  const alternateRegistry = alternate ? readLanesRegistryTolerant(workspaceRoot, alternate.registry, "alternate_language_markdown") : emptyRegistryRead(null, "alternate_language_markdown");
+  const alternateShared = alternate ? readSharedContextTolerant(workspaceRoot, alternate.shared, "alternate_language_markdown") : emptySharedRead(null, "alternate_language_markdown");
+  const legacyClasses = [];
+  const conflicts = [];
+  const warnings = [];
+  const readSources = [];
+  if (stateInfo.exists) readSources.push(".starwork/agent-lanes/state.json");
+  if (currentRegistry.exists) readSources.push(collaboration.registry);
+  if (currentShared.exists) readSources.push(collaboration.shared);
+
+  if (stateInfo.exists && stateInfo.parseError) {
+    legacyClasses.push("malformed_state");
+  } else if (stateInfo.exists && stateInfo.version === 1) {
+    legacyClasses.push("state_v1_current");
+  } else if (stateInfo.exists && stateInfo.version == null) {
+    legacyClasses.push("state_unversioned");
+  }
+  if (!stateInfo.exists && currentRegistry.lanes.length) legacyClasses.push("markdown_only");
+  if (stateInfo.exists && !stateInfo.parseError && stateInfo.lanes.length && !currentRegistry.exists) legacyClasses.push("state_only");
+  if ((alternateRegistry.lanes.length || alternateShared.requests.length) && (currentRegistry.lanes.length || currentShared.requests.length || stateInfo.lanes.length)) {
+    legacyClasses.push("mixed_language_paths");
+    conflicts.push(`当前语言协作路径和另一套语言协作路径都存在 MultiAgent 记录：${collaboration.root} / ${alternate.root}`);
+  }
+  const stateByLane = new Map(stateInfo.lanes.map((lane) => [lane.lane, lane]));
+  for (const lane of currentRegistry.lanes) {
+    const stateLane = stateByLane.get(lane.lane);
+    if (!stateLane) continue;
+    if (stateLane.current_session && lane.current_session && stateLane.current_session !== lane.current_session) {
+      legacyClasses.push("conflicting_lane");
+      conflicts.push(`lane ${lane.lane} 的 state.json session ${stateLane.current_session} 与 agent-lanes.md ${lane.current_session} 不一致`);
+    }
+  }
+  if (currentRegistry.exists && currentRegistry.parseWarning) warnings.push(currentRegistry.parseWarning);
+  if (currentShared.exists && currentShared.parseWarning) warnings.push(currentShared.parseWarning);
+  const lanes = mergeCompatibleLanes(currentRegistry.lanes, stateInfo.lanes);
+  const shared = currentShared.exists ? currentShared.shared : { outputs: [], requests: [], agreements: [] };
+  const status = resolveMultiagentCompatibilityStatus({ stateInfo, currentRegistry, lanes, conflicts, legacyClasses });
+  const requiredForWrite = status === "migration_required_for_write" || status === "blocked_conflict" || status === "unknown_partial";
+  return {
+    workspaceRoot,
+    collaboration,
+    stateInfo,
+    registry: currentRegistry,
+    shared,
+    alternateRegistry,
+    alternateShared,
+    lanes,
+    conflicts,
+    warnings,
+    compatibility: {
+      status,
+      structure_version: stateInfo.version,
+      target_structure_version: 1,
+      legacy_classes: [...new Set(legacyClasses.filter((item) => item !== "state_v1_current" || status === "current"))],
+      read_sources: readSources,
+      required_for_write: requiredForWrite,
+      migration: {
+        required_for_write: requiredForWrite,
+        available: ["migration_required_for_write", "current"].includes(status) && conflicts.length === 0,
+        dry_run_command: `starwork multiagent upgrade --target ${workspaceRoot} --dry-run`
+      },
+      conflicts,
+      warnings
+    }
+  };
+}
+
+function readAgentLanesStateRaw(workspaceRoot) {
+  const statePath = agentLanesStatePath(workspaceRoot);
+  if (!fs.existsSync(statePath)) {
+    return { exists: false, path: statePath, version: null, data: defaultAgentLanesState(), lanes: [], requests: [], parseError: null };
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    const lanesObject = data.lanes && typeof data.lanes === "object" ? data.lanes : {};
+    const lanes = Object.entries(lanesObject).map(([laneId, record]) => normalizeLaneRecord({
+      lane: laneId,
+      purpose: normalizeMarkdownCell(record?.purpose || "待补充"),
+      current_session: normalizeMarkdownCell(record?.current_session || "unbound"),
+      write_scope: normalizeMarkdownCell(record?.write_scope || "待补充"),
+      worklog: record?.worklog || defaultLaneWorklogPath(laneId),
+      workspace: record?.workspace || defaultLaneWorkspacePath(laneId)
+    }));
+    return {
+      exists: true,
+      path: statePath,
+      version: Number.isInteger(data.version) ? data.version : null,
+      data,
+      lanes,
+      requests: Array.isArray(data.requests) ? data.requests : [],
+      parseError: null
+    };
+  } catch (error) {
+    return { exists: true, path: statePath, version: null, data: null, lanes: [], requests: [], parseError: error.message };
+  }
+}
+
+function readLanesRegistryTolerant(workspaceRoot, relativePath, source) {
+  const registryPath = path.join(workspaceRoot, relativePath);
+  if (!fs.existsSync(registryPath)) return emptyRegistryRead(relativePath, source);
+  const content = fs.readFileSync(registryPath, "utf8");
+  const lanes = parseMarkdownTableSection(content, "## Lanes", ["lane", "purpose", "current_session", "write_scope", "worklog", "workspace"])
+    .filter((row) => row.lane)
+    .map(normalizeLaneRecord);
+  const hasLanesHeading = /^## Lanes\s*$/m.test(content);
+  return {
+    exists: true,
+    relativePath,
+    source,
+    lanes,
+    parseWarning: hasLanesHeading && !lanes.length ? `${relativePath} 包含 Lanes 段落但没有可解析 lane 表格。` : null
+  };
+}
+
+function emptyRegistryRead(relativePath, source) {
+  return { exists: false, relativePath, source, lanes: [], parseWarning: null };
+}
+
+function readSharedContextTolerant(workspaceRoot, relativePath, source) {
+  const sharedPath = path.join(workspaceRoot, relativePath);
+  if (!fs.existsSync(sharedPath)) return emptySharedRead(relativePath, source);
+  const content = fs.readFileSync(sharedPath, "utf8");
+  const requests = parseMarkdownTableSection(content, "## Cross-Lane Requests", ["id", "from", "to", "request", "status", "host_delivery", "link", "updated"]);
+  const legacyRequests = requests.length ? [] : parseMarkdownTableSection(content, "## Cross-Lane Requests", ["from", "to", "request", "status", "link"]).map((row) => ({
+    id: "",
+    from: row.from,
+    to: row.to,
+    request: row.request,
+    status: row.status,
+    host_delivery: "",
+    link: row.link,
+    updated: ""
+  }));
+  const shared = {
+    outputs: parseMarkdownTableSection(content, "## Shared Outputs", ["from", "title", "path", "audience", "status", "updated"]),
+    requests: requests.length ? requests : legacyRequests,
+    agreements: parseMarkdownTableSection(content, "## Shared Agreements", ["agreement", "owner", "status", "link"])
+  };
+  const hasRequestsHeading = /^## Cross-Lane Requests\s*$/m.test(content);
+  return {
+    exists: true,
+    relativePath,
+    source,
+    shared,
+    requests: shared.requests,
+    parseWarning: hasRequestsHeading && !shared.requests.length ? `${relativePath} 包含 Cross-Lane Requests 段落但没有可解析 request 表格。` : null
+  };
+}
+
+function emptySharedRead(relativePath, source) {
+  return { exists: false, relativePath, source, shared: { outputs: [], requests: [], agreements: [] }, requests: [], parseWarning: null };
+}
+
+function getAlternateCollaborationPaths(currentRoot) {
+  const alternateRoot = currentRoot === path.join("_系统", "协作")
+    ? path.join("_system", "collaboration")
+    : path.join("_系统", "协作");
+  return {
+    root: alternateRoot,
+    registry: path.join(alternateRoot, "agent-lanes.md"),
+    shared: path.join(alternateRoot, "shared.md")
+  };
+}
+
+function mergeCompatibleLanes(markdownLanes, stateLanes) {
+  const byLane = new Map();
+  for (const lane of stateLanes) byLane.set(lane.lane, normalizeLaneRecord(lane));
+  for (const lane of markdownLanes) {
+    const stateLane = byLane.get(lane.lane) || {};
+    byLane.set(lane.lane, normalizeLaneRecord({
+      ...stateLane,
+      ...lane,
+      current_session: lane.current_session && lane.current_session !== "unbound"
+        ? lane.current_session
+        : (stateLane.current_session || lane.current_session || "unbound")
+    }));
+  }
+  return [...byLane.values()].sort((a, b) => a.lane.localeCompare(b.lane));
+}
+
+function resolveMultiagentCompatibilityStatus({ stateInfo, currentRegistry, lanes, conflicts, legacyClasses }) {
+  if (conflicts.length || legacyClasses.includes("mixed_language_paths") || legacyClasses.includes("conflicting_lane")) return "blocked_conflict";
+  if (stateInfo.exists && stateInfo.parseError) return lanes.length || currentRegistry.lanes.length ? "unknown_partial" : "blocked_conflict";
+  if (!stateInfo.exists && !currentRegistry.exists && lanes.length === 0) return "current";
+  if (stateInfo.version === 1 && currentRegistry.exists) return "current";
+  if (legacyClasses.includes("state_unversioned") || legacyClasses.includes("markdown_only") || legacyClasses.includes("state_only")) {
+    return "migration_required_for_write";
+  }
+  return "current";
+}
+
+function assertMultiagentWritable(workspaceRoot) {
+  const compatibility = inspectMultiagentCompatibility(workspaceRoot).compatibility;
+  if (!compatibility.required_for_write) return;
+  throw new Error(`检测到旧版或冲突的 MultiAgent 协作记录（${compatibility.status}）。写入前请先运行：${compatibility.migration.dry_run_command}`);
+}
+
+function buildMultiagentMigrationPlan(workspaceRoot) {
+  const report = inspectMultiagentCompatibility(workspaceRoot);
+  const timestamp = timestampForFile();
+  const actions = [];
+  const willCreate = [];
+  const willUpdate = [];
+  const willPreserve = [];
+  const willNotTouch = [
+    "不删除旧文件",
+    "不覆盖非空 worklog、shared outputs 或 request 记录",
+    "不创建、通知、改名、置顶或归档任何 AI 会话",
+    "不修改 AGENTS.md / CLAUDE.md / README.md"
+  ];
+  const backupSources = [];
+  const stateRelativePath = path.join(".starwork", "agent-lanes", "state.json");
+  const stateExists = report.stateInfo.exists && !report.stateInfo.parseError;
+  const safeToApply = report.conflicts.length === 0 && !report.stateInfo.parseError;
+  let nextState = stateExists ? normalizeAgentLanesStateData(report.stateInfo.data) : defaultAgentLanesState();
+  if (!report.stateInfo.exists || report.compatibility.legacy_classes.includes("markdown_only")) {
+    nextState = {
+      version: 1,
+      lanes: Object.fromEntries(report.lanes.map((lane) => [lane.lane, laneToStateRecord(lane)])),
+      requests: report.shared.requests.map(sharedRequestToStateRequest)
+    };
+    actions.push(directoryAction(workspaceRoot, path.join(".starwork", "agent-lanes")));
+    actions.push(upsertFileAction(workspaceRoot, stateRelativePath, renderAgentLanesState(nextState)));
+    willCreate.push({ path: stateRelativePath, reason: "从可读 Markdown 协作记录补齐机器状态文件" });
+  } else if (report.stateInfo.version !== 1) {
+    nextState = {
+      ...nextState,
+      version: 1,
+      lanes: {
+        ...(nextState.lanes || {}),
+        ...Object.fromEntries(report.lanes.map((lane) => [lane.lane, {
+          ...(nextState.lanes?.[lane.lane] || {}),
+          ...laneToStateRecord(lane)
+        }]))
+      }
+    };
+    actions.push(overwriteFileAction(workspaceRoot, stateRelativePath, renderAgentLanesState(nextState)));
+    backupSources.push(stateRelativePath);
+    willUpdate.push({ path: stateRelativePath, reason: "补充 version: 1，并保留已有 lanes / requests" });
+  }
+  if (!report.registry.exists && report.lanes.length) {
+    actions.push(fileAction(workspaceRoot, report.collaboration.registry, renderAgentLanesRegistry(report.lanes)));
+    willCreate.push({ path: report.collaboration.registry, reason: "从 state.json 补齐人类可读 lane 注册表" });
+  } else if (report.registry.exists) {
+    backupSources.push(report.collaboration.registry);
+    willPreserve.push(report.collaboration.registry);
+  }
+  if (!fs.existsSync(path.join(workspaceRoot, report.collaboration.shared))) {
+    actions.push(fileAction(workspaceRoot, report.collaboration.shared, renderSharedContext(report.shared)));
+    willCreate.push({ path: report.collaboration.shared, reason: "补齐共享输出和交接记录索引" });
+  } else {
+    backupSources.push(report.collaboration.shared);
+    willPreserve.push(report.collaboration.shared);
+  }
+  for (const lane of report.lanes) {
+    const worklog = path.join(report.collaboration.root, lane.worklog);
+    const workspaceReadme = path.join(report.collaboration.root, lane.workspace, "README.md");
+    if (!fs.existsSync(path.join(workspaceRoot, worklog))) {
+      actions.push(fileAction(workspaceRoot, worklog, renderLaneWorklog(lane.lane)));
+      willCreate.push({ path: worklog, reason: `补齐 ${lane.lane} lane worklog` });
+    } else {
+      willPreserve.push(worklog);
+    }
+    if (!fs.existsSync(path.join(workspaceRoot, workspaceReadme))) {
+      actions.push(fileAction(workspaceRoot, workspaceReadme, renderLaneWorkspaceReadme(lane.lane, report.collaboration)));
+      willCreate.push({ path: workspaceReadme, reason: `补齐 ${lane.lane} lane workspace 说明` });
+    } else {
+      willPreserve.push(workspaceReadme);
+    }
+  }
+  const uniqueBackupSources = [...new Set(backupSources)].filter((relativePath) => fs.existsSync(path.join(workspaceRoot, relativePath)));
+  return {
+    workspaceRoot,
+    status: report.compatibility.status === "current" ? "current" : "migration_available",
+    targetStructureVersion: 1,
+    safeToApply,
+    compatibility: report.compatibility,
+    actions: dedupeActions(actions),
+    willCreate,
+    willUpdate,
+    willCopy: uniqueBackupSources.map((relativePath) => ({ from: relativePath, to: path.join(".starwork", "backups", "multiagent", timestamp, relativePath) })),
+    willPreserve: [...new Set(willPreserve)],
+    willNotTouch,
+    conflicts: report.conflicts,
+    warnings: report.warnings,
+    backupPath: path.join(".starwork", "backups", "multiagent", timestamp),
+    backupSources: uniqueBackupSources,
+    reportPath: path.join(".starwork", "agent-lanes", `migration-report-${timestamp}.json`),
+    timestamp
+  };
+}
+
+function normalizeAgentLanesStateData(data = {}) {
+  return {
+    version: 1,
+    lanes: data.lanes && typeof data.lanes === "object" ? data.lanes : {},
+    requests: Array.isArray(data.requests) ? data.requests : []
+  };
+}
+
+function laneToStateRecord(lane) {
+  const parsed = parseAdapterSession(lane.current_session || "unbound");
+  return {
+    current_session: lane.current_session || "unbound",
+    host: parsed.host,
+    session_id: parsed.id,
+    thread_id: parsed.host === "codex" ? parsed.id : null,
+    purpose: lane.purpose || "待补充",
+    write_scope: lane.write_scope || "待补充",
+    worklog: lane.worklog || defaultLaneWorklogPath(lane.lane),
+    workspace: lane.workspace || defaultLaneWorkspacePath(lane.lane)
+  };
+}
+
+function sharedRequestToStateRequest(row) {
+  return {
+    id: row.id || buildLaneRequestId(row.to || "lane"),
+    from: row.from || "user",
+    to: row.to || "unknown",
+    message_type: "instruction",
+    recorded_in: row.link || "",
+    host_delivery: {
+      status: row.host_delivery || row.status || "recorded_only",
+      delivery_tool: "legacy_shared_md",
+      mode: "migrated"
+    }
+  };
+}
+
+function renderMultiagentMigrationPlanJson(plan) {
+  return {
+    status: plan.status,
+    target_structure_version: plan.targetStructureVersion,
+    safe_to_apply: plan.safeToApply,
+    compatibility: plan.compatibility,
+    will_create: plan.willCreate,
+    will_update: plan.willUpdate,
+    will_copy: plan.willCopy,
+    will_preserve: plan.willPreserve,
+    will_not_touch: plan.willNotTouch,
+    conflicts: plan.conflicts,
+    warnings: plan.warnings,
+    backup: {
+      will_create_backup: plan.willCopy.length > 0,
+      path: plan.backupPath
+    },
+    report_path: plan.reportPath
+  };
+}
+
+function printMultiagentMigrationPlan(plan, dryRun = true) {
+  console.log("");
+  console.log(dryRun ? "这是一次预览，不会写入文件。" : "MultiAgent 结构迁移计划：");
+  console.log("");
+  console.log("已识别：");
+  for (const source of plan.compatibility.read_sources || []) console.log(`- ${source}`);
+  if (!plan.compatibility.read_sources?.length) console.log("- 未发现已有 MultiAgent 协作记录。");
+  printMigrationGroup("将会创建：", plan.willCreate.map((item) => `${item.path}：${item.reason}`));
+  printMigrationGroup("将会更新：", plan.willUpdate.map((item) => `${item.path}：${item.reason}`));
+  printMigrationGroup("将会备份：", plan.willCopy.map((item) => `${item.from} -> ${item.to}`));
+  printMigrationGroup("将会保留：", plan.willPreserve);
+  printMigrationGroup("不会做：", plan.willNotTouch);
+  if (plan.conflicts.length) printMigrationGroup("需要人工处理的冲突：", plan.conflicts);
+  if (plan.warnings.length) printMigrationGroup("提醒：", plan.warnings);
+}
+
+function printMigrationGroup(title, items) {
+  console.log("");
+  console.log(title);
+  if (!items.length) {
+    console.log("- 无");
+    return;
+  }
+  for (const item of items) console.log(`- ${item}`);
+}
+
+function applyMultiagentMigrationPlan(plan) {
+  const backupRoot = path.join(plan.workspaceRoot, plan.backupPath);
+  if (plan.willCopy.length) {
+    fs.mkdirSync(backupRoot, { recursive: true });
+    for (const relativePath of plan.backupSources) {
+      const source = path.join(plan.workspaceRoot, relativePath);
+      if (!fs.existsSync(source)) continue;
+      const target = path.join(backupRoot, relativePath);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.copyFileSync(source, target);
+    }
+  }
+  applyPlan({ targetDir: plan.workspaceRoot, actions: plan.actions });
+  const report = {
+    source_version: plan.compatibility.structure_version,
+    target_version: plan.targetStructureVersion,
+    legacy_classes: plan.compatibility.legacy_classes,
+    applied_actions: plan.actions.map((action) => ({
+      type: action.type,
+      mode: action.mode,
+      path: action.relativePath
+    })),
+    backup_path: plan.willCopy.length ? plan.backupPath : null,
+    skipped_actions: plan.willPreserve,
+    conflicts_resolved: [],
+    conflicts_unresolved: plan.conflicts,
+    command_timestamp: new Date().toISOString()
+  };
+  fs.mkdirSync(path.dirname(path.join(plan.workspaceRoot, plan.reportPath)), { recursive: true });
+  fs.writeFileSync(path.join(plan.workspaceRoot, plan.reportPath), `${JSON.stringify(report, null, 2)}\n`, "utf8");
+}
+
+function timestampForFile(date = new Date()) {
+  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+function printMultiagentCompatibilitySummary(report) {
+  if (report.compatibility.status === "current") return;
+  console.log("");
+  console.log("升级提示：");
+  if (report.compatibility.status === "blocked_conflict") {
+    console.log("- 检测到旧版 MultiAgent 协作记录存在冲突，暂不能自动迁移。");
+  } else if (report.compatibility.status === "unknown_partial") {
+    console.log("- 检测到部分旧版 MultiAgent 协作记录，但机器状态可能损坏。");
+  } else {
+    console.log("- 已检测到旧版 MultiAgent 协作记录，目前可以读取已有 AI 岗位。");
+    console.log("- 写入新岗位、绑定会话或记录交接前，建议先预览迁移。预览不会写入文件。");
+  }
+  console.log(`- 预览命令：${report.compatibility.migration.dry_run_command}`);
 }
 
 function parseMarkdownTableSection(content, heading, fields) {
@@ -10009,7 +10515,7 @@ function printLanesHelp() {
   console.log(`StarWork Multiagent
 
 Usage:
-  starwork multiagent <init|add|bind|release|status|read|instruct|handoff|continue|launch|message|request|share> [options]
+  starwork multiagent <init|add|bind|release|status|upgrade|read|instruct|handoff|continue|launch|message|request|share> [options]
 
 Agent Lanes 用于同一项目内多个 Agent 会话按项目自定义职责位协作。
 
@@ -10019,6 +10525,7 @@ Subcommands:
   bind       将当前会话绑定到 lane。
   release    释放 lane 的当前会话绑定。
   status     查看 lane 分工和共享请求，可加 --host 观察宿主会话。
+  upgrade    预览并确认迁移旧版 MultiAgent 协作结构。
   read       读取某个 lane 绑定宿主的可用近况；Claude Code 只输出 transcript 摘要。
   instruct   向另一个 lane 发送格式化跨会话指令。
   handoff    生成并记录人工交付消息，不后台发送。
@@ -10033,6 +10540,7 @@ Subcommands:
   starwork multiagent add review --purpose "审校和风险检查" --write "reviews/**,product/docs/**" --target ./my-workspace --yes
   starwork multiagent bind research --session codex:manual-research-1 --session-name "Research Agent" --target ./my-workspace --yes
   starwork multiagent status --host --target ./my-workspace --json
+  starwork multiagent upgrade --target ./my-workspace --dry-run
   starwork multiagent message instruct development --from product-planning --message "请根据 SPEC 开始实现。" --target ./my-workspace --json
   starwork multiagent request record --from product-planning --to development --message "请根据 SPEC 开始实现。" --host-delivery delivered_via_codex_thread_tool --delivery-tool send_message_to_thread --target ./my-workspace --yes
 `);
@@ -10117,6 +10625,29 @@ Options:
   --host
   --load
   --transcript <path>  Claude Code transcript JSONL 文件或目录，只读摘要
+`);
+}
+
+function printLanesUpgradeHelp() {
+  console.log(`StarWork Multiagent Upgrade
+
+Usage:
+  starwork multiagent upgrade [options]
+
+Options:
+  --target <path>
+  --dry-run
+  --json
+  --yes, -y
+
+说明：
+  这是 MultiAgent 协作结构迁移，不会创建或通知 AI 会话。
+  默认先使用 --dry-run 预览；确认后 --yes 会备份旧文件、补齐安全结构并写 migration report。
+
+示例：
+  starwork multiagent upgrade --target ./my-workspace --dry-run
+  starwork multiagent upgrade --target ./my-workspace --json --dry-run
+  starwork multiagent upgrade --target ./my-workspace --yes
 `);
 }
 

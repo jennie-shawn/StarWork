@@ -21,10 +21,10 @@ node --version
 npm --version
 ```
 
-安装 CLI：
+安装 next CLI：
 
 ```bash
-npm install -g @jennie-shawn/starwork@latest
+npm install -g @jennie-shawn/starwork@next
 starwork --version
 starwork --help
 ```
@@ -32,7 +32,7 @@ starwork --help
 安装 Skills：
 
 ```bash
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --full-depth -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills-next --full-depth -g -a codex -y
 ```
 
 验证：

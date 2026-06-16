@@ -33,6 +33,7 @@ MultiAgent 已从 Codex 单宿主编排升级为 runtime host routing，并进�
 - [v0.8 Skill / CLI 最小边界 SPEC](specs/v0.8-skill-cli-minimal-boundary.md)
 - [v0.9 友好引导体验 SPEC](specs/v0.9-friendly-onboarding.md)
 - [v0.10 升级 / 迁移兼容 SPEC](specs/v0.10-upgrade-migration-compatibility.md)
+- [v0.11 Workflow Builder / Runner MVP SPEC](specs/v0.11-workflow-builder-runner-mvp.md)
 - [Lane Workflow / Handoff Rules MVP 讨论](discussions/2026-06-15-lane-workflow-mvp.md)
 - [Workflow Packet Runtime 设计讨论](discussions/2026-06-15-workflow-packet-runtime.md)
 - [v0.2 验收报告](acceptance/2026-06-01-v0.2-acceptance-report.md)

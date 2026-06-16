@@ -8,6 +8,8 @@ const { execFileSync, spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..", "..");
 const bin = path.join(root, "cli", "bin", "starwork.js");
 const packageJson = require(path.join(root, "package.json"));
+const stableSkillsSource = "https://github.com/jennie-shawn/StarWork/tree/main/product/skills";
+const nextSkillsSource = "https://github.com/jennie-shawn/StarWork/tree/main/product/skills-next";
 
 function tempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "starwork-init-test-"));
@@ -195,7 +197,7 @@ test("skill management v0.2 exposes main router and scoped skill layers", () => 
   assert.match(routing, /L0 主入口/);
   assert.match(routing, /多 Agent[\s\S]*starworkMultiagent/);
   assert.match(routing, /从项目中心创建项目[\s\S]*starworkSpawn/);
-  assert.match(install, /npx skills add jennie-shawn\/StarWork -g -a codex -y/);
+  assert.match(install, new RegExp(`npx skills add ${stableSkillsSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --full-depth -g -a codex -y`));
   assert.match(install, /starwork[\s\S]*starworkInit[\s\S]*starworkDoctor[\s\S]*starworkKnowledge[\s\S]*starworkMultiagent/);
   assert.doesNotMatch(install, /全局安装[\s\S]*(starworkSpawn|starworkAudit|neat-freak|starworkKnowledgeProject)/);
 });
@@ -258,6 +260,43 @@ test("public docs describe main StarWork skill and keep kit skills out of global
   assert.match(registry, /L2 Kit 自带/);
   assert.match(registry, /starworkKnowledgeProject<\/code>/);
   assert.match(registry, /L3 Capability 项目内/);
+  assert.match(readme, /product\/skills/);
+  assert.match(installGuide, /stable \/ latest Skill 目录/);
+  assert.match(alphaGuide, new RegExp(`${stableSkillsSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --full-depth -g -a codex -y`));
+  assert.match(skillsReadme, /stable \/ latest 用户/);
+  assert.match(registry, /stable \/ latest 用户从 <code>product\/skills\/<\/code> 安装/);
+});
+
+test("skill next directory separates workflow channel from stable skills", () => {
+  const allowedGlobalSkills = ["starwork", "starworkDoctor", "starworkInit", "starworkKnowledge", "starworkMultiagent"];
+  const nextSkillNames = fs.readdirSync(path.join(root, "skills-next"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  const stableMultiagent = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "SKILL.md"), "utf8");
+  const nextMultiagent = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "SKILL.md"), "utf8");
+  const alphaGuide = fs.readFileSync(path.join(root, "docs", "alpha-test-guide.md"), "utf8");
+  const userGuide = fs.readFileSync(path.join(root, "docs", "multiagent-user-guide.md"), "utf8");
+  const forbiddenCodexPath = /starwork multiagent instruct|starwork multiagent launch|multiagent message instruct|multiagent message launch|multiagent read --host codex|multiagent status --host codex|--session-name|--pin/;
+
+  assert.deepEqual(nextSkillNames, allowedGlobalSkills);
+  for (const name of nextSkillNames) {
+    const skill = fs.readFileSync(path.join(root, "skills-next", name, "SKILL.md"), "utf8");
+    assert.match(skill, /starwork_channel: next/, `${name} should be marked as next channel`);
+  }
+
+  assert.doesNotMatch(nextSkillNames.join("\n"), /starworkSpawn|starworkAudit|neat-freak|starworkKnowledgeProject/);
+  assert.doesNotMatch(stableMultiagent, /starwork_channel: next|starwork_multiagent: v0\.11-workflow-mvp/);
+  assert.doesNotMatch(stableMultiagent, /## Workflow Builder|## Workflow Runner/);
+  assert.match(nextMultiagent, /starwork_channel: next/);
+  assert.match(nextMultiagent, /starwork_multiagent: v0\.11-workflow-mvp/);
+  assert.match(nextMultiagent, /## Workflow Builder/);
+  assert.match(nextMultiagent, /## Workflow Runner/);
+  assert.doesNotMatch(stableMultiagent, forbiddenCodexPath);
+  assert.doesNotMatch(nextMultiagent, forbiddenCodexPath);
+  assert.match(alphaGuide, new RegExp(`${nextSkillsSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --full-depth -g -a codex -y`));
+  assert.match(userGuide, new RegExp(`${nextSkillsSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --full-depth -g -a codex -y`));
+  assert.doesNotMatch(`${alphaGuide}\n${userGuide}`, /npx skills add jennie-shawn\/StarWork -g -a codex -y/);
 });
 
 test("starworkMultiagent skill uses Codex standard session tools directly", () => {
@@ -336,6 +375,64 @@ test("starworkMultiagent skill presents friendly onboarding before internal work
   assert.match(skill, /你可以这样开始/);
   assert.match(skill, /这些只是参考/);
   assert.match(skill, /不会直接套模板/);
+});
+
+test("starworkMultiagent next skill defines workflow builder runner and next protection", () => {
+  const skill = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "SKILL.md"), "utf8");
+  const spec = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent-spec.md"), "utf8");
+  const alphaGuide = fs.readFileSync(path.join(root, "docs", "alpha-test-guide.md"), "utf8");
+  const userGuide = fs.readFileSync(path.join(root, "docs", "multiagent-user-guide.md"), "utf8");
+  const registry = fs.readFileSync(path.join(root, "docs", "cli-skill-registry.html"), "utf8");
+  const legacySection = markdownSection(skill, "旧版 MultiAgent 结构保护");
+  const builderSection = markdownSection(skill, "Workflow Builder");
+  const runnerSection = markdownSection(skill, "Workflow Runner");
+
+  assert.match(skill, /starwork_channel: next/);
+  assert.match(skill, /starwork_multiagent: v0\.11-workflow-mvp/);
+  assert.match(legacySection, /旧版结构/);
+  assert.match(legacySection, /upgrade --target <path> --dry-run/);
+  assert.match(legacySection, /确认后才执行/);
+  assert.match(legacySection, /不能把旧结构误说成“没有 AI 岗位”/);
+
+  assert.match(builderSection, /只会生成 workflow 草案/);
+  assert.match(builderSection, /不会通知任何 Agent/);
+  assert.match(builderSection, /不会启动真实流程/);
+  assert.match(builderSection, /目标/);
+  assert.match(builderSection, /参与 AI 岗位/);
+  assert.match(builderSection, /触发条件/);
+  assert.match(builderSection, /Return Contract/);
+  assert.match(builderSection, /Gate \/ Stop/);
+  assert.match(builderSection, /负责 lane[\s\S]*触发条件[\s\S]*输入[\s\S]*产出[\s\S]*Return Contract[\s\S]*Gate \/ Stop/);
+  assert.match(builderSection, /我只会先保存草案，不会启动流程或通知任何 Agent/);
+  assert.match(builderSection, /workspace\/drafts\/workflows\/<workflow-id>\.draft\.md/);
+  assert.match(builderSection, /不投递消息/);
+  assert.match(builderSection, /不创建 workflow instance/);
+  assert.match(builderSection, /不写 `product\/`/);
+  assert.match(builderSection, /不记录 delivery status/);
+
+  assert.match(runnerSection, /只读取已确认 definition/);
+  assert.match(runnerSection, /当前会话 ID/);
+  assert.match(runnerSection, /目标 lane session ID/);
+  assert.match(runnerSection, /目标 lane 绑定的是当前会话/);
+  assert.match(runnerSection, /本地执行模式不调用 `send_message_to_thread`/);
+  assert.match(runnerSection, /packet_mode: compact/);
+  assert.match(runnerSection, /wf_i/);
+  assert.match(runnerSection, /2,000 中文字符/);
+  assert.match(runnerSection, /1,500 中文字符/);
+  assert.match(runnerSection, /4,000 中文字符/);
+  assert.match(runnerSection, /workflow 当前节点消息已送达，并已记录 StarWork request/);
+  assert.match(runnerSection, /不得说目标 Agent 已完成、workflow 已完成/);
+
+  assert.match(spec, /v0\.10 升级 \/ 迁移兼容/);
+  assert.match(spec, /v0\.11 Workflow Builder \/ Runner/);
+  assert.match(spec, /Builder 不得写 `product\/`/);
+  assert.match(spec, /Runner 只读取已确认 definition/);
+  assert.match(alphaGuide, /@next/);
+  assert.match(alphaGuide, /不要用普通 `latest` CLI 或 stable Skill 目录来测试 workflow/);
+  assert.match(alphaGuide, new RegExp(`${nextSkillsSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --full-depth -g -a codex -y`));
+  assert.match(userGuide, /Workflow 目前是 next 内测能力/);
+  assert.match(userGuide, /product\/skills-next/);
+  assert.match(registry, /next workflow 草案 \/ compact packet/);
 });
 
 test("multiagent user docs describe friendly onboarding instead of command-first workflow", () => {
@@ -1238,6 +1335,105 @@ test("multiagent add bind share and status update markdown state", () => {
   const humanStatus = runCommand(["multiagent", "status", "--target", dir]);
   assert.match(humanStatus.stdout, /StarWork 多 AI 协作状态/);
   assert.match(humanStatus.stdout, /职责位：1 个；已绑定会话：1 个；共享输出：1 项/);
+});
+
+test("multiagent upgrade reads unversioned state and safely migrates before writes", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--lanes", "development", "--yes"]);
+  runCommand(["multiagent", "bind", "development", "--session", "codex:dev-thread-1", "--target", dir, "--yes"]);
+  const statePath = path.join(dir, ".starwork", "agent-lanes", "state.json");
+  const state = readJson(statePath);
+  delete state.version;
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + "\n", "utf8");
+
+  const status = runCommand(["multiagent", "status", "--target", dir, "--json"]);
+  const statusReport = JSON.parse(status.stdout);
+  const doctor = runDoctor(["--target", dir, "--strict", "--json"]);
+  const doctorReport = JSON.parse(doctor.stdout);
+  const blockedAdd = runCommand(["multiagent", "add", "review", "--purpose", "复验", "--write", "product/**", "--target", dir, "--yes"]);
+  const beforeDryRun = listFiles(dir).sort();
+  const dryRun = runCommand(["multiagent", "upgrade", "--target", dir, "--json", "--dry-run"]);
+  const dryRunReport = JSON.parse(dryRun.stdout);
+  const afterDryRun = listFiles(dir).sort();
+  const apply = runCommand(["multiagent", "upgrade", "--target", dir, "--yes"]);
+  const migratedState = readJson(statePath);
+
+  assert.equal(status.status, 0);
+  assert.equal(statusReport.lanes[0].lane, "development");
+  assert.equal(statusReport.lanes[0].current_session, "codex:dev-thread-1");
+  assert.equal(statusReport.multiagent.compatibility.status, "migration_required_for_write");
+  assert(statusReport.multiagent.compatibility.legacy_classes.includes("state_unversioned"));
+  assert.equal(doctor.status, 1);
+  assert.equal(doctorReport.multiagent.compatibility.required_for_write, true);
+  assert.match(doctorReport.checks.find((check) => check.id === "multiagent.compatibility.migration_required").message, /预览迁移/);
+  assert.notEqual(blockedAdd.status, 0);
+  assert.match(blockedAdd.stderr, /写入前请先运行/);
+  assert.equal(dryRun.status, 0);
+  assert.equal(dryRunReport.safe_to_apply, true);
+  assert(dryRunReport.will_update.some((item) => item.path === ".starwork/agent-lanes/state.json" && /version: 1/.test(item.reason)));
+  assert.deepEqual(afterDryRun, beforeDryRun);
+  assert.equal(apply.status, 0);
+  assert.equal(migratedState.version, 1);
+  assert.equal(migratedState.lanes.development.current_session, "codex:dev-thread-1");
+  assert.equal(fs.readdirSync(path.join(dir, ".starwork", "backups", "multiagent")).length, 1);
+  assert.equal(fs.readdirSync(path.join(dir, ".starwork", "agent-lanes")).some((name) => /^migration-report-.*\.json$/.test(name)), true);
+});
+
+test("multiagent upgrade reads markdown-only lanes without treating the team as empty", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--lanes", "planning", "--yes"]);
+  fs.rmSync(path.join(dir, ".starwork", "agent-lanes", "state.json"));
+
+  const status = runCommand(["multiagent", "status", "--target", dir, "--json"]);
+  const statusReport = JSON.parse(status.stdout);
+  const dryRun = runCommand(["multiagent", "upgrade", "--target", dir, "--json", "--dry-run"]);
+  const dryRunReport = JSON.parse(dryRun.stdout);
+  const blockedRecord = runCommand([
+    "multiagent", "request", "record",
+    "--from", "user",
+    "--to", "planning",
+    "--message", "请先检查 workflow 草案。",
+    "--host-delivery", "recorded_only",
+    "--target", dir,
+    "--yes"
+  ]);
+  const apply = runCommand(["multiagent", "upgrade", "--target", dir, "--yes"]);
+  const migratedState = readJson(path.join(dir, ".starwork", "agent-lanes", "state.json"));
+
+  assert.equal(status.status, 0);
+  assert.equal(statusReport.lanes[0].lane, "planning");
+  assert.equal(statusReport.multiagent.compatibility.status, "migration_required_for_write");
+  assert(statusReport.multiagent.compatibility.legacy_classes.includes("markdown_only"));
+  assert.equal(dryRun.status, 0);
+  assert(dryRunReport.will_create.some((item) => item.path === ".starwork/agent-lanes/state.json"));
+  assert.notEqual(blockedRecord.status, 0);
+  assert.match(blockedRecord.stderr, /写入前请先运行/);
+  assert.equal(apply.status, 0);
+  assert.equal(migratedState.version, 1);
+  assert.equal(migratedState.lanes.planning.current_session, "unbound");
+});
+
+test("multiagent compatibility handles malformed state without hiding markdown lanes", () => {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  runCommand(["multiagent", "init", "--target", dir, "--lanes", "development", "--yes"]);
+  fs.writeFileSync(path.join(dir, ".starwork", "agent-lanes", "state.json"), "{ broken json", "utf8");
+
+  const status = runCommand(["multiagent", "status", "--target", dir, "--json"]);
+  const statusReport = JSON.parse(status.stdout);
+  const doctor = runDoctor(["--target", dir, "--json"]);
+  const doctorReport = JSON.parse(doctor.stdout);
+  const apply = runCommand(["multiagent", "upgrade", "--target", dir, "--yes"]);
+
+  assert.equal(status.status, 0);
+  assert.equal(statusReport.lanes[0].lane, "development");
+  assert.equal(statusReport.multiagent.compatibility.status, "unknown_partial");
+  assert.equal(doctor.status, 0);
+  assert.equal(doctorReport.multiagent.compatibility.status, "unknown_partial");
+  assert.notEqual(apply.status, 0);
+  assert.match(apply.stderr, /不能执行 --yes/);
 });
 
 test("multiagent bind records session name request without calling Codex app-server", () => {

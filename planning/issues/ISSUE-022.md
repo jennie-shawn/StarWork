@@ -6,12 +6,12 @@
 | --- | --- |
 | 类型 | cli / skill / core / upgrade / workflow |
 | 优先级 | P1 |
-| 状态 | ready-for-development |
+| 状态 | closed |
 | 来源 | 用户反馈 / 产品风险 |
 | 发现日期 | 2026-06-15 |
 | 关联 GitHub Issue | 无 |
 | 关联 SPEC | `product/planning/features/multiagent/specs/v0.10-upgrade-migration-compatibility.md` |
-| 关联验收 | 无 |
+| 关联验收 | `_系统/协作/lanes/product-lead/workspace/2026-06-16-multiagent-next-workflow-acceptance.md` |
 | 负责人 | product-lead lane |
 
 ## 现象
@@ -52,12 +52,12 @@ multiagent需要考虑升级后，如果文件结构有变化，如何对已有�
 
 - 是否转 SPEC：是，已转入 MultiAgent v0.10 upgrade compatibility / schema migration 规格。
 - 是否转 GitHub：暂不转，先在本地产品问题单跟踪。
-- 是否转开发 lane：待用户确认后由 product-lead lane 交 development lane 落地。
+- 是否转开发 lane：是，已作为 MultiAgent next Phase 0 交 development lane 落地。
 - 是否需要用户补信息：暂不需要。该问题属于明确的架构风险。
 
 ## 下一步
 
-product-lead lane 已晋升 MultiAgent v0.10 升级兼容 SPEC。下一步待用户确认后交 development lane 实现，重点覆盖：
+已关闭：MultiAgent next Phase 0 已完成并通过 product-lead 复验。实现重点覆盖：
 
 1. MultiAgent 文件结构和状态文件的 version / schema 标识。
 2. 旧结构识别规则：能检测历史 lane registry、binding、request、shared output、worklog 位置。
@@ -74,4 +74,4 @@ product-lead lane 已晋升 MultiAgent v0.10 升级兼容 SPEC。下一步待用
 - 验收条件 3：升级或修复命令提供 dry-run，明确列出结构变化和将写入的文件。
 - 验收条件 4：迁移不得覆盖用户手写 worklog、shared outputs 或 request 记录。
 - 验收条件 5：`starworkMultiagent` Skill 在旧结构上会先提示升级兼容事项，并等待用户确认后再执行会写入的迁移或新结构初始化。
-- 关闭标准：MultiAgent 兼容升级 SPEC 被接受，development lane 完成旧结构 fixture、doctor/status/upgrade 或 repair 行为，并通过自动化测试与一次手工 smoke。
+- 关闭标准：已满足。development lane 完成旧结构 fixture、doctor/status/upgrade 行为；product-lead 验证目标测试 119/119、`npm test` 119/119，并补充 `state_only` / `conflicting_lane` smoke 通过。

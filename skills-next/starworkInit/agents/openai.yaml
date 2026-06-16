@@ -1,0 +1,7 @@
+interface:
+  display_name: "StarWork Init"
+  short_description: "设计 StarWork 初始化方案"
+  default_prompt: "Use $starworkInit to design a friendly StarWork init plan for a new workspace."
+
+policy:
+  allow_implicit_invocation: true

@@ -2,13 +2,13 @@
 
 ## 状态
 
-- 版本：stable v0.10 compatibility note
+- 版本：v0.11 next implementation note
 - 所属模块：StarWork Skills
 - Skill 名称：`starworkMultiagent`
 - 相关命令：`starwork multiagent`
 - 相关 Core 能力：Agent Lanes
-- 实现状态：v0.10 升级兼容 + v0.9 友好引导已落地
-- 目标：把用户关于多 AI 协作的自然语言请求，转成“先解释、再检查、先预览、确认后执行”的安全协作流程
+- 实现状态：v0.10 升级兼容 + v0.11 Workflow Builder / Runner MVP 开发中
+- 目标：把用户关于多 AI 协作和 workflow 的自然语言请求，转成“先解释、再检查、再设计、先预览、确认后执行”的安全协作流程
 
 ## 一句话定义
 
@@ -16,7 +16,7 @@
 
 它面向用户时讲“AI 岗位、当前 AI 会话、可以整理或修改的范围、交接消息”；面向项目事实源时仍维护 Agent Lanes；面向 Codex App 时仍直接调用标准线程工具。
 
-Workflow Builder / Runner 是 `product/skills-next/` 的 next 内测能力；stable Skill 不引导普通用户测试 workflow。
+Workflow 是 `next` 内测能力。Skill 必须标注同源 channel，并在 CLI / Skill 错配时停止 workflow 操作，提示用户重新安装 next Skill 或仅限内部手工测试。
 
 ## v0.9 用户体验原则
 
@@ -158,6 +158,62 @@ starwork multiagent status --target <path> --json
 
 如果状态为 `blocked_conflict` 或 `unknown_partial`，不得承诺自动修复，应提示人工判断。
 
+## v0.11 Workflow Builder / Runner
+
+### 意图区分
+
+| 用户话语 | 行为 |
+|---|---|
+| 设计 workflow / 自动通知流程 / 产品开发循环 | Workflow Builder |
+| 启动 / 进入 / 执行 workflow | Workflow Runner |
+| 帮我做一个产品迭代循环 | 先追问“你是想先设计这个流程，还是现在就按已有流程开始执行？” |
+
+### Builder
+
+Builder 只设计、采访、预览、校验和保存草案。第一屏必须说明“不会通知任何 Agent，也不会启动真实流程”。
+
+采访至少覆盖：
+
+- 目标
+- 参与 lane
+- 触发条件
+- 输入
+- 产出
+- return contract
+- gate / stop
+- 写入边界
+
+保存前必须展示预览表，列出 lane、触发条件、输入、产出、return contract、gate / stop，并使用确认句：
+
+```text
+如果这个 workflow 设计没问题，我只会先保存草案，不会启动流程或通知任何 Agent。
+```
+
+确认后只写：
+
+```text
+_系统/协作/lanes/<builder-lane>/workspace/drafts/workflows/<workflow-id>.draft.md
+_system/collaboration/lanes/<builder-lane>/workspace/drafts/workflows/<workflow-id>.draft.md
+```
+
+Builder 不得写 `product/`，不得写 `.starwork/workflows/state.json`，不得调用投递工具，不得记录 delivery status。
+
+### Runner
+
+Runner 只读取已确认 definition，不执行未确认 draft。流程：
+
+1. 检查 v0.10 compatibility 为 `current`。
+2. 检查目标 lane 存在且有 session。
+3. 确认当前会话 ID、目标 lane session ID，并确认目标不是当前会话。
+4. 生成 workflow instance id。
+5. 生成 compact + reference packet。
+6. 使用标准线程工具投递，或输出 `manual_handoff_required`。
+7. 用 `multiagent request record` 记录真实 delivery status。
+
+默认 packet 包含 `packet_mode: compact`、`wf`、`wf_i`、`wf_def`、`wf_v`、`node`、`inputs`、`do`、`return`、`gate`。默认 instruction 不超过 2,000 中文字符，默认 response 不超过 1,500 中文字符；full packet 只在目标 Agent 无法访问项目文件、manual handoff 必须自包含或用户明确要求时使用，且不超过 4,000 中文字符。
+
+投递成功只能说“workflow 当前节点消息已送达，并已记录 StarWork request”，不得说目标任务已完成。
+
 ## 主要流程
 
 ### 创建 AI 团队
@@ -246,4 +302,7 @@ AI 入口文档处于 `pending_merge` 时，说这是为了避免不同 AI 读�
 - 自动工具不可用时说明还没有自动送达，并给出完整可复制交接消息。
 - v0.8 禁止项扫描继续通过。
 - 旧结构状态下可读取已有岗位；写入前阻断并引导 upgrade dry-run。
-- Workflow Builder / Runner 仅在 `product/skills-next/` 中启用，stable spec 不承诺 next workflow 行为。
+- Workflow Builder 与 Runner 意图区分正确；含混语义必须追问。
+- Builder 只保存 lane workspace 草案，不投递、不写 `.starwork/workflows/state.json`、不写 `product/`。
+- Runner 只执行 confirmed definition，生成 compact + reference packet，并做当前会话 ID 校验。
+- next 文档使用 `@next`，普通用户文档不引导 `latest` 测 workflow。

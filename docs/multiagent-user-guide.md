@@ -82,6 +82,35 @@ docs/multiagent-ai-install-playbook.md
 
 如果你看到“下面是预览，还不会真正写入”，表示它还没有改文件。正式写入后，它也应该说明“这次只写入了协作记录，没有改你的业务内容”。
 
+## Workflow 目前是 next 内测能力
+
+如果你想让多个 AI 按固定流程协作，例如“SPEC 完成后通知开发，开发完成后回到产品复验”，这是 MultiAgent workflow 能力。
+
+目前 workflow 仍是 `@next` 内测能力，不建议普通用户用 `latest` 测试。普通用户可以继续使用 AI 岗位、会话绑定和交接消息；workflow Builder / Runner 需要 CLI 和 `starworkMultiagent` Skill 都来自同一个 next 版本。
+
+内测用户请同时安装 next CLI 和 next Skill 目录：
+
+```bash
+npm install -g @jennie-shawn/starwork@next
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills-next --full-depth -g -a codex -y
+```
+
+普通用户安装 stable Skill 目录：
+
+```bash
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --full-depth -g -a codex -y
+```
+
+你可以先这样对 AI 说：
+
+```text
+请先帮我设计一个多 AI workflow 草案。
+这一步只做流程设计，不要通知任何 Agent，也不要启动真实流程。
+请先问我目标、参与岗位、触发条件、输入、产出、回传要求和需要人工确认的节点。
+```
+
+如果 AI 提示当前 Skill 或 CLI 不是 next 版本，请先停止 workflow 测试，避免 CLI 和 Skill 能力错配。
+
 ## 使用场景 1：做一组自媒体内容
 
 你可以对 AI 说：

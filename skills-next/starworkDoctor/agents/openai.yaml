@@ -1,0 +1,7 @@
+interface:
+  display_name: "StarWork Doctor"
+  short_description: "解释 StarWork 检查结果，识别旧模板或 Hub-like 主库，并按需生成升级蓝图"
+  default_prompt: "Use $starworkDoctor to explain starwork doctor output, diagnose legacy or Hub-like main repositories, and generate a safe upgrade blueprint when requested."
+
+policy:
+  allow_implicit_invocation: true

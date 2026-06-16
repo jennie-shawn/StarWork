@@ -2,11 +2,21 @@
 
 日期：2026-06-15
 
-状态：discussion accepted，尚未进入正式 SPEC。
+状态：revised accepted，尚未进入正式 SPEC。
 
 原始草案：`_系统/协作/lanes/product-multiagent/workspace/drafts/2026-06-15-lane-workflow-mvp.md`
 
-product-lead 验收判断：方向成立，但不进入 development。第一版应继续作为 agent-mediated automation 的讨论沉淀，等 `SPEC accepted -> development -> product review` 路径再跑 2 到 3 次真实 workflow 后，再决定是否立正式 SPEC。
+product-lead 初次验收判断：方向成立，但不进入 development。第一版应继续作为 agent-mediated automation 的讨论沉淀，等 `SPEC accepted -> development -> product review` 路径再跑 2 到 3 次真实 workflow 后，再决定是否立正式 SPEC。
+
+2026-06-16 追加复核：本文需要退回 product-multiagent 修订。当前版本没有讲清楚“构建 workflow 的入口 Skill”如何触发、如何采访用户、如何生成 / 预览 / 确认 Workflow Definition，也没有处理 Agent-to-Agent Message 过度冗长的 token 成本问题。
+
+2026-06-16 修订验收：product-multiagent 已补充 Workflow Builder Entry Skill 和 Workflow Packet Token Budget 两份草案，product-lead 复核通过。正式口径补充如下：
+
+- 第一版不新增独立 `starworkWorkflow` Skill，先由 `starworkMultiagent` 承担 workflow 构建和运行入口。
+- `starworkMultiagent` 必须在内部区分 `Workflow Builder` 与 `Workflow Runner`。
+- Builder 只设计、采访、预览、校验和保存草案；不得创建 workflow instance、不得投递、不得记录 delivery status。
+- Runner 只在用户明确说“启动 / 进入 / 执行 workflow”后运行，读取已确认定义，生成 instance 和当前节点 packet，再投递或生成人工交接。
+- 默认 Agent message 使用 compact + reference packet，不复制完整 workflow；full packet 只在目标 Agent 无法访问项目文件、manual handoff 必须自包含或用户明确要求时使用。
 
 ## 背景
 
@@ -173,6 +183,40 @@ delivery status 必须记录真实投递状态，不混淆目标完成状态。
 - 未经确认自动修改正式产品文件。
 - 根据聊天摘要猜测目标任务已完成。
 - 跨宿主用不匹配工具硬凑自动投递。
+
+## Workflow Builder / Runner 边界
+
+Workflow 相关意图必须先区分“设计流程”还是“执行流程”。
+
+| 用户意图 | 子模式 | 行为 |
+| --- | --- | --- |
+| 设计 / 创建 / 定义 / 配置 workflow | Workflow Builder | 采访用户，生成 Workflow Definition 草案，预览和校验，不投递 |
+| 进入 / 启动 / 执行已有 workflow | Workflow Runner | 读取已确认 definition，生成 instance 和当前节点 packet，按 gate 投递 |
+
+用户表述含混时，先问：
+
+```text
+你是想先设计这个流程，还是现在就按已有流程开始执行？
+```
+
+Builder 第一屏必须说明：当前只是设计流程，不会通知任何 Agent，也不会启动真实流程。
+
+Builder 采访至少覆盖：
+
+- workflow 要稳定解决的问题；
+- 参与 lane，优先复用已有 lane；
+- 触发条件；
+- 每个节点必须产出的 return contract；
+- gate / stop 条件；
+- 用户确认前是否只保存草案。
+
+Workflow Definition 草案默认存入 builder lane workspace，例如：
+
+```text
+_系统/协作/lanes/<builder-lane>/workspace/drafts/workflows/<workflow-id>.draft.md
+```
+
+用户确认前，草案不得写入 `.starwork` workflow state，不得作为 Pack / Core 正式能力发布，也不得触发真实投递。
 
 ## MVP 规则形态
 

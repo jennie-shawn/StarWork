@@ -78,7 +78,7 @@ npx @jennie-shawn/starwork@latest multiagent --help
 先查看仓库里有哪些系统 Skill：
 
 ```bash
-npx skills add jennie-shawn/StarWork -l
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills -l --full-depth
 ```
 
 预期能看到：
@@ -94,10 +94,10 @@ npx skills add jennie-shawn/StarWork -l
 当前默认面向 Codex：
 
 ```bash
-npx skills add jennie-shawn/StarWork --skill starwork -g -a codex -y
-npx skills add jennie-shawn/StarWork --skill starworkInit -g -a codex -y
-npx skills add jennie-shawn/StarWork --skill starworkDoctor -g -a codex -y
-npx skills add jennie-shawn/StarWork --skill starworkMultiagent -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starwork -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkInit -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkDoctor -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkMultiagent -g -a codex -y
 ```
 
 如果用户使用的不是 Codex，需要把 `-a codex` 替换成 `skills` 工具支持的目标 Agent 名称。无法确认目标名称时，先不要猜；让用户确认正在使用的 AI 工具，或改用默认 Codex 安装路径。
@@ -152,13 +152,13 @@ npx skills ls -g -a codex --json
    - starwork multiagent --help
 
 4. 查看 StarWork 仓库可安装的 Skills：
-   - npx skills add jennie-shawn/StarWork -l
+   - npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills -l --full-depth
 
 5. 只安装 MultiAgent 所需的最小 Skill 组合，默认面向 Codex：
-   - npx skills add jennie-shawn/StarWork --skill starwork -g -a codex -y
-   - npx skills add jennie-shawn/StarWork --skill starworkInit -g -a codex -y
-   - npx skills add jennie-shawn/StarWork --skill starworkDoctor -g -a codex -y
-   - npx skills add jennie-shawn/StarWork --skill starworkMultiagent -g -a codex -y
+   - npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starwork -g -a codex -y
+   - npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkInit -g -a codex -y
+   - npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkDoctor -g -a codex -y
+   - npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkMultiagent -g -a codex -y
 
 6. 不要默认安装 starworkKnowledge。
    不要默认安装 starworkSpawn、starworkAudit、neat-freak 或 starworkKnowledgeProject。
@@ -198,7 +198,7 @@ starwork --help
 starwork multiagent --help
 npx @jennie-shawn/starwork@latest --version
 npx @jennie-shawn/starwork@latest multiagent --help
-npx skills add jennie-shawn/StarWork -l
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills -l --full-depth
 npx skills ls -g -a codex --json
 ```
 
@@ -206,10 +206,10 @@ npx skills ls -g -a codex --json
 
 ```bash
 npm install -g @jennie-shawn/starwork@latest
-npx skills add jennie-shawn/StarWork --skill starwork -g -a codex -y
-npx skills add jennie-shawn/StarWork --skill starworkInit -g -a codex -y
-npx skills add jennie-shawn/StarWork --skill starworkDoctor -g -a codex -y
-npx skills add jennie-shawn/StarWork --skill starworkMultiagent -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starwork -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkInit -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkDoctor -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkMultiagent -g -a codex -y
 ```
 
 ## 如果选择性安装失败
@@ -217,7 +217,7 @@ npx skills add jennie-shawn/StarWork --skill starworkMultiagent -g -a codex -y
 如果 `npx skills add ... --skill <name>` 失败，先检查：
 
 ```bash
-npx skills add jennie-shawn/StarWork -l
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills -l --full-depth
 ```
 
 确认 Skill 名称是否存在。
@@ -225,7 +225,7 @@ npx skills add jennie-shawn/StarWork -l
 如果 `skills` 工具暂时不支持选择性安装，退而求其次可以安装 StarWork 全局系统 Skills：
 
 ```bash
-npx skills add jennie-shawn/StarWork -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --full-depth -g -a codex -y
 ```
 
 这个命令会安装：
@@ -253,7 +253,7 @@ npx skills add jennie-shawn/StarWork -g -a codex -y
 请确认 StarWork MultiAgent 当前最小安装口径：
 
 1. npm 包名是否仍为 @jennie-shawn/starwork，CLI 命令是否仍为 starwork？
-2. `npx skills add jennie-shawn/StarWork --skill starworkMultiagent -g -a codex -y` 是否仍是单独安装 MultiAgent Skill 的正确命令？
+2. `npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkMultiagent -g -a codex -y` 是否仍是单独安装 MultiAgent Skill 的正确命令？
 3. MultiAgent 最小安装是否仍建议包含 starwork、starworkInit、starworkMultiagent？
 4. starworkDoctor 是否仍是 MultiAgent 最小安装的必装项？
 5. starworkKnowledge 是否仍不属于 MultiAgent 最小安装范围？
