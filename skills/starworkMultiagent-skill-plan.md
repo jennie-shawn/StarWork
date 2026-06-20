@@ -59,7 +59,7 @@ description: Use this skill when a user wants AI help designing, initializing, u
 - `product/README.md` 的系统 Skill 安装命令覆盖该 Skill：
 
 ```bash
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --full-depth -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills --full-depth -g -a codex -y
 ```
 
 - `product/docs/cli-skill-registry.html` 增加 `starworkMultiagent` 与 `starwork multiagent` 的配合关系。

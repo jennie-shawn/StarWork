@@ -461,7 +461,7 @@
     <section class="section">
       <div class="section-header">
         <h2>当前总览</h2>
-        <p class="section-note">截至 alpha.20，StarWork 已有 10 个可用 CLI 命令和 9 个 StarWork 自研 Skill，其中 5 个全局系统 Skill、3 个 Kit 自带 Skill、1 个 Capability 项目内 Skill。Skill 已分为 L0 主入口、L1 系统专家、L2 Kit 自带和 L3 Capability 项目内能力；stable / latest 用户从 <code>product/skills/</code> 安装，全局只包含 L0/L1；workflow next 内测用户从 <code>product/skills-next/</code> 安装，不使用无目录说明的 GitHub 仓库命令。`update` 和 `starwork skill` 仍是未来命令，不在当前可用列表里。新增或调整命令、skill、Kit 分发范围、npm 版本时必须同步维护本页。</p>
+        <p class="section-note">截至 alpha.20，StarWork 已有 10 个可用 CLI 命令和 9 个 StarWork 自研 Skill，其中 5 个全局系统 Skill、3 个 Kit 自带 Skill、1 个 Capability 项目内 Skill。Skill 已分为 L0 主入口、L1 系统专家、L2 Kit 自带和 L3 Capability 项目内能力；stable / latest 用户从 <code>skills/</code> 安装，全局只包含 L0/L1；workflow next 内测用户从 <code>skills-next/</code> 安装，不使用无目录说明的 GitHub 仓库命令。`update` 和 `starwork skill` 仍是未来命令，不在当前可用列表里。新增或调整命令、skill、Kit 分发范围、npm 版本时必须同步维护本页。</p>
       </div>
       <div class="grid-3">
         <article class="panel">
@@ -659,7 +659,7 @@
           </tr>
           <tr>
             <td><strong><code>starworkMultiagent</code></strong></td>
-            <td>L1 系统专家：多 AI 协作顾问；workflow Builder / Runner 只在 <code>product/skills-next/</code> 内测目录中启用。</td>
+            <td>L1 系统专家：多 AI 协作顾问；workflow Builder / Runner 只在 <code>skills-next/</code> 内测目录中启用。</td>
             <td>用户想创建 AI 团队、设计 AI 岗位 / 职责位、把当前 AI 会话登记到某个岗位、查看分工、登记共享成果、准备交接消息、查看其他岗位进展，或在 next 内测中设计 / 启动 workflow。</td>
             <td>先用用户语言解释多 AI 分工；自然追问项目目标、分工需求和不希望主动修改的内容；先预览 AI 岗位表格；遇到旧版 MultiAgent 结构先引导 upgrade dry-run；next 目录中的 workflow Builder 只设计和保存草案，Runner 只执行已确认 definition 并继续使用 Codex 标准线程工具。</td>
             <td>岗位方案预览、写入影响说明、确认后的协作记录、交接消息、当前分工解释、next workflow 草案 / compact packet、Codex 标准线程工具动作结果、过程材料放置建议。</td>
@@ -780,8 +780,8 @@ starwork multiagent share research --title "Source notes draft" --path notes/sou
           </tr>
           <tr>
             <td>新增、改名、删除 Skill。</td>
-            <td>Skill 注册表、<code>product/skills/README.md</code>、npm 打包内容。</td>
-            <td>检查 <code>product/skills/*/SKILL.md</code> 和 <code>npm pack --dry-run</code>。</td>
+            <td>Skill 注册表、<code>skills/README.md</code>、npm 打包内容。</td>
+            <td>检查 <code>skills/*/SKILL.md</code> 和 <code>npm pack --dry-run</code>。</td>
           </tr>
           <tr>
             <td>CLI 与 Skill 的分工变化。</td>

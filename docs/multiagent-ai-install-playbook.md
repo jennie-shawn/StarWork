@@ -114,7 +114,7 @@ npx @jennie-shawn/starwork@latest multiagent --help
 运行：
 
 ```bash
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills -l --full-depth
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills -l --full-depth
 ```
 
 确认列表里能看到：
@@ -138,10 +138,10 @@ npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills
 如果当前目标 AI 工具是 Codex，运行：
 
 ```bash
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starwork -g -a codex -y
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkInit -g -a codex -y
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkDoctor -g -a codex -y
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --skill starworkMultiagent -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills --skill starwork -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills --skill starworkInit -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills --skill starworkDoctor -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills --skill starworkMultiagent -g -a codex -y
 ```
 
 如果目标不是 Codex：
@@ -162,7 +162,7 @@ npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills
 如果选择性安装失败，再运行：
 
 ```bash
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills -l --full-depth
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills -l --full-depth
 ```
 
 确认名称是否写错。如果当前 `skills` 工具不支持单独安装，才向用户解释 fallback：
@@ -174,7 +174,7 @@ npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills
 用户确认后再运行：
 
 ```bash
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --full-depth -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills --full-depth -g -a codex -y
 ```
 
 ## 第六步：验证安装

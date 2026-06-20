@@ -12,3 +12,5 @@
 | v0.9 | 友好引导体验 | accepted | `v0.9-friendly-onboarding.md` |
 | v0.10 | 升级 / 迁移兼容 | accepted | `v0.10-upgrade-migration-compatibility.md` |
 | v0.11 | Workflow Builder / Runner MVP | accepted | `v0.11-workflow-builder-runner-mvp.md` |
+| v0.12 | Workflow 投递保证 | accepted | `v0.12-workflow-delivery-guarantee.md` |
+| v0.13 | starworkMultiagent Skill 瘦身 / 分层 | accepted | `v0.13-starworkMultiagent-skill-decomposition.md` |

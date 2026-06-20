@@ -86,19 +86,21 @@ docs/multiagent-ai-install-playbook.md
 
 如果你想让多个 AI 按固定流程协作，例如“SPEC 完成后通知开发，开发完成后回到产品复验”，这是 MultiAgent workflow 能力。
 
-目前 workflow 仍是 `@next` 内测能力，不建议普通用户用 `latest` 测试。普通用户可以继续使用 AI 岗位、会话绑定和交接消息；workflow Builder / Runner 需要 CLI 和 `starworkMultiagent` Skill 都来自同一个 next 版本。
+目前 workflow 仍是 next 内测能力。内测用户请使用 next CLI + `skills-next` 目录；普通用户可以继续使用 AI 岗位、会话绑定和交接消息。
 
 内测用户请同时安装 next CLI 和 next Skill 目录：
 
 ```bash
 npm install -g @jennie-shawn/starwork@next
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills-next --full-depth -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills-next --full-depth -g -a codex -y
 ```
+
+命令里的 `--full-depth` 用来确保 `starworkMultiagent/references/` 一起安装。缺少 references 时，AI 会停止 workflow 或跨会话投递这类高风险动作，并提示安装不完整。
 
 普通用户安装 stable Skill 目录：
 
 ```bash
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --full-depth -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills --full-depth -g -a codex -y
 ```
 
 你可以先这样对 AI 说：
@@ -110,6 +112,8 @@ npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills
 ```
 
 如果 AI 提示当前 Skill 或 CLI 不是 next 版本，请先停止 workflow 测试，避免 CLI 和 Skill 能力错配。
+
+启动 workflow 后，交给另一个 AI 岗位的节点必须真实送达目标会话；如果当前工具不能自动送达，AI 应给出 `manual_handoff_required` 和完整可复制交接消息，并明确尚未自动送达。消息已送达只代表交接完成，不代表目标岗位已经完成任务。
 
 ## 使用场景 1：做一组自媒体内容
 

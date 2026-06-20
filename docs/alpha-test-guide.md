@@ -33,15 +33,17 @@ npx @jennie-shawn/starwork --help
 安装 StarWork 系统 skills：
 
 ```bash
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --full-depth -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills --full-depth -g -a codex -y
 ```
 
 说明：这是一条短命令，只安装 StarWork 全局系统 Skills：L0 主入口 + L1 专家 Skills。`starworkSpawn`、`starworkAudit`、`neat-freak` 和 `starworkKnowledgeProject` 不应被全局安装；前三个是 Kit 自带 Skill，会随对应工作台写入，`starworkKnowledgeProject` 会在项目开启知识库能力后写入当前项目。
 
+必须保留 `--full-depth`，确保 `starworkMultiagent/references/` 随主 Skill 一起安装。缺少 references 时，MultiAgent 的创建团队、跨会话投递和 workflow 测试应停止并提示安装不完整。
+
 安装前可先查看仓库会安装哪些 Skills：
 
 ```bash
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills -l --full-depth
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills -l --full-depth
 ```
 
 预期只看到：
@@ -258,22 +260,24 @@ starwork multiagent status \
 
 在 Codex App 中让 `starworkMultiagent` 执行“看看 development lane 做到哪了”。预期流程是：Skill 读取 `multiagent status --target ~/Desktop/starwork-alpha-project --json`，再调用 `read_thread` 或 `list_threads` 观察 Codex 会话。
 
-预期：标准工具成功时，StarWork request 记录为 `delivered_via_codex_thread_tool`。如果标准工具不可见或调用失败，Skill 应输出 `manual_handoff_required` 和完整可复制消息，并明确尚未自动送达。
+预期：标准工具成功时，StarWork request 记录为 `delivered_via_codex_thread_tool`。跨会话指令是必须投递步骤，不能只在当前回复里说明。Skill 必须先真实调用 `send_message_to_thread`，成功后再记录 request；如果标准工具不可见或调用失败，Skill 应先尝试工具发现，然后输出 `manual_handoff_required` 和完整可复制消息，并明确尚未自动送达。
 
 #### v0.11 next：Workflow Builder / Runner 内测保护
 
-Workflow 仍是 next 内测能力。测试前请使用同源 next CLI 和 next Skill 目录：
+Workflow 仍是 next 内测能力。测试前请使用 next CLI 和 next Skill 目录：
 
 ```bash
 npm install -g @jennie-shawn/starwork@next
 npx @jennie-shawn/starwork@next --version
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills-next --full-depth -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills-next --full-depth -g -a codex -y
 ```
 
-不要用普通 `latest` CLI 或 stable Skill 目录来测试 workflow。下面这条命令只安装 stable Skills，不是 workflow next Skill 来源：
+这里同样必须保留 `--full-depth`，否则 workflow Builder / Runner / packet budget references 可能缺失。
+
+不要只安装 stable Skill 目录来测试 workflow。下面这条命令只安装 stable Skills，不是 workflow next Skill 来源：
 
 ```bash
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --full-depth -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills --full-depth -g -a codex -y
 ```
 
 安装 next Skill 后，请确认当前 `starworkMultiagent` 的 frontmatter 包含：
@@ -296,6 +300,7 @@ starwork_multiagent: v0.11-workflow-mvp
 - 保存前展示包含 lane、触发条件、输入、产出、return contract、gate / stop 的预览表。
 - 确认后只保存草案到 `_系统/协作/lanes/<builder-lane>/workspace/drafts/workflows/<workflow-id>.draft.md`，不写 `product/`，不写 `.starwork/workflows/state.json`，不投递，不记录 delivery。
 - 用户说“启动 workflow”时才进入 Runner；Runner 只读取已确认 definition，并在投递前确认当前会话 ID、目标 lane session ID 和两者不相同。
+- Runner 的跨 lane 节点是必须投递步骤，不能只在当前回复里说明；如果工具不可见，先工具发现，仍不可用时进入 `manual_handoff_required`，并说明尚未自动送达。
 - 投递成功只能说明“workflow 当前节点消息已送达，并已记录 StarWork request”，不能说目标任务已完成。
 
 ### 5. 可选：验证 Host Adapter

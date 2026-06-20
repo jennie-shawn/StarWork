@@ -8,8 +8,8 @@ const { execFileSync, spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..", "..");
 const bin = path.join(root, "cli", "bin", "starwork.js");
 const packageJson = require(path.join(root, "package.json"));
-const stableSkillsSource = "https://github.com/jennie-shawn/StarWork/tree/main/product/skills";
-const nextSkillsSource = "https://github.com/jennie-shawn/StarWork/tree/main/product/skills-next";
+const stableSkillsSource = "https://github.com/jennie-shawn/StarWork/tree/main/skills";
+const nextSkillsSource = "https://github.com/jennie-shawn/StarWork/tree/main/skills-next";
 
 function tempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "starwork-init-test-"));
@@ -260,11 +260,11 @@ test("public docs describe main StarWork skill and keep kit skills out of global
   assert.match(registry, /L2 Kit 自带/);
   assert.match(registry, /starworkKnowledgeProject<\/code>/);
   assert.match(registry, /L3 Capability 项目内/);
-  assert.match(readme, /product\/skills/);
+  assert.match(readme, /skills-next/);
   assert.match(installGuide, /stable \/ latest Skill 目录/);
   assert.match(alphaGuide, new RegExp(`${stableSkillsSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --full-depth -g -a codex -y`));
   assert.match(skillsReadme, /stable \/ latest 用户/);
-  assert.match(registry, /stable \/ latest 用户从 <code>product\/skills\/<\/code> 安装/);
+  assert.match(registry, /stable \/ latest 用户从 <code>skills\/<\/code> 安装/);
 });
 
 test("skill next directory separates workflow channel from stable skills", () => {
@@ -290,8 +290,8 @@ test("skill next directory separates workflow channel from stable skills", () =>
   assert.doesNotMatch(stableMultiagent, /## Workflow Builder|## Workflow Runner/);
   assert.match(nextMultiagent, /starwork_channel: next/);
   assert.match(nextMultiagent, /starwork_multiagent: v0\.11-workflow-mvp/);
-  assert.match(nextMultiagent, /## Workflow Builder/);
-  assert.match(nextMultiagent, /## Workflow Runner/);
+  assert.match(nextMultiagent, /Workflow Builder/);
+  assert.match(nextMultiagent, /Workflow Runner/);
   assert.doesNotMatch(stableMultiagent, forbiddenCodexPath);
   assert.doesNotMatch(nextMultiagent, forbiddenCodexPath);
   assert.match(alphaGuide, new RegExp(`${nextSkillsSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --full-depth -g -a codex -y`));
@@ -299,140 +299,257 @@ test("skill next directory separates workflow channel from stable skills", () =>
   assert.doesNotMatch(`${alphaGuide}\n${userGuide}`, /npx skills add jennie-shawn\/StarWork -g -a codex -y/);
 });
 
+test("starworkMultiagent decomposition keeps main skills short and references installed", () => {
+  const stableSkillPath = path.join(root, "skills", "starworkMultiagent", "SKILL.md");
+  const nextSkillPath = path.join(root, "skills-next", "starworkMultiagent", "SKILL.md");
+  const stableSkill = fs.readFileSync(stableSkillPath, "utf8");
+  const nextSkill = fs.readFileSync(nextSkillPath, "utf8");
+  const stableRefsDir = path.join(root, "skills", "starworkMultiagent", "references");
+  const nextRefsDir = path.join(root, "skills-next", "starworkMultiagent", "references");
+  const skillsReadme = fs.readFileSync(path.join(root, "skills", "README.md"), "utf8");
+  const nextReadme = fs.readFileSync(path.join(root, "skills-next", "README.md"), "utf8");
+  const installGuide = fs.readFileSync(path.join(root, "docs", "agent-install-guide.md"), "utf8");
+  const alphaGuide = fs.readFileSync(path.join(root, "docs", "alpha-test-guide.md"), "utf8");
+  const multiagentInstallGuide = fs.readFileSync(path.join(root, "docs", "starwork-multiagent-install-guide.md"), "utf8");
+  const stableLineCount = stableSkill.trimEnd().split(/\n/).length;
+  const nextLineCount = nextSkill.trimEnd().split(/\n/).length;
+  const listedStableRefs = [...stableSkill.matchAll(/references\/([a-z0-9-]+\.md)/g)].map((match) => match[1]);
+  const listedNextRefs = [...nextSkill.matchAll(/references\/([a-z0-9-]+\.md)/g)].map((match) => match[1]);
+  const requiredStableRefs = [
+    "README.md",
+    "intent-routing.md",
+    "context-and-compatibility.md",
+    "session-tools.md",
+    "delivery-guarantee.md",
+    "team-onboarding.md",
+    "message-templates.md",
+    "lane-workspace-output-promotion.md",
+    "safety-output-rules.md",
+  ];
+  const workflowRefs = ["workflow-builder.md", "workflow-runner.md", "workflow-packet-budget.md"];
+
+  assert.ok(stableLineCount <= 240, `stable main Skill should be <= 240 lines, got ${stableLineCount}`);
+  assert.ok(nextLineCount <= 260, `next main Skill should be <= 260 lines, got ${nextLineCount}`);
+  for (const ref of requiredStableRefs) {
+    assert.ok(fs.existsSync(path.join(stableRefsDir, ref)), `stable reference missing: ${ref}`);
+    assert.ok(fs.existsSync(path.join(nextRefsDir, ref)), `next shared reference missing: ${ref}`);
+  }
+  for (const ref of new Set(listedStableRefs)) {
+    assert.ok(fs.existsSync(path.join(stableRefsDir, ref)), `stable listed reference missing: ${ref}`);
+  }
+  for (const ref of new Set(listedNextRefs)) {
+    assert.ok(fs.existsSync(path.join(nextRefsDir, ref)), `next listed reference missing: ${ref}`);
+  }
+  for (const ref of workflowRefs) {
+    assert.ok(!fs.existsSync(path.join(stableRefsDir, ref)), `stable should not include workflow reference: ${ref}`);
+    assert.ok(fs.existsSync(path.join(nextRefsDir, ref)), `next workflow reference missing: ${ref}`);
+    assert.match(nextSkill, new RegExp(ref.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  assert.doesNotMatch(stableSkill, /Workflow Builder|Workflow Runner|compact \+ reference|full packet/);
+  assert.match(nextSkill, /Workflow Builder/);
+  assert.match(nextSkill, /Workflow Runner/);
+  assert.match(nextSkill, /compact \+ reference/);
+  assert.match(nextSkill, /full packet/);
+  assert.match(`${skillsReadme}\n${nextReadme}\n${installGuide}\n${alphaGuide}\n${multiagentInstallGuide}`, /references\//);
+  assert.match(`${skillsReadme}\n${nextReadme}\n${installGuide}\n${alphaGuide}\n${multiagentInstallGuide}`, /--full-depth/);
+});
+
 test("starworkMultiagent skill uses Codex standard session tools directly", () => {
   const skill = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "SKILL.md"), "utf8");
+  const sessionTools = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "references", "session-tools.md"), "utf8");
+  const delivery = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "references", "delivery-guarantee.md"), "utf8");
+  const team = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "references", "team-onboarding.md"), "utf8");
+  const combined = `${skill}\n${sessionTools}\n${delivery}\n${team}`;
+  const lineCount = skill.trimEnd().split(/\n/).length;
+  const forbiddenCodexPath = /starwork multiagent instruct|starwork multiagent launch|multiagent message instruct|multiagent message launch|multiagent read --host codex|multiagent status --host codex|--session-name|--pin/;
 
-  assert.doesNotMatch(skill, /\| Host \|/);
+  assert.ok(lineCount <= 240, `stable starworkMultiagent SKILL.md should be <= 240 lines, got ${lineCount}`);
+  assert.doesNotMatch(skill, forbiddenCodexPath);
   assert.doesNotMatch(skill, /Codex app-server|app-server/);
-  assert.doesNotMatch(skill, /Claude Code \|/);
-  assert.doesNotMatch(skill, /multiagent launch --lanes/);
-  assert.doesNotMatch(skill, /starwork multiagent instruct|starwork multiagent launch/);
-  assert.doesNotMatch(skill, /multiagent message instruct|multiagent message launch/);
-  assert.doesNotMatch(skill, /multiagent read --host codex|multiagent status --host codex/);
-  assert.doesNotMatch(skill, /--session-name|--pin/);
-  assert.doesNotMatch(skill, /launch_status|binding_status|host_action_required|host-action complete/);
   assert.doesNotMatch(skill, /thread\/start|turn\/start|thread\/resume|thread\/name\/set|thread\/read|thread\/list/);
-  assert.match(skill, /<职责名> Agent/);
+  assert.match(skill, /reference 文件不存在或无法读取/);
+  assert.match(skill, /Reference 加载规则/);
+  assert.match(skill, /context-and-compatibility\.md/);
+  assert.match(skill, /session-tools\.md/);
+  assert.match(skill, /delivery-guarantee\.md/);
+  assert.match(skill, /team-onboarding\.md/);
+  assert.match(skill, /message-templates\.md/);
+  assert.match(skill, /lane-workspace-output-promotion\.md/);
+  assert.match(skill, /safety-output-rules\.md/);
+  assert.match(skill, /当前会话 ID/);
+  assert.match(skill, /必须投递/);
+  assert.match(skill, /工具发现/);
+  assert.match(skill, /manual_handoff_required/);
+  assert.match(skill, /尚未自动送达/);
+  assert.match(skill, /delivered_via_codex_thread_tool/);
+  assert.match(skill, /CLI 只做 StarWork 项目事实源/);
+  assert.match(skill, /消息已送达不等于目标任务已完成/);
+  assert.match(combined, /<职责名> Agent/);
   assert.match(skill, /create_thread/);
   assert.match(skill, /send_message_to_thread/);
   assert.match(skill, /read_thread/);
   assert.match(skill, /set_thread_title/);
   assert.match(skill, /set_thread_pinned/);
   assert.match(skill, /set_thread_archived/);
-  assert.match(skill, /当前会话 ID 校验/);
+  assert.match(skill, /当前会话 ID/);
   assert.match(skill, /source_thread_id/);
-  assert.match(skill, /不能凭记忆、旧 worklog、旧 binding/);
-  assert.match(skill, /给自己发消息/);
+  assert.match(skill, /不得用历史 worklog、旧 binding/);
+  assert.match(skill, /阻断自我投递/);
   assert.match(skill, /multiagent status --target/);
   assert.match(skill, /multiagent add/);
   assert.match(skill, /multiagent bind/);
   assert.match(skill, /multiagent share/);
   assert.match(skill, /multiagent request record/);
-  assert.match(skill, /delivered_via_codex_thread_tool/);
-  assert.match(skill, /delivered_via_claude_code_session_tool/);
-  assert.match(skill, /mcp__ccd_session_mgmt__send_message/);
-  assert.match(skill, /mcp__ccd_session_mgmt__search_session_transcripts/);
+  assert.match(combined, /delivered_via_claude_code_session_tool/);
+  assert.match(combined, /mcp__ccd_session_mgmt__send_message/);
+  assert.match(combined, /mcp__ccd_session_mgmt__search_session_transcripts/);
   assert.match(skill, /STARWORK:MULTIAGENT_MESSAGE v1/);
-  assert.match(skill, /manual_handoff_required/);
   assert.match(skill, /pending_merge/);
 });
 
-test("starworkMultiagent skill presents friendly onboarding before internal workflow", () => {
+test("starworkMultiagent decomposition keeps long onboarding flow in references", () => {
   const skill = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "SKILL.md"), "utf8");
-  const firstScreen = markdownSection(skill, "创建 AI 团队的第一屏");
-  const questionSection = markdownSection(skill, "自然追问");
-  const previewSection = markdownSection(skill, "预览与确认");
-  const fallbackSection = markdownSection(skill, "降级与安全接入");
+  const team = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "references", "team-onboarding.md"), "utf8");
+  const safety = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "references", "safety-output-rules.md"), "utf8");
 
-  assert.notEqual(firstScreen.trim(), "");
-  assert.match(firstScreen, /AI 岗位/);
-  assert.match(firstScreen, /负责什么/);
-  assert.match(firstScreen, /可以整理或修改哪些内容/);
-  assert.match(firstScreen, /交接/);
-  assert.match(firstScreen, /先检查当前项目是否准备好/);
-  assert.match(firstScreen, /先预览/);
-  assert.match(firstScreen, /确认后/);
-  assert.doesNotMatch(firstScreen, /lane|write_scope|binding|thread|CLI|doctor|multiagent init|multiagent add/);
-
-  assert.match(questionSection, /这个项目主要想完成什么/);
-  assert.match(questionSection, /希望哪些事情交给不同 AI 分开做/);
-  assert.match(questionSection, /哪些文件或内容不希望 AI 主动修改/);
-  assert.doesNotMatch(questionSection, /请输入 lane id|write_scope 怎么填|session id/);
-
-  assert.match(previewSection, /AI 岗位[\s\S]*负责什么[\s\S]*可以整理或修改的范围[\s\S]*交接方式/);
-  assert.match(previewSection, /如果这个方案没问题，我再创建这些协作记录/);
-  assert.match(previewSection, /下面是预览，还不会真正写入/);
-  assert.match(previewSection, /这次只写入了协作记录，没有改你的业务内容/);
-
-  assert.match(fallbackSection, /我还不能确认这个目录已经适合开启多 AI 分工/);
-  assert.match(fallbackSection, /当前这个 AI 工具暂时不能自动把消息送到另一个会话/);
-  assert.match(fallbackSection, /还没有自动送达/);
-  assert.doesNotMatch(fallbackSection, /已通知|已发送成功/);
+  assert.doesNotMatch(skill, /## 创建 AI 团队的第一屏|## 自然追问|## 预览与确认/);
+  assert.match(team, /AI 岗位/);
+  assert.match(team, /负责什么/);
+  assert.match(team, /可以整理或修改的范围/);
+  assert.match(team, /交接方式/);
+  assert.match(team, /检查和预览阶段不会改业务内容/);
+  assert.match(team, /下面是预览，还不会真正写入/);
+  assert.match(team, /这次只写入了协作记录，没有改你的业务内容/);
+  assert.match(team, /如果这个方案没问题，我再创建这些协作记录/);
+  assert.match(team, /这个项目主要想完成什么/);
+  assert.match(team, /哪些文件或内容不希望 AI 主动修改/);
+  assert.match(team, /完整成功标准/);
+  assert.match(team, /create_thread/);
+  assert.match(team, /set_thread_title/);
+  assert.match(team, /set_thread_pinned/);
+  assert.match(safety, /manual_handoff_required/);
+  assert.match(safety, /不把消息已送达说成目标任务已完成/);
+  const firstScreen = team.match(/## 第一屏[\s\S]*?## 自然追问/)?.[0] ?? "";
+  const firstScreenUserText = firstScreen.split("不要在第一屏")[0];
+  assert.doesNotMatch(firstScreenUserText, /lane|write_scope|binding|thread|CLI|doctor|multiagent init|multiagent add/);
+  assert.match(firstScreen, /不要在第一屏出现 lane、write_scope、binding、thread、CLI、doctor/);
   assert.match(skill, /岗位已创建/);
   assert.match(skill, /会话已绑定/);
   assert.match(skill, /消息已送达/);
   assert.match(skill, /目标任务已完成/);
-  assert.match(skill, /你可以这样开始/);
-  assert.match(skill, /这些只是参考/);
-  assert.match(skill, /不会直接套模板/);
+  assert.match(safety, /不把示例 lane 当默认模板/);
 });
 
 test("starworkMultiagent next skill defines workflow builder runner and next protection", () => {
   const skill = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "SKILL.md"), "utf8");
   const spec = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent-spec.md"), "utf8");
+  const builderRef = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "references", "workflow-builder.md"), "utf8");
+  const runnerRef = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "references", "workflow-runner.md"), "utf8");
+  const packetRef = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "references", "workflow-packet-budget.md"), "utf8");
   const alphaGuide = fs.readFileSync(path.join(root, "docs", "alpha-test-guide.md"), "utf8");
   const userGuide = fs.readFileSync(path.join(root, "docs", "multiagent-user-guide.md"), "utf8");
   const registry = fs.readFileSync(path.join(root, "docs", "cli-skill-registry.html"), "utf8");
-  const legacySection = markdownSection(skill, "旧版 MultiAgent 结构保护");
-  const builderSection = markdownSection(skill, "Workflow Builder");
-  const runnerSection = markdownSection(skill, "Workflow Runner");
+  const lineCount = skill.trimEnd().split(/\n/).length;
 
+  assert.ok(lineCount <= 260, `next starworkMultiagent SKILL.md should be <= 260 lines, got ${lineCount}`);
   assert.match(skill, /starwork_channel: next/);
   assert.match(skill, /starwork_multiagent: v0\.11-workflow-mvp/);
-  assert.match(legacySection, /旧版结构/);
-  assert.match(legacySection, /upgrade --target <path> --dry-run/);
-  assert.match(legacySection, /确认后才执行/);
-  assert.match(legacySection, /不能把旧结构误说成“没有 AI 岗位”/);
-
-  assert.match(builderSection, /只会生成 workflow 草案/);
-  assert.match(builderSection, /不会通知任何 Agent/);
-  assert.match(builderSection, /不会启动真实流程/);
-  assert.match(builderSection, /目标/);
-  assert.match(builderSection, /参与 AI 岗位/);
-  assert.match(builderSection, /触发条件/);
-  assert.match(builderSection, /Return Contract/);
-  assert.match(builderSection, /Gate \/ Stop/);
-  assert.match(builderSection, /负责 lane[\s\S]*触发条件[\s\S]*输入[\s\S]*产出[\s\S]*Return Contract[\s\S]*Gate \/ Stop/);
-  assert.match(builderSection, /我只会先保存草案，不会启动流程或通知任何 Agent/);
-  assert.match(builderSection, /workspace\/drafts\/workflows\/<workflow-id>\.draft\.md/);
-  assert.match(builderSection, /不投递消息/);
-  assert.match(builderSection, /不创建 workflow instance/);
-  assert.match(builderSection, /不写 `product\/`/);
-  assert.match(builderSection, /不记录 delivery status/);
-
-  assert.match(runnerSection, /只读取已确认 definition/);
-  assert.match(runnerSection, /当前会话 ID/);
-  assert.match(runnerSection, /目标 lane session ID/);
-  assert.match(runnerSection, /目标 lane 绑定的是当前会话/);
-  assert.match(runnerSection, /本地执行模式不调用 `send_message_to_thread`/);
-  assert.match(runnerSection, /packet_mode: compact/);
-  assert.match(runnerSection, /wf_i/);
-  assert.match(runnerSection, /2,000 中文字符/);
-  assert.match(runnerSection, /1,500 中文字符/);
-  assert.match(runnerSection, /4,000 中文字符/);
-  assert.match(runnerSection, /workflow 当前节点消息已送达，并已记录 StarWork request/);
-  assert.match(runnerSection, /不得说目标 Agent 已完成、workflow 已完成/);
-
-  assert.match(spec, /v0\.10 升级 \/ 迁移兼容/);
-  assert.match(spec, /v0\.11 Workflow Builder \/ Runner/);
-  assert.match(spec, /Builder 不得写 `product\/`/);
-  assert.match(spec, /Runner 只读取已确认 definition/);
-  assert.match(alphaGuide, /@next/);
-  assert.match(alphaGuide, /不要用普通 `latest` CLI 或 stable Skill 目录来测试 workflow/);
+  assert.match(skill, /Workflow Builder/);
+  assert.match(skill, /Workflow Runner/);
+  assert.match(skill, /workflow-builder\.md/);
+  assert.match(skill, /workflow-runner\.md/);
+  assert.match(skill, /workflow-packet-budget\.md/);
+  assert.match(skill, /compact \+ reference/);
+  assert.match(skill, /full packet/);
+  assert.match(builderRef, /只会生成 workflow 草案/);
+  assert.match(builderRef, /不会通知任何 Agent/);
+  assert.match(builderRef, /不会启动真实流程/);
+  assert.match(builderRef, /参与 AI 岗位/);
+  assert.match(builderRef, /Return Contract/);
+  assert.match(builderRef, /Gate \/ Stop/);
+  assert.match(builderRef, /workspace\/drafts\/workflows\/<workflow-id>\.draft\.md/);
+  assert.match(builderRef, /不投递消息/);
+  assert.match(builderRef, /不创建 workflow instance/);
+  assert.match(builderRef, /不写 `product\/`/);
+  assert.match(builderRef, /不记录 delivery status/);
+  assert.match(runnerRef, /只执行已确认 definition/);
+  assert.match(runnerRef, /当前会话 ID/);
+  assert.match(runnerRef, /目标 lane session ID/);
+  assert.match(runnerRef, /本地执行模式不调用 `send_message_to_thread`/);
+  assert.match(runnerRef, /workflow 当前节点消息已送达，并已记录 StarWork request/);
+  assert.match(runnerRef, /不得说目标 Agent 已完成、workflow 已完成/);
+  assert.match(packetRef, /compact \+ reference/);
+  assert.match(packetRef, /packet_mode: compact/);
+  assert.match(packetRef, /wf_i/);
+  assert.match(packetRef, /2,000 中文字符/);
+  assert.match(packetRef, /1,500 中文字符/);
+  assert.match(packetRef, /4,000 中文字符/);
+  assert.match(spec, /短主入口 \+ references 分场景加载/);
+  assert.match(spec, /workflow-builder\.md/);
+  assert.match(spec, /workflow-runner\.md/);
+  assert.match(alphaGuide, /不要只安装 stable Skill 目录来测试 workflow/);
+  assert.doesNotMatch(`${alphaGuide}\n${userGuide}`, /尚未发布 [`]?next[`]? dist-tag|@latest 获取已发布的 CLI|当前 latest CLI/);
+  assert.match(alphaGuide, /@jennie-shawn\/starwork@next/);
+  assert.match(userGuide, /@jennie-shawn\/starwork@next/);
   assert.match(alphaGuide, new RegExp(`${nextSkillsSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --full-depth -g -a codex -y`));
   assert.match(userGuide, /Workflow 目前是 next 内测能力/);
-  assert.match(userGuide, /product\/skills-next/);
+  assert.match(userGuide, /skills-next/);
   assert.match(registry, /next workflow 草案 \/ compact packet/);
+});
+
+test("starworkMultiagent next skill requires delivery before request record", () => {
+  const skill = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "SKILL.md"), "utf8");
+  const deliveryRef = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "references", "delivery-guarantee.md"), "utf8");
+  const spec = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent-spec.md"), "utf8");
+  const alphaGuide = fs.readFileSync(path.join(root, "docs", "alpha-test-guide.md"), "utf8");
+  const guaranteeSection = markdownSection(skill, "必须投递");
+  const sendIndex = guaranteeSection.indexOf("send_message_to_thread");
+  const deliveredIndex = guaranteeSection.indexOf("delivered_via_codex_thread_tool");
+  const recordIndex = guaranteeSection.indexOf("request record");
+
+  assert.notEqual(guaranteeSection.trim(), "");
+  assert.match(guaranteeSection, /必须投递/);
+  assert.match(guaranteeSection, /不能用当前回复说明替代/);
+  assert.match(guaranteeSection, /真实自动投递成功/);
+  assert.match(guaranteeSection, /确认目标 lane \/ session \/ 当前会话 ID/);
+  assert.match(guaranteeSection, /调用 send_message_to_thread 或对应宿主标准工具成功/);
+  assert.match(guaranteeSection, /再执行 starwork multiagent request record delivered/);
+  assert.match(deliveryRef, /确认目标 lane \/ session \/ current session/);
+  assert.match(deliveryRef, /starwork multiagent request record --host-delivery delivered_via_codex_thread_tool/);
+  assert.match(deliveryRef, /未真实投递成功不得记录/);
+  assert.ok(sendIndex >= 0, "guarantee section should mention send_message_to_thread");
+  assert.ok(deliveredIndex > sendIndex, "delivered status should appear after the send tool requirement");
+  assert.ok(recordIndex > sendIndex, "request record should appear after the send tool requirement");
+  assert.match(spec, /未投递成功不得记录 delivered/);
+  assert.match(alphaGuide, /必须先真实调用 `send_message_to_thread`，成功后再记录 request/);
+});
+
+test("starworkMultiagent next skill uses discovery and manual handoff when delivery tool is unavailable", () => {
+  const skill = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "SKILL.md"), "utf8");
+  const stableSkill = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "SKILL.md"), "utf8");
+  const deliveryRef = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "references", "delivery-guarantee.md"), "utf8");
+  const spec = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent-spec.md"), "utf8");
+  const userGuide = fs.readFileSync(path.join(root, "docs", "multiagent-user-guide.md"), "utf8");
+  const guaranteeSection = markdownSection(skill, "必须投递");
+  const forbiddenCompletion = /发送回传指令或在回复中说明|发送回传指令或在回复中明确说明|或在回复中说明/;
+
+  assert.match(guaranteeSection, /工具发现/);
+  assert.match(guaranteeSection, /manual_handoff_required/);
+  assert.match(guaranteeSection, /完整可复制消息/);
+  assert.match(guaranteeSection, /尚未自动送达/);
+  assert.match(guaranteeSection, /未真实投递成功不得记录 `delivered_via_codex_thread_tool`/);
+  assert.match(guaranteeSection, /工具发现不可见、发现失败或调用失败时，进入 `manual_handoff_required`/);
+  assert.match(guaranteeSection, /完整 `STARWORK:MULTIAGENT_MESSAGE v1`/);
+  assert.match(deliveryRef, /先用工具发现能力查找/);
+  assert.match(deliveryRef, /不得写 delivered/);
+  assert.match(stableSkill, /## 必须投递/);
+  assert.match(stableSkill, /不能用当前回复说明替代/);
+  assert.match(stableSkill, /工具发现不可见、发现失败或调用失败时，进入 `manual_handoff_required`/);
+  assert.match(spec, /manual_handoff_required/);
+  assert.match(spec, /未投递成功不得记录 delivered/);
+  assert.match(userGuide, /必须真实送达目标会话/);
+  assert.match(userGuide, /尚未自动送达/);
+  assert.doesNotMatch(skill, forbiddenCompletion);
 });
 
 test("multiagent user docs describe friendly onboarding instead of command-first workflow", () => {
@@ -519,6 +636,7 @@ test("mainflow skills guide MultiAgent-only users through init and doctor prefli
 test("init-family skills start with user-facing capability framing", () => {
   const knowledge = fs.readFileSync(path.join(root, "skills", "starworkKnowledge", "SKILL.md"), "utf8");
   const multiagent = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "SKILL.md"), "utf8");
+  const multiagentOnboarding = fs.readFileSync(path.join(root, "skills", "starworkMultiagent", "references", "team-onboarding.md"), "utf8");
   const doctor = fs.readFileSync(path.join(root, "skills", "starworkDoctor", "SKILL.md"), "utf8");
   const spawn = fs.readFileSync(path.join(root, "kit-skills", "starworkSpawn", "SKILL.md"), "utf8");
   const spawnFirstScreen = spawn.split("第一屏之后")[0];
@@ -526,9 +644,10 @@ test("init-family skills start with user-facing capability framing", () => {
   assert.match(knowledge, /项目知识库是让 AI 长期记住项目稳定理解的地方/);
   assert.match(knowledge, /不是原始资料文件夹/);
   assert.match(knowledge, /先检查当前项目是否已经有知识库/);
-  assert.match(multiagent, /帮你把这个项目拆成几个清楚的 AI 岗位/);
-  assert.match(multiagent, /先检查当前项目是否准备好/);
-  assert.match(multiagent, /等你确认后再正式创建/);
+  assert.match(multiagent, /Reference 加载规则/);
+  assert.match(multiagentOnboarding, /把项目拆成几个清楚的 AI 岗位/);
+  assert.match(multiagentOnboarding, /先检查项目/);
+  assert.match(multiagentOnboarding, /确认后创建/);
   assert.match(doctor, /诊断是先看清当前目录的事实/);
   assert.match(doctor, /升级是无损补齐 StarWork 工作台规则/);
   assert.match(doctor, /不会移动、删除或覆盖你的历史文件/);

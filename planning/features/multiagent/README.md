@@ -13,7 +13,7 @@ StarWork MultiAgent 是同一项目内多个 AI 会话的职责分工、边界�
 
 ## 当前状态
 
-MultiAgent 已从 Codex 单宿主编排升级为 runtime host routing，并进入 `0.1.0-alpha.20` A 测口径。当前最新已验收版本是 v0.9：在 v0.8 标准线程工具边界上，把 `starworkMultiagent` 首次使用体验改成面向普通用户的“AI 岗位”引导，先解释、再检查、再设计、先预览、确认后执行；Codex App 正常路径仍由 Skill 直接调用标准线程工具，CLI 只做 StarWork 项目事实源记录。
+MultiAgent 已从 Codex 单宿主编排升级为 runtime host routing，并进入 workflow next 内测口径。当前最新已验收版本是 v0.13：在 v0.10 升级兼容、v0.11 Workflow Builder / Runner MVP 和 v0.12 投递保证基础上，将 `starworkMultiagent` 从长主 Skill 拆为短主入口和按场景加载的 references，降低漏读、token 浪费和 stable / next 漂移风险；跨 lane / Agent / session 步骤仍必须真实投递或明确 manual handoff，不能用当前回复说明替代。
 
 - Codex：保留已验证的多会话 `launch/read/instruct` 主链路。
 - Cursor：通过 Host Adapter v0.2 支持 `agent-transcripts/<uuid>/<uuid>.jsonl` 只读摘要和 `cursor agent status` 安全探测；不做跨 IDE 会话自动投递。
@@ -34,6 +34,8 @@ MultiAgent 已从 Codex 单宿主编排升级为 runtime host routing，并进�
 - [v0.9 友好引导体验 SPEC](specs/v0.9-friendly-onboarding.md)
 - [v0.10 升级 / 迁移兼容 SPEC](specs/v0.10-upgrade-migration-compatibility.md)
 - [v0.11 Workflow Builder / Runner MVP SPEC](specs/v0.11-workflow-builder-runner-mvp.md)
+- [v0.12 Workflow 投递保证 SPEC](specs/v0.12-workflow-delivery-guarantee.md)
+- [v0.13 starworkMultiagent Skill 瘦身 / 分层 SPEC](specs/v0.13-starworkMultiagent-skill-decomposition.md)
 - [Lane Workflow / Handoff Rules MVP 讨论](discussions/2026-06-15-lane-workflow-mvp.md)
 - [Workflow Packet Runtime 设计讨论](discussions/2026-06-15-workflow-packet-runtime.md)
 - [v0.2 验收报告](acceptance/2026-06-01-v0.2-acceptance-report.md)

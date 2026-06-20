@@ -131,10 +131,10 @@ StarWork 的基础能力是“让 AI 读懂并安全接手项目”。在此基�
 当前默认面向 Codex，安装 stable / latest 系统 Skills：
 
 ```bash
-npx skills add https://github.com/jennie-shawn/StarWork/tree/main/product/skills --full-depth -g -a codex -y
+npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills --full-depth -g -a codex -y
 ```
 
-Workflow next 内测用户使用独立目录 `product/skills-next/`；普通用户不要用 stable Skill 目录测试 workflow next。
+Workflow next 内测用户使用独立目录 `skills-next/`；普通用户不要用 stable Skill 目录测试 workflow next。
 
 安装后，AI 会拥有一个 StarWork 主入口和几个专家 Skills，可以更自然地帮你：
 

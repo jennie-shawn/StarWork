@@ -8,6 +8,8 @@
 
 | ID | 标题 | 类型 | 优先级 | 状态 | 负责人 | 来源 | 详情 | 下一步 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ISSUE-026 | starworkMultiagent Skill 过长导致读取可靠性和维护风险 | skill / docs / product | P1 | closed | product-lead lane | 用户反馈 / product-multiagent 设计 | [ISSUE-026.md](ISSUE-026.md) | 已关闭：v0.13 二次复验通过，主 Skill 已瘦身为短入口 + references；next 安装口径已改为 `@next` CLI + `skills-next --full-depth`。 |
+| ISSUE-025 | MultiAgent workflow 自动流程中 Agent 未自动投递消息导致中断 | skill / workflow / adapter / product | P1 | closed | product-lead lane | 用户反馈 / 截图 | [ISSUE-025.md](ISSUE-025.md) | 已关闭：v0.12 复验通过，workflow / delegation 必须真实投递；工具不可见时进入 discovery / manual handoff，未投递不得记录 delivered。 |
 | ISSUE-024 | MultiAgent 缺少 Workflow Builder / Runner MVP 与 next 同源安装保护 | skill / cli / docs / release / workflow | P1 | closed | product-lead lane | 用户反馈 / product-multiagent 规划 | [ISSUE-024.md](ISSUE-024.md) | 已关闭：MultiAgent next / workflow 复验通过；完整 `starwork skills install` 未实现，按 next 最小保护策略接受。 |
 | ISSUE-023 | Init / Doctor 缺少面向 MultiAgent-only 用户的友好起步 | skill / cli / docs / onboarding / workflow | P1 | closed | product-lead lane | product-mainflow review / 运营 Agent 优化建议 | [ISSUE-023.md](ISSUE-023.md) | 已关闭：Mainflow v0.1 复验通过，Init / Doctor 已承接 MultiAgent-only 用户友好起步体验。 |
 | ISSUE-022 | MultiAgent 升级后文件结构变化需要兼容已有用户 | cli / skill / core / upgrade / workflow | P1 | closed | product-lead lane | 用户反馈 / 产品风险 | [ISSUE-022.md](ISSUE-022.md) | 已关闭：v0.10 兼容读取、迁移 dry-run / --yes、写入阻断和旧结构 smoke 均通过。 |
