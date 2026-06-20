@@ -119,6 +119,116 @@ Then decide the path:
 | User wants multiple AI roles | Use `starworkMultiagent`, but only after the workspace is healthy. |
 | User wants workflow automation | Use next workflow only if CLI and Skill are both next. |
 
+## General Project Workspace Template
+
+The default StarWork project workbench is built from two layers:
+
+1. Project Kit: the baseline AI-readable project structure.
+2. General Pack: the default business folders for references, drafts, and confirmed outputs.
+
+The Chinese default structure looks like this:
+
+```text
+<project>/
+  AGENTS.md
+  README.md
+  .starwork/
+    workspace.json
+    rules/
+    handoff/
+    drafts/
+  .obsidian/
+  .agents/
+    skills/
+  .claude/
+    skills/
+  _系统/
+    上下文/
+      当前项目.md
+    任务/
+      当前工作.md
+    身份/
+    教训/
+    协作/
+      agent-lanes.md
+      shared.md
+      lanes/
+  参考资料/
+  输出/
+    草稿/
+    确认成果/
+```
+
+English workspaces use the corresponding `_system/` paths and English business folders:
+
+```text
+<project>/
+  AGENTS.md
+  README.md
+  .starwork/
+  .obsidian/
+  .agents/skills/
+  .claude/skills/
+  _system/
+    context/current-project.md
+    tasks/current-work.md
+    identity/
+    lessons/
+    collaboration/
+  references/
+  outputs/
+    drafts/
+    final/
+```
+
+### Folder And File Roles
+
+| Path | Layer | Use when | AI behavior |
+| --- | --- | --- | --- |
+| `AGENTS.md` | Project Kit | Any AI agent enters the project | Read first. It is the main AI entry rule file. Do not overwrite user-authored rules without a merge flow. |
+| `README.md` | Project Kit | A human or AI needs a plain project overview | Keep it user-facing. Do not turn it into an internal state dump. |
+| `.starwork/` | Runtime layer | CLI, doctor, adapters, migration, handoff, and generated internal state need machine-readable records | Treat as StarWork mechanism data. Do not edit by hand unless a SPEC or repair flow says so. |
+| `.starwork/workspace.json` | Runtime layer | The CLI needs to know workspace type, profile, packs, adapters, and capabilities | Read for facts; write only through CLI. |
+| `.starwork/rules/` | Runtime layer | Pack and profile rules need structured storage | Do not use as a user-facing knowledge base. |
+| `.starwork/handoff/` | Runtime layer | StarWork needs durable handoff artifacts | Use for handoff records produced by StarWork flows, not general drafts. |
+| `.starwork/drafts/` | Runtime layer | Existing projects need proposed AI entry docs before merge | Treat as pending proposals. Final AI entry docs are not active until merged. |
+| `.obsidian/` | Project Kit | The workspace should open cleanly in Obsidian | Usually leave alone. |
+| `.agents/skills/` | Project Kit | Codex or compatible hosts need project-mounted Skills | Only mount Skills intentionally. Do not put every global Skill here. |
+| `.claude/skills/` | Project Kit | Claude-compatible hosts need project-mounted Skills | Same boundary as `.agents/skills/`. |
+| `_系统/上下文/当前项目.md` | Project Kit | AI needs the current project state, purpose, and facts | Read early. Keep it as the project status fact source. |
+| `_系统/任务/当前工作.md` | Project Kit | AI needs to know what is being worked on now | Read before proposing next actions. Update only when the current work state changes. |
+| `_系统/身份/` | Project Kit | The project has local preferences, audience, user context, or stable background | Store project-local identity and preference notes, not global user identity unless explicitly copied. |
+| `_系统/教训/` | Project Kit | The project accumulates reusable lessons or mistakes to avoid | Store reusable project lessons after they are confirmed. |
+| `_系统/协作/agent-lanes.md` | MultiAgent capability | The project uses AI roles / lanes | Source of lane responsibilities, current session bindings, write scopes, worklogs, and workspaces. |
+| `_系统/协作/shared.md` | MultiAgent capability | Lanes need shared outputs or cross-lane request records | Use as a collaboration ledger. Do not treat delivery as task completion. |
+| `_系统/协作/lanes/<lane>/worklog.md` | MultiAgent capability | A lane needs durable progress history | Each lane updates its own worklog with decisions, outputs, verification, and next steps. |
+| `_系统/协作/lanes/<lane>/workspace/` | MultiAgent capability | A lane needs process space for drafts, notes, evidence, and handoff material | Keep process work here until product-lead or the user promotes it to a formal project location. |
+| `参考资料/` | General Pack | The user provides raw materials, source documents, links, screenshots, transcripts, or references | Default read-only. Do not rewrite original material unless explicitly asked. |
+| `输出/草稿/` | General Pack | AI creates drafts, experiments, outlines, temporary analysis, or unconfirmed outputs | Safe place for unconfirmed AI work. Drafts are not the formal fact source. |
+| `输出/确认成果/` | General Pack | The user has approved a deliverable or final output | Default confirmed-output location unless the project declares another formal source. |
+
+### Optional Folders
+
+| Optional path | Created by | Use when | Notes |
+| --- | --- | --- | --- |
+| `知识库/` | `starwork knowledge init` | The project needs stable reusable knowledge: customer background, product rules, terminology, long-term decisions, and synthesis | Do not dump raw materials here. Raw sources stay in `参考资料/`; knowledge should be curated. |
+| `事项/` | Legacy / compatibility only | Old workspaces may still have matter-style records | Do not create new matter registries in current StarWork flows. |
+| `_系统/主库同步/`, `.core-sync.json`, `.internal/` | Main-repo sync / hub-related flows | A workspace participates in main repository sync or hub management | Not part of the default project workbench for normal users. |
+
+### How To Choose The Right Location
+
+| If the content is... | Put it in... |
+| --- | --- |
+| Raw source material from the user or outside world | `参考资料/` |
+| AI-generated but not confirmed | `输出/草稿/` or the current lane workspace |
+| Confirmed final output | `输出/确认成果/` or the declared formal source |
+| Current task state | `_系统/任务/当前工作.md` |
+| Project facts and status | `_系统/上下文/当前项目.md` |
+| Reusable project lessons | `_系统/教训/` |
+| Stable knowledge synthesized from sources | `知识库/` after knowledge is enabled |
+| MultiAgent lane process notes | `_系统/协作/lanes/<lane>/workspace/` |
+| Cross-lane shared output index or request record | `_系统/协作/shared.md` |
+
 ## Safety Rules For AI Agents
 
 Before writing:
@@ -216,4 +326,3 @@ Then help me understand this StarWork project:
 3. tell me whether you need to install CLI / Skills, initialize a workspace, run doctor, enable knowledge, or set up MultiAgent;
 4. preview any file changes before writing.
 ```
-
