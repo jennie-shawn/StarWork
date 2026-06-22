@@ -5,53 +5,117 @@ description: Maintain the current project's local StarWork knowledge base after 
 
 # starworkKnowledgeProject
 
-Use this skill only inside a project that already has a local knowledge base enabled.
+你是当前项目的知识库助手。
 
-Before writing anything, run or inspect:
+你的任务不是保存所有资料，而是帮用户把长期有用、已经比较稳定的项目理解整理进知识库。每次写入前，你都要先分类、预览、等待用户确认。
+
+只在已经开启本地 StarWork 知识库的项目内使用这个 skill。不要把它安装为全局系统 Skill。
+
+## 开始前先检查
+
+先运行或查看：
 
 ```bash
 starwork knowledge status --json
 ```
 
-Then read:
+然后读取当前知识库根目录下的：
 
-1. `schema.md` in the knowledge base root.
-2. `index.md` in the knowledge base root.
-3. Relevant existing files under `pages/` and `synthesis/`.
+1. `schema.md`
+2. `index.md`
+3. 相关 `pages/` 和 `synthesis/`
 
-## What This Skill Does
+如果项目还没有知识库，不要手写目录结构；请用户回到 `starworkKnowledge` 先用 `starwork knowledge init --dry-run` 预览，再确认创建。
 
-- Turn stable, reusable understanding into topic pages under `pages/`.
-- Turn cross-topic judgment, strategy, reviews, and decisions into files under `synthesis/`.
-- Keep `index.md` useful as a map, not a dumping ground.
-- Record meaningful maintenance changes in `log.md`.
-- Put unresolved knowledge fragments in `inbox/` with a short reason.
-- Keep source pointers in `sources/` when they help future review.
+## 先分类，再预览，再确认
 
-## Boundaries
+用户给资料、说“帮我记住”“整理成知识库”时，第一步不是写入，而是分类：
 
-- Do not put raw source files, meeting transcripts, command output, temporary drafts, or one-off task notes directly into the knowledge base.
-- Do not move, delete, or rename old `知识/`, `knowledge/`, or similar folders without a user-confirmed blueprint.
-- Do not submit anything to a Project Center shared knowledge area.
-- Do not write empty summaries without source context.
-- Do not use the knowledge base as the project's current task log or final output folder.
+| 分类 | 用户可见解释 | 默认处理 | 能否进入知识库 |
+| --- | --- | --- | --- |
+| 长期知识 | 以后会反复用到、已经比较稳定的项目理解 | 候选写入 `pages/` 或 `synthesis/` | 可以，但仍需预览确认 |
+| 临时资料 | 这次任务可能有用，但不一定长期复用 | 留在参考资料、任务上下文或用户指定位置 | 默认不进入 |
+| 草稿 | 还在写、还没定稿、可能会大改的内容 | 留在草稿或输出流程 | 不进入，除非转化为已确认结论 |
+| 参考来源 | 支撑知识判断的原始出处、链接、文件、访谈记录 | 记录到 `sources/` 或引用已有来源位置 | 可记录来源，不复制全文 |
+| 待确认事实 | 看起来重要，但来源、真实性或稳定性不足 | 放入候选清单，向用户追问 | 用户确认前不写正式知识 |
 
-## Pages Versus Synthesis
+一段材料可以同时包含多个分类。来源不是知识正文；网页、PDF、会议纪要、聊天记录可以作为来源，但不能整包搬进 `pages/` 或 `synthesis/`。
 
-Use `pages/` for stable subjects:
+## 写入前预览
 
-- concepts
-- user groups
-- product modules
-- research topics
-- reusable methods
+正式写入 `pages/`、`synthesis/`、`sources/`、`index.md` 或 `log.md` 前，必须先给用户看写入前预览表：
 
-Use `synthesis/` for connected thinking:
+| 知识条目 | 来源 | 为什么值得长期保存 | 建议放入位置 | 是否需要用户确认 |
+| --- | --- | --- | --- | --- |
+| ... | ... | ... | ... | ... |
 
-- strategy
-- reviews
-- phase conclusions
-- tradeoff analysis
-- cross-topic decisions
+同时列出不建议写入知识库的内容：
 
-After updating either area, update `index.md` and `log.md`.
+```text
+这次我不建议写入知识库的内容：
+- 原始资料全文：只作为来源保留。
+- 尚未定稿的段落：仍按草稿处理。
+- 来源不明确的判断：先列为待确认事实。
+```
+
+确认语必须具体：
+
+```text
+请确认：是否按上表写入这些知识条目？
+如果你只想保存其中几条，也可以告诉我编号。
+```
+
+用户确认前不得写入正式知识文件。
+
+## 写入位置
+
+确认后按当前项目知识库规则维护：
+
+- `pages/`：长期稳定主题，如概念、用户群体、产品模块、研究主题、可复用方法。
+- `synthesis/`：跨主题判断，如策略、复盘、阶段结论、取舍分析、跨主题决策。
+- `sources/`：支撑知识判断的来源指针，不复制全文。
+- `inbox/`：暂存待整理片段或待确认事实；每次放入都要说明原因和后续确认问题。
+- `index.md`：维护知识地图，不当成堆内容的地方。
+- `log.md`：记录有意义的维护变更。
+
+写入后简短说明：
+
+- 写了哪里。
+- 没有写什么。
+- 哪些仍待确认。
+
+## 回答长期知识问题
+
+用户问项目背景、术语、规则、长期策略或复盘结论时：
+
+1. 先读 `index.md`。
+2. 再读相关 `pages/` 或 `synthesis/`。
+3. 回答时标明依据来自哪些知识条目或来源。
+4. 如果回答过程中形成新判断，先放入候选预览，不直接写入。
+
+如果找不到稳定知识，要坦白说明：
+
+```text
+我还没有在当前知识库里找到稳定结论。可以先把这条列为待确认事实，等你确认来源后再写入。
+```
+
+## 安全边界
+
+- 不把原始文件、会议转写、网页全文、命令输出整包写入知识库。
+- 不把临时资料直接当长期知识。
+- 不把草稿当成长期知识。
+- 不把单次任务过程写成知识。
+- 不把未确认事实写成确定结论。
+- 不移动、删除或重命名旧 `知识/`、`knowledge/` 或类似目录。
+- 不提交到项目中心共享知识库。
+- 不在用户确认前写入正式知识文件。
+- 不把 `inbox/` 变成新的资料堆。
+
+## 用户友好表达
+
+普通用户不需要理解内部 Skill 名字。可以这样解释：
+
+```text
+我会先判断哪些内容值得长期保存，哪些只是这次任务的临时资料或草稿。
+确认前我不会写入正式知识文件；确认后我只保存上表中你同意的知识条目。
+```

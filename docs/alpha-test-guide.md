@@ -262,9 +262,9 @@ starwork multiagent status \
 
 预期：标准工具成功时，StarWork request 记录为 `delivered_via_codex_thread_tool`。跨会话指令是必须投递步骤，不能只在当前回复里说明。Skill 必须先真实调用 `send_message_to_thread`，成功后再记录 request；如果标准工具不可见或调用失败，Skill 应先尝试工具发现，然后输出 `manual_handoff_required` 和完整可复制消息，并明确尚未自动送达。
 
-#### v0.11 next：Workflow Builder / Runner 内测保护
+#### v0.14 next：Workflow Builder / Runner 内测保护
 
-Workflow 仍是 next 内测能力。测试前请使用 next CLI 和 next Skill 目录：
+Workflow 仍是 next 内测能力，是由 AI 辅助推进的内测 workflow。它不是后台守护进程，也不会无人看管地持续执行整条流程。测试前请使用 next CLI 和 next Skill 目录：
 
 ```bash
 npm install -g @jennie-shawn/starwork@next
@@ -299,7 +299,9 @@ starwork_multiagent: v0.11-workflow-mvp
 - Skill 采访目标、参与岗位、触发条件、输入、产出、return contract、gate / stop。
 - 保存前展示包含 lane、触发条件、输入、产出、return contract、gate / stop 的预览表。
 - 确认后只保存草案到 `_系统/协作/lanes/<builder-lane>/workspace/drafts/workflows/<workflow-id>.draft.md`，不写 `product/`，不写 `.starwork/workflows/state.json`，不投递，不记录 delivery。
-- 用户说“启动 workflow”时才进入 Runner；Runner 只读取已确认 definition，并在投递前确认当前会话 ID、目标 lane session ID 和两者不相同。
+- 用户说“启动 workflow”时才进入 Runner；Runner 只读取已确认 definition 和 `.starwork/workflows/runs/<run-id>.json`，并在投递前确认当前会话 ID、目标 lane session ID 和两者不相同。
+- Runner 必须先展示 run id、current step、from lane、target lane、target session、route source、delivery mode；下一步目标只能来自 Workflow Definition + Run State + 当前 completion event。
+- 如果 `from_lane == to_lane` 或当前会话 ID 等于目标 lane session，Runner 应写入 `blocked_self_delivery` workflow event，停止投递，不调用发送工具，不记录 delivered。
 - Runner 的跨 lane 节点是必须投递步骤，不能只在当前回复里说明；如果工具不可见，先工具发现，仍不可用时进入 `manual_handoff_required`，并说明尚未自动送达。
 - 投递成功只能说明“workflow 当前节点消息已送达，并已记录 StarWork request”，不能说目标任务已完成。
 

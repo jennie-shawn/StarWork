@@ -151,6 +151,21 @@ const HOST_DELIVERY_STATUSES = new Set([
   MANUAL_HANDOFF_STATUS,
   "failed"
 ]);
+const WORKFLOW_RUN_SCHEMA = "starwork.multiagent.workflow_run.v0.1";
+const WORKFLOW_ROUTE_SCHEMA = "starwork.multiagent.workflow_route.v0.1";
+const WORKFLOW_RUN_STATUSES = new Set([
+  "planned",
+  "ready",
+  "delivering",
+  "delivered",
+  "blocked_self_delivery",
+  "manual_confirmation_required",
+  "blocked_missing_route",
+  MANUAL_HANDOFF_STATUS,
+  "self_step_recorded",
+  "completed",
+  "failed"
+]);
 
 const KIT_BUNDLED_SKILLS = {
   hub: [
@@ -755,6 +770,18 @@ function parseArgs(argv) {
       options.id = readValue(argv, ++i, arg);
     } else if (arg === "--status") {
       options.status = readValue(argv, ++i, arg);
+    } else if (arg === "--definition") {
+      options.definition = readValue(argv, ++i, arg);
+    } else if (arg === "--entry-node") {
+      options.entryNode = readValue(argv, ++i, arg);
+    } else if (arg === "--actor-lane") {
+      options.actorLane = readValue(argv, ++i, arg);
+    } else if (arg === "--run") {
+      options.run = readValue(argv, ++i, arg);
+    } else if (arg === "--event") {
+      options.event = readValue(argv, ++i, arg);
+    } else if (arg === "--current-session") {
+      options.currentSession = readValue(argv, ++i, arg);
     } else if (arg === "--lanes") {
       options.lanes = readValue(argv, ++i, arg);
     } else if (arg === "--purpose") {
@@ -934,12 +961,44 @@ async function lanesCommand(argv) {
     await lanesRequest(argv.slice(1));
     return;
   }
+  if (subcommand === "workflow") {
+    await lanesWorkflow(argv.slice(1));
+    return;
+  }
   if (subcommand === "share") {
     await lanesShare(argv.slice(1));
     return;
   }
 
   throw new Error(`未知 multiagent 子命令：${subcommand}`);
+}
+
+async function lanesWorkflow(argv) {
+  const subcommand = argv[0];
+  if (!subcommand || subcommand === "--help" || subcommand === "-h") {
+    printLanesWorkflowHelp();
+    return;
+  }
+  if (subcommand === "start") {
+    await lanesWorkflowStart(argv.slice(1));
+    return;
+  }
+  if (subcommand === "status") {
+    await lanesWorkflowStatus(argv.slice(1));
+    return;
+  }
+  if (subcommand === "route") {
+    await lanesWorkflowRoute(argv.slice(1));
+    return;
+  }
+  if (subcommand === "event") {
+    if (argv[1] === "record") {
+      await lanesWorkflowEventRecord(argv.slice(2));
+      return;
+    }
+    throw new Error(`未知 multiagent workflow event 子命令：${argv[1] || "(empty)"}`);
+  }
+  throw new Error(`未知 multiagent workflow 子命令：${subcommand}`);
 }
 
 async function lanesInit(argv) {
@@ -1203,6 +1262,187 @@ async function lanesUpgrade(argv) {
     console.log("MultiAgent 结构迁移已完成。");
     console.log(`迁移报告：${plan.reportPath}`);
   }
+}
+
+async function lanesWorkflowStart(argv) {
+  const options = parseArgs(argv);
+  if (options.help) {
+    printLanesWorkflowStartHelp();
+    return;
+  }
+  if (!options.definition) throw new Error("multiagent workflow start 需要 --definition <path>。");
+  if (!options.entryNode) throw new Error("multiagent workflow start 需要 --entry-node <node>。");
+  if (!options.actorLane) throw new Error("multiagent workflow start 需要 --actor-lane <lane>。");
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  assertMultiagentWritable(workspaceRoot);
+  const registry = readLanesRegistry(workspaceRoot);
+  const actorLane = normalizeLaneId(options.actorLane, "actor lane");
+  findLaneOrThrow(registry.lanes, actorLane);
+  const definition = loadWorkflowDefinition(options.definition, workspaceRoot);
+  const entryNode = normalizeWorkflowNodeId(options.entryNode, "entry node");
+  const node = getWorkflowNodeOrThrow(definition, entryNode);
+  const runId = options.run ? requireWorkflowRunId(options.run) : (options.id ? normalizeWorkflowRunId(options.id) : buildWorkflowRunId(definition.workflow_id));
+  const now = new Date().toISOString();
+  const route = computeWorkflowRoute({
+    workspaceRoot,
+    registry,
+    definition,
+    run: {
+      run_id: runId,
+      current_node: entryNode,
+      current_actor_lane: actorLane
+    },
+    eventKey: null,
+    currentSession: null,
+    writeEvent: false
+  });
+  const run = {
+    schema_version: 1,
+    schema: WORKFLOW_RUN_SCHEMA,
+    run_id: runId,
+    workflow_id: definition.workflow_id,
+    workflow_version: definition.version,
+    workflow_definition_path: definition.relative_path,
+    status: route.route_status,
+    current_node: entryNode,
+    current_step: entryNode,
+    current_actor_lane: actorLane,
+    next_target_node: route.target_node || null,
+    next_target_lane: route.to_lane || null,
+    last_event_id: null,
+    blocked_reason: route.blocked_reason || null,
+    created_at: now,
+    updated_at: now,
+    route_source: "definition + run_state",
+    events: []
+  };
+  appendWorkflowEvent(run, {
+    type: "run_started",
+    actor_lane: actorLane,
+    node: entryNode,
+    status: run.status,
+    route_event: route.route_event || null,
+    blocked_reason: run.blocked_reason
+  });
+  await confirmOrThrow(options, `是否创建 workflow run ${runId}？`);
+  writeWorkflowRun(workspaceRoot, run);
+  const result = {
+    schema: "starwork.multiagent.workflow_start.v0.1",
+    run,
+    route
+  };
+  if (options.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  console.log("");
+  console.log(`Workflow run 已创建：${runId}`);
+  console.log(`current step: ${entryNode}`);
+  console.log(`next target lane: ${run.next_target_lane || "(none)"}`);
+  console.log(`status: ${run.status}`);
+}
+
+async function lanesWorkflowStatus(argv) {
+  const options = parseArgs(argv);
+  if (options.help) {
+    printLanesWorkflowStatusHelp();
+    return;
+  }
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  const run = readWorkflowRun(workspaceRoot, requireWorkflowRunId(options.run));
+  const result = {
+    schema: "starwork.multiagent.workflow_status.v0.1",
+    run
+  };
+  if (options.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  console.log("");
+  console.log(`Workflow run: ${run.run_id}`);
+  console.log(`workflow: ${run.workflow_id}@${run.workflow_version}`);
+  console.log(`status: ${run.status}`);
+  console.log(`current step: ${run.current_step || run.current_node}`);
+  console.log(`from lane: ${run.current_actor_lane}`);
+  console.log(`target lane: ${run.next_target_lane || "(none)"}`);
+  console.log(`blocked reason: ${run.blocked_reason || "(none)"}`);
+}
+
+async function lanesWorkflowRoute(argv) {
+  const options = parseArgs(argv);
+  if (options.help) {
+    printLanesWorkflowRouteHelp();
+    return;
+  }
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  assertMultiagentWritable(workspaceRoot);
+  const registry = readLanesRegistry(workspaceRoot);
+  const run = readWorkflowRun(workspaceRoot, requireWorkflowRunId(options.run));
+  const definition = loadWorkflowDefinition(path.resolve(workspaceRoot, run.workflow_definition_path), workspaceRoot);
+  const route = computeWorkflowRoute({
+    workspaceRoot,
+    registry,
+    definition,
+    run,
+    eventKey: parseWorkflowRouteEvent(options.event),
+    currentSession: resolveCurrentWorkflowSession(options),
+    writeEvent: true
+  });
+  applyWorkflowRouteToRun(run, route);
+  writeWorkflowRun(workspaceRoot, run);
+  if (options.json) {
+    console.log(JSON.stringify(route, null, 2));
+    return;
+  }
+  printWorkflowRoute(route);
+}
+
+async function lanesWorkflowEventRecord(argv) {
+  const options = parseArgs(argv);
+  if (options.help) {
+    printLanesWorkflowEventRecordHelp();
+    return;
+  }
+  const workspaceRoot = requireWorkspaceRoot(path.resolve(options.target || process.cwd()));
+  assertMultiagentWritable(workspaceRoot);
+  const run = readWorkflowRun(workspaceRoot, requireWorkflowRunId(options.run));
+  if (!options.type) throw new Error("multiagent workflow event record 需要 --type <type>。");
+  if (!options.status) throw new Error("multiagent workflow event record 需要 --status <status>。");
+  const nextStatus = normalizeWorkflowStatus(options.status);
+  validateWorkflowStatusTransition(run.status, nextStatus);
+  if (nextStatus === "delivered" && (!run.next_target_node || !run.next_target_lane)) {
+    throw new Error("workflow delivered 需要先有 route 计算出的 next_target_node / next_target_lane。");
+  }
+  await confirmOrThrow(options, `是否记录 workflow event ${options.type} -> ${nextStatus}？`);
+  run.status = nextStatus;
+  run.blocked_reason = isWorkflowBlockedStatus(nextStatus) ? (options.message || run.blocked_reason || nextStatus) : null;
+  run.updated_at = new Date().toISOString();
+  appendWorkflowEvent(run, {
+    type: normalizeMarkdownCell(options.type),
+    status: nextStatus,
+    actor_lane: run.current_actor_lane,
+    node: run.current_node,
+    blocked_reason: run.blocked_reason,
+    message: options.message || ""
+  });
+  if (nextStatus === "delivered") {
+    advanceWorkflowRunAfterDelivered(run);
+  }
+  writeWorkflowRun(workspaceRoot, run);
+  const result = {
+    schema: "starwork.multiagent.workflow_event_record.v0.1",
+    run_id: run.run_id,
+    status: run.status,
+    event: run.events[run.events.length - 1],
+    run
+  };
+  if (options.json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  console.log("");
+  console.log(`Workflow event 已记录：${result.event.event_id}`);
+  console.log(`status: ${run.status}`);
 }
 
 async function collectLanesHostStatus(workspaceRoot, registry, options = {}) {
@@ -7716,6 +7956,473 @@ function assertMultiagentWritable(workspaceRoot) {
   throw new Error(`检测到旧版或冲突的 MultiAgent 协作记录（${compatibility.status}）。写入前请先运行：${compatibility.migration.dry_run_command}`);
 }
 
+function workflowRunsDir(workspaceRoot) {
+  return path.join(workspaceRoot, ".starwork", "workflows", "runs");
+}
+
+function workflowRunPath(workspaceRoot, runId) {
+  return path.join(workflowRunsDir(workspaceRoot), `${normalizeWorkflowRunId(runId)}.json`);
+}
+
+function normalizeWorkflowRunId(value) {
+  const raw = normalizeMarkdownCell(value || "");
+  if (!raw || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(raw)) {
+    throw new Error(`workflow run id 只能包含字母、数字、点、短横线和下划线：${value}`);
+  }
+  return raw;
+}
+
+function requireWorkflowRunId(value) {
+  if (!value) throw new Error("需要 --run <run-id>。");
+  return normalizeWorkflowRunId(value);
+}
+
+function normalizeWorkflowNodeId(value, label) {
+  const raw = normalizeMarkdownCell(value || "");
+  if (!raw || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(raw)) {
+    throw new Error(`${label} 只能包含字母、数字、点、短横线和下划线：${value}`);
+  }
+  return raw;
+}
+
+function buildWorkflowRunId(workflowId) {
+  return `WF-${timestampForFile()}-${slugifyProjectId(workflowId || "workflow")}`;
+}
+
+function readWorkflowRun(workspaceRoot, runId) {
+  const file = workflowRunPath(workspaceRoot, runId);
+  if (!fs.existsSync(file)) {
+    throw new Error(`找不到 workflow run state：${runId}`);
+  }
+  try {
+    const run = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (!run.run_id) throw new Error("缺少 run_id");
+    if (!run.workflow_definition_path) throw new Error("缺少 workflow_definition_path");
+    if (!Array.isArray(run.events)) run.events = [];
+    return run;
+  } catch (error) {
+    throw new Error(`无法读取 workflow run state：${error.message}`);
+  }
+}
+
+function writeWorkflowRun(workspaceRoot, run) {
+  fs.mkdirSync(workflowRunsDir(workspaceRoot), { recursive: true });
+  fs.writeFileSync(workflowRunPath(workspaceRoot, run.run_id), `${JSON.stringify(run, null, 2)}\n`, "utf8");
+}
+
+function loadWorkflowDefinition(definitionPath, workspaceRoot) {
+  const absolute = path.resolve(definitionPath);
+  if (!fs.existsSync(absolute)) throw new Error(`Workflow definition 不存在：${definitionPath}`);
+  const content = fs.readFileSync(absolute, "utf8");
+  const parsed = parseWorkflowDefinitionContent(content);
+  if (!parsed || typeof parsed !== "object") throw new Error("Workflow definition 解析结果无效。");
+  if (!parsed.workflow_id) throw new Error("Workflow definition 缺少 workflow_id。");
+  if (!parsed.nodes || typeof parsed.nodes !== "object") throw new Error("Workflow definition 缺少 nodes。");
+  return {
+    workflow_id: normalizeWorkflowNodeId(parsed.workflow_id, "workflow_id"),
+    version: normalizeMarkdownCell(parsed.version || parsed.workflow_version || "0.1"),
+    status: normalizeMarkdownCell(parsed.status || "confirmed"),
+    entry: parsed.entry || {},
+    nodes: parsed.nodes,
+    path: absolute,
+    relative_path: normalizeWorkflowDefinitionPath(absolute, workspaceRoot)
+  };
+}
+
+function normalizeWorkflowDefinitionPath(absolute, workspaceRoot) {
+  const relative = normalizeRelativePath(path.relative(workspaceRoot, absolute));
+  if (!relative.startsWith("..")) return relative;
+  return absolute;
+}
+
+function parseWorkflowDefinitionContent(content) {
+  const trimmed = content.trim();
+  if (trimmed.startsWith("{")) return JSON.parse(trimmed);
+  const fencedJson = trimmed.match(/```json\s*([\s\S]*?)```/i);
+  if (fencedJson) return JSON.parse(fencedJson[1]);
+  const fencedYaml = trimmed.match(/```ya?ml\s*([\s\S]*?)```/i);
+  return parseSimpleWorkflowYaml(fencedYaml ? fencedYaml[1] : trimmed);
+}
+
+function parseSimpleWorkflowYaml(content) {
+  const definition = { nodes: {} };
+  let section = null;
+  let currentNode = null;
+  let inTransitions = false;
+  let currentTransition = null;
+  for (const rawLine of content.split(/\r?\n/)) {
+    const withoutComment = rawLine.replace(/\s+#.*$/, "");
+    if (!withoutComment.trim()) continue;
+    const indent = withoutComment.match(/^\s*/)[0].length;
+    const line = withoutComment.trim();
+    const kv = line.match(/^([^:]+):(?:\s*(.*))?$/);
+    if (!kv) continue;
+    const key = kv[1].trim();
+    const value = parseSimpleYamlScalar(kv[2] || "");
+    if (indent === 0) {
+      section = key;
+      currentNode = null;
+      currentTransition = null;
+      inTransitions = false;
+      if (value !== "") definition[key] = value;
+      else if (key === "entry") definition.entry = {};
+      else if (key === "nodes") definition.nodes = {};
+      continue;
+    }
+    if (section === "entry" && indent === 2) {
+      definition.entry[key] = value;
+      continue;
+    }
+    if (section !== "nodes") continue;
+    if (indent === 2 && value === "") {
+      currentNode = key;
+      definition.nodes[currentNode] = definition.nodes[currentNode] || {};
+      inTransitions = false;
+      currentTransition = null;
+      continue;
+    }
+    if (!currentNode) continue;
+    if (indent === 4 && key === "transitions") {
+      definition.nodes[currentNode].transitions = definition.nodes[currentNode].transitions || {};
+      inTransitions = true;
+      currentTransition = null;
+      continue;
+    }
+    if (indent === 4 && !inTransitions) {
+      definition.nodes[currentNode][key] = value;
+      continue;
+    }
+    if (indent === 6 && inTransitions && value === "") {
+      currentTransition = key;
+      definition.nodes[currentNode].transitions[currentTransition] = definition.nodes[currentNode].transitions[currentTransition] || {};
+      continue;
+    }
+    if (indent === 8 && inTransitions && currentTransition) {
+      definition.nodes[currentNode].transitions[currentTransition][key] = value;
+    }
+  }
+  return definition;
+}
+
+function parseSimpleYamlScalar(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  if (trimmed === "true") return true;
+  if (trimmed === "false") return false;
+  return trimmed.replace(/^["']|["']$/g, "");
+}
+
+function getWorkflowNodeOrThrow(definition, nodeId) {
+  const node = definition.nodes?.[nodeId];
+  if (!node) throw new Error(`Workflow definition 找不到节点：${nodeId}`);
+  return node;
+}
+
+function parseWorkflowRouteEvent(eventValue) {
+  if (!eventValue) return null;
+  const raw = String(eventValue).trim();
+  if (!raw) return null;
+  if (raw.startsWith("{")) {
+    const event = JSON.parse(raw);
+    return normalizeWorkflowNodeId(event.outcome || event.key || event.event || event.type || event.status, "workflow event");
+  }
+  return normalizeWorkflowNodeId(raw, "workflow event");
+}
+
+function resolveCurrentWorkflowSession(options) {
+  if (options.currentSession) return normalizeHostSession(options.currentSession, options.agent);
+  if (process.env.CODEX_THREAD_ID) return `codex:${process.env.CODEX_THREAD_ID}`;
+  if (process.env.CLAUDE_CODE_SESSION_ID) return `claude-code:${process.env.CLAUDE_CODE_SESSION_ID}`;
+  return null;
+}
+
+function computeWorkflowRoute({ workspaceRoot, registry, definition, run, eventKey, currentSession }) {
+  const currentNodeId = normalizeWorkflowNodeId(run.current_node || run.current_step, "current node");
+  const currentNode = getWorkflowNodeOrThrow(definition, currentNodeId);
+  const fromLane = normalizeLaneId(run.current_actor_lane || currentNode.actor_lane, "from lane");
+  const transitionEntry = selectWorkflowTransition(currentNode, eventKey);
+  if (!transitionEntry) {
+    return buildWorkflowRouteResult({
+      run,
+      definition,
+      fromLane,
+      targetNode: null,
+      toLane: null,
+      targetSession: null,
+      eventKey,
+      routeStatus: "blocked_missing_route",
+      blockedReason: "definition_missing_transition"
+    });
+  }
+  const [transitionKey, transition] = transitionEntry;
+  const targetNode = normalizeMarkdownCell(transition.target_node || "");
+  if (!targetNode || targetNode === "stop") {
+    return buildWorkflowRouteResult({
+      run,
+      definition,
+      fromLane,
+      targetNode: targetNode || "stop",
+      toLane: null,
+      targetSession: null,
+      eventKey: transitionKey,
+      routeStatus: "completed",
+      blockedReason: null
+    });
+  }
+  const toLaneRaw = transition.target_lane || definition.nodes?.[targetNode]?.actor_lane || "";
+  if (!toLaneRaw) {
+    return buildWorkflowRouteResult({
+      run,
+      definition,
+      fromLane,
+      targetNode,
+      toLane: null,
+      targetSession: null,
+      eventKey: transitionKey,
+      routeStatus: "blocked_missing_route",
+      blockedReason: "target_lane_missing"
+    });
+  }
+  const toLane = normalizeLaneId(toLaneRaw, "target lane");
+  const targetLane = findLaneOrThrow(registry.lanes, toLane);
+  const lanesState = readAgentLanesState(workspaceRoot);
+  const targetSession = lanesState.lanes?.[toLane]?.current_session || targetLane.current_session || "unbound";
+  const allowSelfStep = Boolean(transition.allow_self_step || currentNode.allow_self_step);
+  if (fromLane === toLane) {
+    return buildWorkflowRouteResult({
+      run,
+      definition,
+      fromLane,
+      targetNode,
+      toLane,
+      targetSession,
+      eventKey: transitionKey,
+      routeStatus: allowSelfStep ? "self_step_recorded" : "blocked_self_delivery",
+      blockedReason: allowSelfStep ? null : "lane_guard_from_lane_equals_to_lane"
+    });
+  }
+  if (targetSession && targetSession !== "unbound" && currentSession && workflowSessionsMatch(currentSession, targetSession)) {
+    return buildWorkflowRouteResult({
+      run,
+      definition,
+      fromLane,
+      targetNode,
+      toLane,
+      targetSession,
+      eventKey: transitionKey,
+      routeStatus: allowSelfStep ? "self_step_recorded" : "blocked_self_delivery",
+      blockedReason: allowSelfStep ? null : "session_guard_current_session_equals_target_session"
+    });
+  }
+  if (!targetSession || targetSession === "unbound") {
+    return buildWorkflowRouteResult({
+      run,
+      definition,
+      fromLane,
+      targetNode,
+      toLane,
+      targetSession: targetSession || "unbound",
+      eventKey: transitionKey,
+      routeStatus: "manual_confirmation_required",
+      blockedReason: "target_session_missing"
+    });
+  }
+  return buildWorkflowRouteResult({
+    run,
+    definition,
+    fromLane,
+    targetNode,
+    toLane,
+    targetSession,
+    eventKey: transitionKey,
+    routeStatus: "ready",
+    blockedReason: null
+  });
+}
+
+function selectWorkflowTransition(node, eventKey) {
+  const transitions = node.transitions && typeof node.transitions === "object" ? node.transitions : {};
+  const entries = Object.entries(transitions);
+  if (!entries.length) return null;
+  if (eventKey && transitions[eventKey]) return [eventKey, transitions[eventKey]];
+  if (eventKey && !transitions[eventKey]) return null;
+  return entries[0];
+}
+
+function workflowSessionsMatch(currentSession, targetSession) {
+  const current = parseAdapterSession(currentSession);
+  const target = parseAdapterSession(targetSession);
+  if (!current.id || !target.id) return false;
+  return current.host === target.host && current.id === target.id;
+}
+
+function buildWorkflowRouteResult({ run, definition, fromLane, targetNode, toLane, targetSession, eventKey, routeStatus, blockedReason }) {
+  const deliveryMode = routeStatus === "ready"
+    ? "codex_thread_tool"
+    : (routeStatus === "manual_confirmation_required" || routeStatus === "manual_handoff_required" ? "manual_handoff" : "blocked");
+  return {
+    schema: WORKFLOW_ROUTE_SCHEMA,
+    run_id: run.run_id,
+    workflow_id: definition.workflow_id,
+    workflow_version: definition.version,
+    workflow_definition_path: definition.relative_path,
+    current_node: run.current_node || run.current_step,
+    current_step: run.current_step || run.current_node,
+    from_lane: fromLane,
+    target_node: targetNode,
+    to_lane: toLane,
+    target_session: targetSession || null,
+    route_status: routeStatus,
+    blocked_reason: blockedReason,
+    route_source: "definition + run_state",
+    route_event: eventKey,
+    delivery_mode: deliveryMode,
+    user_message: routeStatus === "blocked_self_delivery"
+      ? "我发现下一步目标会指向当前 Agent 自己，这可能是 workflow 配置或路由错误，已停止自动投递。"
+      : null,
+    guarantees: routeStatus === "blocked_self_delivery" || routeStatus === "manual_confirmation_required" || routeStatus === "self_step_recorded"
+      ? {
+        send_tool_called: false,
+        delivered_request_recorded: false,
+        delivered_wording_allowed: false
+      }
+      : undefined
+  };
+}
+
+function applyWorkflowRouteToRun(run, route) {
+  run.status = route.route_status;
+  run.current_node = route.current_node;
+  run.current_step = route.current_step;
+  run.current_actor_lane = route.from_lane;
+  run.next_target_node = route.target_node;
+  run.next_target_lane = route.to_lane;
+  run.blocked_reason = route.blocked_reason;
+  run.route_source = route.route_source;
+  run.updated_at = new Date().toISOString();
+  appendWorkflowEvent(run, {
+    type: route.route_status === "ready" ? "route_ready" : `route_${route.route_status}`,
+    actor_lane: route.from_lane,
+    node: route.current_node,
+    status: route.route_status,
+    route_event: route.route_event,
+    target_node: route.target_node,
+    target_lane: route.to_lane,
+    target_session: route.target_session,
+    blocked_reason: route.blocked_reason
+  });
+}
+
+function appendWorkflowEvent(run, event) {
+  if (!Array.isArray(run.events)) run.events = [];
+  const now = new Date().toISOString();
+  const eventId = `EVT-${timestampForFile()}-${String(run.events.length + 1).padStart(3, "0")}`;
+  const record = {
+    event_id: eventId,
+    type: event.type,
+    actor_lane: event.actor_lane || run.current_actor_lane,
+    node: event.node || run.current_node,
+    status: event.status || run.status,
+    created_at: now,
+    ...(event.route_event ? { route_event: event.route_event } : {}),
+    ...(event.from_node ? { from_node: event.from_node } : {}),
+    ...(event.from_lane ? { from_lane: event.from_lane } : {}),
+    ...(event.target_node ? { target_node: event.target_node } : {}),
+    ...(event.target_lane ? { target_lane: event.target_lane } : {}),
+    ...(event.target_session ? { target_session: event.target_session } : {}),
+    ...(event.blocked_reason ? { blocked_reason: event.blocked_reason } : {}),
+    ...(event.message ? { message: event.message } : {})
+  };
+  run.events.push(record);
+  run.last_event_id = eventId;
+  run.updated_at = now;
+  return record;
+}
+
+function advanceWorkflowRunAfterDelivered(run) {
+  const fromNode = run.current_node || run.current_step;
+  const fromLane = run.current_actor_lane;
+  const targetNode = run.next_target_node;
+  const targetLane = run.next_target_lane;
+  if (!targetNode || !targetLane) {
+    throw new Error("workflow delivered 后无法推进：缺少 next target。");
+  }
+  run.current_node = targetNode;
+  run.current_step = targetNode;
+  run.current_actor_lane = targetLane;
+  run.next_target_node = null;
+  run.next_target_lane = null;
+  run.blocked_reason = null;
+  run.updated_at = new Date().toISOString();
+  appendWorkflowEvent(run, {
+    type: "step_entered",
+    status: run.status,
+    actor_lane: targetLane,
+    node: targetNode,
+    from_node: fromNode,
+    from_lane: fromLane,
+    target_node: targetNode,
+    target_lane: targetLane
+  });
+}
+
+function normalizeWorkflowStatus(status) {
+  const normalized = normalizeMarkdownCell(status);
+  if (!WORKFLOW_RUN_STATUSES.has(normalized)) {
+    throw new Error(`不支持的 workflow status：${status}`);
+  }
+  return normalized;
+}
+
+function isWorkflowBlockedStatus(status) {
+  return ["blocked_self_delivery", "manual_confirmation_required", "blocked_missing_route", MANUAL_HANDOFF_STATUS, "failed"].includes(status);
+}
+
+function validateWorkflowStatusTransition(currentStatus, nextStatus) {
+  const current = normalizeWorkflowStatus(currentStatus || "planned");
+  const next = normalizeWorkflowStatus(nextStatus);
+  if (next === "delivered" && current !== "delivering") {
+    throw new Error(`非法 workflow 状态转换：${current} -> delivered。delivered 必须先经过 delivering。`);
+  }
+  if ((current === "blocked_self_delivery" || current === "self_step_recorded") && next === "delivered") {
+    throw new Error(`非法 workflow 状态转换：${current} -> delivered。阻断或 self step 不能记录为 delivered。`);
+  }
+  const allowed = {
+    planned: new Set(["ready", "failed"]),
+    ready: new Set(["delivering", "blocked_self_delivery", "manual_confirmation_required", "blocked_missing_route", MANUAL_HANDOFF_STATUS, "self_step_recorded", "completed", "failed"]),
+    delivering: new Set(["delivered", MANUAL_HANDOFF_STATUS, "failed"]),
+    delivered: new Set(["ready", "completed", "failed"]),
+    blocked_self_delivery: new Set(["manual_confirmation_required", "failed"]),
+    manual_confirmation_required: new Set(["self_step_recorded", "failed"]),
+    blocked_missing_route: new Set(["manual_confirmation_required", "failed"]),
+    [MANUAL_HANDOFF_STATUS]: new Set(["delivering", "failed"]),
+    self_step_recorded: new Set(["ready", "completed", "failed"]),
+    completed: new Set([]),
+    failed: new Set([])
+  };
+  if (!allowed[current]?.has(next)) {
+    throw new Error(`非法 workflow 状态转换：${current} -> ${next}`);
+  }
+}
+
+function printWorkflowRoute(route) {
+  console.log("");
+  console.log("Workflow route preflight");
+  console.log("");
+  console.log(`run id: ${route.run_id}`);
+  console.log(`workflow id: ${route.workflow_id}`);
+  console.log(`current step: ${route.current_step}`);
+  console.log(`from lane: ${route.from_lane}`);
+  console.log(`target node: ${route.target_node || "(none)"}`);
+  console.log(`target lane: ${route.to_lane || "(none)"}`);
+  console.log(`target session: ${route.target_session || "(none)"}`);
+  console.log(`route source: ${route.route_source}`);
+  console.log(`delivery mode: ${route.delivery_mode}`);
+  console.log(`route status: ${route.route_status}`);
+  if (route.user_message) console.log(route.user_message);
+  if (route.blocked_reason) console.log(`blocked reason: ${route.blocked_reason}`);
+}
+
 function buildMultiagentMigrationPlan(workspaceRoot) {
   const report = inspectMultiagentCompatibility(workspaceRoot);
   const timestamp = timestampForFile();
@@ -10515,7 +11222,7 @@ function printLanesHelp() {
   console.log(`StarWork Multiagent
 
 Usage:
-  starwork multiagent <init|add|bind|release|status|upgrade|read|instruct|handoff|continue|launch|message|request|share> [options]
+  starwork multiagent <init|add|bind|release|status|upgrade|read|instruct|handoff|continue|launch|message|request|workflow|share> [options]
 
 Agent Lanes 用于同一项目内多个 Agent 会话按项目自定义职责位协作。
 
@@ -10533,6 +11240,7 @@ Subcommands:
   launch     旧入口：为 Codex 生成 Launch Message；实际创建由 starworkMultiagent 调用 create_thread。
   message    生成标准 launch / instruction 消息模板，不写状态。
   request    记录已由 Skill 或人工完成的跨 lane 请求投递状态。
+  workflow   管理 next workflow run state、route 和 event。
   share      登记一个跨 lane 可读输出。
 
 示例：
@@ -10543,6 +11251,7 @@ Subcommands:
   starwork multiagent upgrade --target ./my-workspace --dry-run
   starwork multiagent message instruct development --from product-planning --message "请根据 SPEC 开始实现。" --target ./my-workspace --json
   starwork multiagent request record --from product-planning --to development --message "请根据 SPEC 开始实现。" --host-delivery delivered_via_codex_thread_tool --delivery-tool send_message_to_thread --target ./my-workspace --yes
+  starwork multiagent workflow route --run WF-20260622-issue-to-delivery --event ready_for_design --target ./my-workspace --json
 `);
 }
 
@@ -10807,6 +11516,86 @@ Options:
   --id <request-id>
   --json
   --dry-run
+  --yes, -y
+`);
+}
+
+function printLanesWorkflowHelp() {
+  console.log(`StarWork Multiagent Workflow
+
+Usage:
+  starwork multiagent workflow start --definition <path> --entry-node <node> --actor-lane <lane> --target <path> --json --yes
+  starwork multiagent workflow status --run <run-id> --target <path> --json
+  starwork multiagent workflow route --run <run-id> --event <event-json-or-key> --target <path> --json
+  starwork multiagent workflow event record --run <run-id> --type <type> --status <status> --target <path> --json --yes
+
+说明：
+  workflow 只管理 run state、Step Router 和 event log，不调用宿主发送工具。
+`);
+}
+
+function printLanesWorkflowStartHelp() {
+  console.log(`StarWork Multiagent Workflow Start
+
+Usage:
+  starwork multiagent workflow start --definition <path> --entry-node <node> --actor-lane <lane> [options]
+
+Options:
+  --target <path>
+  --definition <path>
+  --entry-node <node>
+  --actor-lane <lane>
+  --id <run-id>
+  --json
+  --yes, -y
+`);
+}
+
+function printLanesWorkflowStatusHelp() {
+  console.log(`StarWork Multiagent Workflow Status
+
+Usage:
+  starwork multiagent workflow status --run <run-id> [options]
+
+Options:
+  --target <path>
+  --run <run-id>
+  --json
+`);
+}
+
+function printLanesWorkflowRouteHelp() {
+  console.log(`StarWork Multiagent Workflow Route
+
+Usage:
+  starwork multiagent workflow route --run <run-id> --event <event-json-or-key> [options]
+
+Options:
+  --target <path>
+  --run <run-id>
+  --event <event-json-or-key>
+  --current-session <agent:session-id>
+  --json
+
+说明：
+  route 只根据 Workflow Definition + Workflow Run State + completion event 计算下一步目标。
+  命中 self-delivery guard 时写入 blocked event，不调用发送工具，不记录 delivered。
+`);
+}
+
+function printLanesWorkflowEventRecordHelp() {
+  console.log(`StarWork Multiagent Workflow Event Record
+
+Usage:
+  starwork multiagent workflow event record --run <run-id> --type <type> --status <status> [options]
+
+Options:
+  --target <path>
+  --run <run-id>
+  --type <type>
+  --status <planned|ready|delivering|delivered|blocked_self_delivery|manual_confirmation_required|blocked_missing_route|manual_handoff_required|self_step_recorded|completed|failed>
+  --message <text>
+  --json
   --yes, -y
 `);
 }

@@ -18,7 +18,7 @@ starwork_multiagent: v0.11-workflow-mvp
 Workflow Builder / Workflow Runner 是 next 内测能力。开始 workflow 前先确认：
 
 - 当前 Skill frontmatter 包含 `starwork_channel: next` 和 `starwork_multiagent`。
-- CLI 来自当前已发布的 `@jennie-shawn/starwork@latest`，或来自同源 next 开发分支。
+- CLI 必须来自 `@jennie-shawn/starwork@next`，并配合 `skills-next` 完整目录安装。
 - 如果 CLI 可用但当前 Skill 没有 workflow references，说明安装错配；停止 workflow 操作，提示用户重新安装 next Skill。
 
 普通 stable 用户不测试 workflow。
@@ -61,7 +61,7 @@ _system/collaboration/shared.md
 | 登记 shared output / 晋升输出 | `references/lane-workspace-output-promotion.md` |
 | 写入、输出、安全边界 | `references/safety-output-rules.md` |
 | 设计 workflow | `references/workflow-builder.md` |
-| 启动 workflow | `references/workflow-runner.md`、`references/workflow-packet-budget.md`、`references/delivery-guarantee.md` |
+| 启动 workflow | `references/workflow-runner.md`、`references/workflow-run-state.md`、`references/workflow-packet-budget.md`、`references/delivery-guarantee.md` |
 
 ## 前置保护
 
@@ -130,7 +130,9 @@ CLI 只维护 StarWork 项目事实源，例如：
 
 用户说“设计 workflow / 自动通知流程 / 产品开发循环”时进入 Workflow Builder：只设计、采访、预览、保存草案；不通知任何 Agent，不启动真实流程，不写 `.starwork/workflows/state.json`，不写 `product/`。
 
-用户说“启动 / 进入 / 执行 workflow”时进入 Workflow Runner：只读取已确认 definition，默认生成 compact + reference packet；full packet 只在目标 Agent 无法访问项目文件、manual handoff 必须完整自包含或用户明确要求时使用。
+用户说“启动 / 进入 / 执行 workflow”时进入 Workflow Runner：先读取 workflow run state，通过 Step Router 从 Workflow Definition + Run State + 当前 completion event 计算下一步目标；默认生成 compact + reference packet；full packet 只在目标 Agent 无法访问项目文件、manual handoff 必须完整自包含或用户明确要求时使用。
+
+Runner 投递前必须展示 run id、current step、from lane、target lane、target session、route source、delivery mode。发生 `blocked_self_delivery`、`manual_confirmation_required` 或 `self_step_recorded` 时停止投递，不调用 `send_message_to_thread`，不记录 `delivered_via_codex_thread_tool`。
 
 Runner 的跨 lane 节点仍受“必须投递”约束。workflow 当前节点消息已送达只代表消息送达和 request 已记录，不代表目标任务完成。
 

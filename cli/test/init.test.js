@@ -326,7 +326,7 @@ test("starworkMultiagent decomposition keeps main skills short and references in
     "lane-workspace-output-promotion.md",
     "safety-output-rules.md",
   ];
-  const workflowRefs = ["workflow-builder.md", "workflow-runner.md", "workflow-packet-budget.md"];
+  const workflowRefs = ["workflow-builder.md", "workflow-runner.md", "workflow-run-state.md", "workflow-packet-budget.md"];
 
   assert.ok(stableLineCount <= 240, `stable main Skill should be <= 240 lines, got ${stableLineCount}`);
   assert.ok(nextLineCount <= 260, `next main Skill should be <= 260 lines, got ${nextLineCount}`);
@@ -445,6 +445,7 @@ test("starworkMultiagent next skill defines workflow builder runner and next pro
   const spec = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent-spec.md"), "utf8");
   const builderRef = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "references", "workflow-builder.md"), "utf8");
   const runnerRef = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "references", "workflow-runner.md"), "utf8");
+  const runStateRef = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "references", "workflow-run-state.md"), "utf8");
   const packetRef = fs.readFileSync(path.join(root, "skills-next", "starworkMultiagent", "references", "workflow-packet-budget.md"), "utf8");
   const alphaGuide = fs.readFileSync(path.join(root, "docs", "alpha-test-guide.md"), "utf8");
   const userGuide = fs.readFileSync(path.join(root, "docs", "multiagent-user-guide.md"), "utf8");
@@ -454,10 +455,14 @@ test("starworkMultiagent next skill defines workflow builder runner and next pro
   assert.ok(lineCount <= 260, `next starworkMultiagent SKILL.md should be <= 260 lines, got ${lineCount}`);
   assert.match(skill, /starwork_channel: next/);
   assert.match(skill, /starwork_multiagent: v0\.11-workflow-mvp/);
+  assert.match(skill, /@jennie-shawn\/starwork@next/);
+  assert.match(skill, /skills-next/);
+  assert.doesNotMatch(skill, /@jennie-shawn\/starwork@latest|当前已发布的 `@jennie-shawn\/starwork@latest`/);
   assert.match(skill, /Workflow Builder/);
   assert.match(skill, /Workflow Runner/);
   assert.match(skill, /workflow-builder\.md/);
   assert.match(skill, /workflow-runner\.md/);
+  assert.match(skill, /workflow-run-state\.md/);
   assert.match(skill, /workflow-packet-budget\.md/);
   assert.match(skill, /compact \+ reference/);
   assert.match(skill, /full packet/);
@@ -473,9 +478,30 @@ test("starworkMultiagent next skill defines workflow builder runner and next pro
   assert.match(builderRef, /不写 `product\/`/);
   assert.match(builderRef, /不记录 delivery status/);
   assert.match(runnerRef, /只执行已确认 definition/);
+  assert.match(runnerRef, /由 AI 辅助推进的内测 workflow/);
+  assert.match(runnerRef, /Workflow Definition \+ Workflow Run State \+ 当前 completion event/);
+  assert.match(runnerRef, /run id/);
+  assert.match(runnerRef, /current step/);
+  assert.match(runnerRef, /from lane/);
+  assert.match(runnerRef, /target lane/);
+  assert.match(runnerRef, /target session/);
+  assert.match(runnerRef, /route source/);
+  assert.match(runnerRef, /delivery mode/);
+  assert.match(runnerRef, /blocked_self_delivery/);
+  assert.match(runnerRef, /self_step_recorded/);
+  assert.match(runnerRef, /不调用 `send_message_to_thread`/);
+  assert.match(runnerRef, /不执行 `multiagent request record --host-delivery delivered_via_codex_thread_tool`/);
+  assert.match(runnerRef, /workflow event record --status delivered/);
+  assert.match(runnerRef, /step_entered/);
+  assert.match(runStateRef, /starwork\.multiagent\.workflow_run\.v0\.1/);
+  assert.match(runStateRef, /\.starwork\/workflows\/runs\/<run-id>\.json/);
+  assert.match(runStateRef, /workflow_definition_path/);
+  assert.match(runStateRef, /Run Progression/);
+  assert.match(runStateRef, /current_node = previous\.next_target_node/);
+  assert.match(runStateRef, /Step Router/);
+  assert.match(runStateRef, /禁止把 `blocked_self_delivery`、`self_step_recorded` 直接改成 `delivered`/);
   assert.match(runnerRef, /当前会话 ID/);
   assert.match(runnerRef, /目标 lane session ID/);
-  assert.match(runnerRef, /本地执行模式不调用 `send_message_to_thread`/);
   assert.match(runnerRef, /workflow 当前节点消息已送达，并已记录 StarWork request/);
   assert.match(runnerRef, /不得说目标 Agent 已完成、workflow 已完成/);
   assert.match(packetRef, /compact \+ reference/);
@@ -493,7 +519,15 @@ test("starworkMultiagent next skill defines workflow builder runner and next pro
   assert.match(userGuide, /@jennie-shawn\/starwork@next/);
   assert.match(alphaGuide, new RegExp(`${nextSkillsSource.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} --full-depth -g -a codex -y`));
   assert.match(userGuide, /Workflow 目前是 next 内测能力/);
+  assert.match(userGuide, /由 AI 辅助推进的内测 workflow/);
+  assert.match(userGuide, /workflow run state/);
+  assert.match(userGuide, /run id/);
+  assert.match(userGuide, /路由来源/);
+  assert.match(userGuide, /self-delivery 阻断/);
   assert.match(userGuide, /skills-next/);
+  assert.match(alphaGuide, /v0\.14 next/);
+  assert.match(alphaGuide, /Workflow Definition \+ Run State \+ 当前 completion event/);
+  assert.match(alphaGuide, /blocked_self_delivery/);
   assert.match(registry, /next workflow 草案 \/ compact packet/);
 });
 
@@ -631,6 +665,94 @@ test("mainflow skills guide MultiAgent-only users through init and doctor prefli
   assert.match(userGuide, /如果 AI 先带你去接入或检查项目/);
   assert.match(registry, /MultiAgent 安全接入口径/);
   assert.match(registry, /多 AI 协作准备度/);
+});
+
+test("mainflow init and doctor skills are short entrypoints with references", () => {
+  const initRefs = [
+    "README.md",
+    "intent-routing.md",
+    "friendly-onboarding.md",
+    "initialization-flow.md",
+    "custom-blueprint.md",
+    "existing-project-agent-docs.md",
+    "host-adapter-flow.md",
+    "knowledge-and-pack-boundaries.md",
+    "output-and-safety-rules.md",
+  ];
+  const doctorRefs = [
+    "README.md",
+    "intent-routing.md",
+    "diagnosis-flow.md",
+    "multiagent-preflight.md",
+    "core-role-mapping.md",
+    "upgrade-blueprint-flow.md",
+    "hub-upgrade.md",
+    "rules-extraction-guide.md",
+    "agent-rules-template.md",
+    "response-guide.md",
+  ];
+  const variants = [
+    { dir: "skills", initMax: 220, doctorMax: 230 },
+    { dir: "skills-next", initMax: 225, doctorMax: 235 },
+  ];
+
+  for (const variant of variants) {
+    const initPath = path.join(root, variant.dir, "starworkInit", "SKILL.md");
+    const doctorPath = path.join(root, variant.dir, "starworkDoctor", "SKILL.md");
+    const initSkill = fs.readFileSync(initPath, "utf8");
+    const doctorSkill = fs.readFileSync(doctorPath, "utf8");
+    const initLineCount = initSkill.trimEnd().split(/\n/).length;
+    const doctorLineCount = doctorSkill.trimEnd().split(/\n/).length;
+    const initRefDir = path.join(root, variant.dir, "starworkInit", "references");
+    const doctorRefDir = path.join(root, variant.dir, "starworkDoctor", "references");
+
+    assert.ok(initLineCount <= variant.initMax, `${variant.dir} starworkInit should be short, got ${initLineCount}`);
+    assert.ok(doctorLineCount <= variant.doctorMax, `${variant.dir} starworkDoctor should be short, got ${doctorLineCount}`);
+    for (const ref of initRefs) {
+      assert.match(initSkill, new RegExp(`references/${ref.replace(".", "\\.")}`));
+      assert.ok(fs.existsSync(path.join(initRefDir, ref)), `${variant.dir} init reference missing: ${ref}`);
+    }
+    for (const ref of doctorRefs) {
+      assert.match(doctorSkill, new RegExp(`references/${ref.replace(".", "\\.")}`));
+      assert.ok(fs.existsSync(path.join(doctorRefDir, ref)), `${variant.dir} doctor reference missing: ${ref}`);
+    }
+
+    assert.match(initSkill, /完整安装/);
+    assert.match(initSkill, /检查 \/ 预览 \/ 写入/);
+    assert.match(initSkill, /reference 文件不存在或无法读取/);
+    assert.match(initSkill, /MultiAgent-only/);
+    assert.match(initSkill, /--agent-docs draft/);
+    assert.match(initSkill, /pending merge/);
+    assert.match(initSkill, /doctor --target/);
+    assert.match(doctorSkill, /完整安装/);
+    assert.match(doctorSkill, /只读/);
+    assert.match(doctorSkill, /不自动 repair/);
+    assert.match(doctorSkill, /upgrade blueprint/);
+    assert.match(doctorSkill, /多 AI 协作准备度/);
+    assert.match(doctorSkill, /reference 文件不存在或无法读取/);
+    assert.doesNotMatch(initSkill, /"schema": "starwork\.init_blueprint\.v0\.1"/);
+    assert.doesNotMatch(doctorSkill, /"schema": "starwork\.doctor_skill\.recommendation\.v0\.1"/);
+  }
+});
+
+test("knowledge skills classify incoming material before writing", () => {
+  const stable = fs.readFileSync(path.join(root, "skills", "starworkKnowledge", "SKILL.md"), "utf8");
+  const next = fs.readFileSync(path.join(root, "skills-next", "starworkKnowledge", "SKILL.md"), "utf8");
+  const project = fs.readFileSync(path.join(root, "core", "capabilities", "knowledge", "skills", "starworkKnowledgeProject", "SKILL.md"), "utf8");
+  const required = /长期知识[\s\S]*临时资料[\s\S]*草稿[\s\S]*参考来源[\s\S]*待确认事实[\s\S]*写入前预览[\s\S]*知识条目[\s\S]*为什么值得长期保存[\s\S]*建议放入位置[\s\S]*用户确认/;
+  const forbidden = /把所有资料写入知识库|直接导入全部资料|不需要确认/;
+
+  assert.ok(stable.trimEnd().split(/\n/).length <= 250);
+  assert.ok(next.trimEnd().split(/\n/).length <= 250);
+  assert.ok(project.trimEnd().split(/\n/).length <= 200);
+  assert.match(stable, required);
+  assert.match(next, required);
+  assert.match(project, required);
+  assert.match(stable, /用户给出材料时，第一步是分类和解释，不是直接写入/);
+  assert.match(project, /你是当前项目的知识库助手/);
+  assert.match(project, /用户确认前不得写入正式知识文件/);
+  assert.match(project, /不把未确认事实写成确定结论/);
+  assert.doesNotMatch(`${stable}\n${next}\n${project}`, forbidden);
 });
 
 test("init-family skills start with user-facing capability framing", () => {
@@ -1454,6 +1576,433 @@ test("multiagent add bind share and status update markdown state", () => {
   const humanStatus = runCommand(["multiagent", "status", "--target", dir]);
   assert.match(humanStatus.stdout, /StarWork 多 AI 协作状态/);
   assert.match(humanStatus.stdout, /职责位：1 个；已绑定会话：1 个；共享输出：1 项/);
+});
+
+function setupWorkflowRunWorkspace({ productLeadSession = "codex:product-thread", testingSession = "codex:testing-thread" } = {}) {
+  const dir = tempDir();
+  runInit(["--type", "single-light", "--pack", "general", "--target", dir, "--yes"]);
+  assert.equal(runCommand(["multiagent", "init", "--target", dir, "--lanes", "testing,product-lead,development", "--yes"]).status, 0);
+  assert.equal(runCommand(["multiagent", "bind", "testing", "--session", testingSession, "--target", dir, "--yes"]).status, 0);
+  assert.equal(runCommand(["multiagent", "bind", "product-lead", "--session", productLeadSession, "--target", dir, "--yes"]).status, 0);
+  assert.equal(runCommand(["multiagent", "bind", "development", "--session", "codex:development-thread", "--target", dir, "--yes"]).status, 0);
+  return dir;
+}
+
+function writeWorkflowFixture(dir, nodes) {
+  const fixturePath = path.join(dir, "_系统", "协作", "lanes", "testing", "workspace", "workflow-definition.json");
+  fs.writeFileSync(fixturePath, JSON.stringify({
+    workflow_id: "issue_027_guard_fixture",
+    version: "0.14",
+    status: "confirmed",
+    entry: {
+      node: "testing_intake",
+      actor_lane: "testing"
+    },
+    nodes
+  }, null, 2), "utf8");
+  return fixturePath;
+}
+
+function startWorkflowRun(dir, definitionPath, runId = "WF-issue-027") {
+  const result = runCommand([
+    "multiagent", "workflow", "start",
+    "--definition", definitionPath,
+    "--entry-node", "testing_intake",
+    "--actor-lane", "testing",
+    "--run", runId,
+    "--target", dir,
+    "--json",
+    "--yes"
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout);
+}
+
+function recordWorkflowEvent(dir, runId, type, status) {
+  const result = runCommand([
+    "multiagent", "workflow", "event", "record",
+    "--run", runId,
+    "--type", type,
+    "--status", status,
+    "--target", dir,
+    "--json",
+    "--yes"
+  ]);
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout);
+}
+
+test("multiagent workflow run state routes testing intake to explicit product lane", () => {
+  const dir = setupWorkflowRunWorkspace();
+  const definitionPath = writeWorkflowFixture(dir, {
+    testing_intake: {
+      actor_lane: "testing",
+      transitions: {
+        ready_for_design: {
+          target_node: "product_design",
+          target_lane: "product-lead"
+        }
+      }
+    },
+    product_design: {
+      actor_lane: "product-lead",
+      transitions: {
+        accepted: {
+          target_node: "development_implementation",
+          target_lane: "development"
+        }
+      }
+    },
+    development_implementation: {
+      actor_lane: "development",
+      transitions: {
+        done: {
+          target_node: "product_review",
+          target_lane: "product-lead"
+        }
+      }
+    },
+    product_review: {
+      actor_lane: "product-lead",
+      transitions: {
+        passed: {
+          target_node: "stop"
+        }
+      }
+    }
+  });
+
+  const start = startWorkflowRun(dir, definitionPath);
+  const runPath = path.join(dir, ".starwork", "workflows", "runs", `${start.run.run_id}.json`);
+  const status = runCommand(["multiagent", "workflow", "status", "--run", start.run.run_id, "--target", dir, "--json"]);
+  const route = runCommand([
+    "multiagent", "workflow", "route",
+    "--run", start.run.run_id,
+    "--event", "ready_for_design",
+    "--current-session", "codex:testing-thread",
+    "--target", dir,
+    "--json"
+  ]);
+  const routeJson = JSON.parse(route.stdout);
+  const run = readJson(runPath);
+
+  assert.equal(fs.existsSync(runPath), true);
+  assert.equal(status.status, 0);
+  assert.equal(JSON.parse(status.stdout).run.workflow_definition_path, "_系统/协作/lanes/testing/workspace/workflow-definition.json");
+  assert.equal(route.status, 0, route.stderr);
+  assert.equal(routeJson.route_status, "ready");
+  assert.equal(routeJson.from_lane, "testing");
+  assert.equal(routeJson.to_lane, "product-lead");
+  assert.equal(routeJson.target_session, "codex:product-thread");
+  assert.equal(routeJson.route_source, "definition + run_state");
+  assert.equal(routeJson.delivery_mode, "codex_thread_tool");
+  assert.notEqual(routeJson.to_lane, "testing");
+  assert.equal(run.events.some((event) => event.type === "route_ready" && event.target_lane === "product-lead"), true);
+});
+
+test("multiagent workflow run state advances after delivered and routes the second hop", () => {
+  const dir = setupWorkflowRunWorkspace();
+  const definitionPath = writeWorkflowFixture(dir, {
+    testing_intake: {
+      actor_lane: "testing",
+      transitions: {
+        ready_for_design: {
+          target_node: "product_design",
+          target_lane: "product-lead"
+        }
+      }
+    },
+    product_design: {
+      actor_lane: "product-lead",
+      transitions: {
+        accepted: {
+          target_node: "development_implementation",
+          target_lane: "development"
+        }
+      }
+    },
+    development_implementation: {
+      actor_lane: "development",
+      transitions: {
+        done: {
+          target_node: "product_review",
+          target_lane: "product-lead"
+        }
+      }
+    },
+    product_review: {
+      actor_lane: "product-lead",
+      transitions: {
+        passed: {
+          target_node: "stop"
+        }
+      }
+    }
+  });
+  const start = startWorkflowRun(dir, definitionPath, "WF-two-hop");
+
+  const route1 = JSON.parse(runCommand([
+    "multiagent", "workflow", "route",
+    "--run", start.run.run_id,
+    "--event", "ready_for_design",
+    "--current-session", "codex:testing-thread",
+    "--target", dir,
+    "--json"
+  ]).stdout);
+  recordWorkflowEvent(dir, start.run.run_id, "step_delivery_started", "delivering");
+  const delivered = recordWorkflowEvent(dir, start.run.run_id, "step_delivered", "delivered");
+  const afterDelivered = delivered.run;
+  const route2 = runCommand([
+    "multiagent", "workflow", "route",
+    "--run", start.run.run_id,
+    "--event", "accepted",
+    "--current-session", "codex:product-thread",
+    "--target", dir,
+    "--json"
+  ]);
+  const route2Json = JSON.parse(route2.stdout);
+
+  assert.equal(route1.from_lane, "testing");
+  assert.equal(route1.to_lane, "product-lead");
+  assert.equal(afterDelivered.current_node, "product_design");
+  assert.equal(afterDelivered.current_step, "product_design");
+  assert.equal(afterDelivered.current_actor_lane, "product-lead");
+  assert.equal(afterDelivered.next_target_node, null);
+  assert.equal(afterDelivered.next_target_lane, null);
+  assert.equal(afterDelivered.events.some((event) => event.type === "step_entered" && event.from_node === "testing_intake" && event.node === "product_design"), true);
+  assert.equal(route2.status, 0, route2.stderr);
+  assert.equal(route2Json.route_status, "ready");
+  assert.equal(route2Json.from_lane, "product-lead");
+  assert.equal(route2Json.to_lane, "development");
+  assert.equal(route2Json.target_node, "development_implementation");
+  assert.equal(route2Json.target_session, "codex:development-thread");
+});
+
+test("multiagent workflow self delivery guard still applies after run progression", () => {
+  const dir = setupWorkflowRunWorkspace();
+  const definitionPath = writeWorkflowFixture(dir, {
+    testing_intake: {
+      actor_lane: "testing",
+      transitions: {
+        ready_for_design: {
+          target_node: "product_design",
+          target_lane: "product-lead"
+        }
+      }
+    },
+    product_design: {
+      actor_lane: "product-lead",
+      transitions: {
+        local_review: {
+          target_node: "product_review",
+          target_lane: "product-lead"
+        }
+      }
+    },
+    product_review: {
+      actor_lane: "product-lead",
+      transitions: {}
+    }
+  });
+  const start = startWorkflowRun(dir, definitionPath, "WF-progressed-self");
+
+  assert.equal(runCommand([
+    "multiagent", "workflow", "route",
+    "--run", start.run.run_id,
+    "--event", "ready_for_design",
+    "--current-session", "codex:testing-thread",
+    "--target", dir,
+    "--json"
+  ]).status, 0);
+  recordWorkflowEvent(dir, start.run.run_id, "step_delivery_started", "delivering");
+  recordWorkflowEvent(dir, start.run.run_id, "step_delivered", "delivered");
+  const route = runCommand([
+    "multiagent", "workflow", "route",
+    "--run", start.run.run_id,
+    "--event", "local_review",
+    "--current-session", "codex:product-thread",
+    "--target", dir,
+    "--json"
+  ]);
+  const routeJson = JSON.parse(route.stdout);
+
+  assert.equal(route.status, 0, route.stderr);
+  assert.equal(routeJson.from_lane, "product-lead");
+  assert.equal(routeJson.to_lane, "product-lead");
+  assert.equal(routeJson.route_status, "blocked_self_delivery");
+  assert.equal(routeJson.blocked_reason, "lane_guard_from_lane_equals_to_lane");
+  assert.equal(routeJson.guarantees.send_tool_called, false);
+  assert.doesNotMatch(route.stdout, /delivered_via_codex_thread_tool|workflow 当前节点消息已送达/);
+});
+
+test("multiagent workflow self delivery guard blocks from lane equal target lane without delivered record", () => {
+  const dir = setupWorkflowRunWorkspace();
+  const definitionPath = writeWorkflowFixture(dir, {
+    testing_intake: {
+      actor_lane: "testing",
+      transitions: {
+        same_lane: {
+          target_node: "testing_followup",
+          target_lane: "testing"
+        }
+      }
+    },
+    testing_followup: {
+      actor_lane: "testing",
+      transitions: {}
+    }
+  });
+  const start = startWorkflowRun(dir, definitionPath, "WF-self-lane");
+
+  const route = runCommand([
+    "multiagent", "workflow", "route",
+    "--run", start.run.run_id,
+    "--event", "same_lane",
+    "--current-session", "codex:testing-thread",
+    "--target", dir,
+    "--json"
+  ]);
+  const routeJson = JSON.parse(route.stdout);
+  const run = readJson(path.join(dir, ".starwork", "workflows", "runs", `${start.run.run_id}.json`));
+  const delivered = runCommand([
+    "multiagent", "workflow", "event", "record",
+    "--run", start.run.run_id,
+    "--type", "step_delivered",
+    "--status", "delivered",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ]);
+
+  assert.equal(route.status, 0, route.stderr);
+  assert.equal(routeJson.route_status, "blocked_self_delivery");
+  assert.equal(routeJson.blocked_reason, "lane_guard_from_lane_equals_to_lane");
+  assert.equal(routeJson.guarantees.send_tool_called, false);
+  assert.equal(routeJson.guarantees.delivered_request_recorded, false);
+  assert.equal(routeJson.guarantees.delivered_wording_allowed, false);
+  assert.doesNotMatch(route.stdout, /delivered_via_codex_thread_tool|workflow 当前节点消息已送达/);
+  assert.equal(run.status, "blocked_self_delivery");
+  assert.equal(run.events.some((event) => event.status === "blocked_self_delivery" && event.blocked_reason === "lane_guard_from_lane_equals_to_lane"), true);
+  assert.notEqual(delivered.status, 0);
+  assert.match(delivered.stderr, /非法 workflow 状态转换/);
+});
+
+test("multiagent workflow self delivery guard blocks target session equal current session", () => {
+  const dir = setupWorkflowRunWorkspace({ productLeadSession: "codex:testing-thread" });
+  const definitionPath = writeWorkflowFixture(dir, {
+    testing_intake: {
+      actor_lane: "testing",
+      transitions: {
+        ready_for_design: {
+          target_node: "product_design",
+          target_lane: "product-lead"
+        }
+      }
+    },
+    product_design: {
+      actor_lane: "product-lead",
+      transitions: {}
+    }
+  });
+  const start = startWorkflowRun(dir, definitionPath, "WF-self-session");
+
+  const route = runCommand([
+    "multiagent", "workflow", "route",
+    "--run", start.run.run_id,
+    "--event", "ready_for_design",
+    "--current-session", "codex:testing-thread",
+    "--target", dir,
+    "--json"
+  ]);
+  const routeJson = JSON.parse(route.stdout);
+
+  assert.equal(route.status, 0, route.stderr);
+  assert.equal(routeJson.route_status, "blocked_self_delivery");
+  assert.equal(routeJson.blocked_reason, "session_guard_current_session_equals_target_session");
+  assert.equal(routeJson.to_lane, "product-lead");
+  assert.equal(routeJson.target_session, "codex:testing-thread");
+  assert.equal(routeJson.guarantees.send_tool_called, false);
+  assert.doesNotMatch(route.stdout, /delivered_via_codex_thread_tool|workflow 当前节点消息已送达/);
+});
+
+test("multiagent workflow allow self step records local step without cross-agent delivery", () => {
+  const dir = setupWorkflowRunWorkspace();
+  const definitionPath = writeWorkflowFixture(dir, {
+    testing_intake: {
+      actor_lane: "testing",
+      transitions: {
+        local_note: {
+          target_node: "testing_followup",
+          target_lane: "testing",
+          allow_self_step: true
+        }
+      }
+    },
+    testing_followup: {
+      actor_lane: "testing",
+      transitions: {}
+    }
+  });
+  const start = startWorkflowRun(dir, definitionPath, "WF-allow-self");
+
+  const route = runCommand([
+    "multiagent", "workflow", "route",
+    "--run", start.run.run_id,
+    "--event", "local_note",
+    "--current-session", "codex:testing-thread",
+    "--target", dir,
+    "--json"
+  ]);
+  const routeJson = JSON.parse(route.stdout);
+  const delivered = runCommand([
+    "multiagent", "workflow", "event", "record",
+    "--run", start.run.run_id,
+    "--type", "step_delivered",
+    "--status", "delivered",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ]);
+
+  assert.equal(route.status, 0, route.stderr);
+  assert.equal(routeJson.route_status, "self_step_recorded");
+  assert.equal(routeJson.guarantees.send_tool_called, false);
+  assert.equal(routeJson.guarantees.delivered_request_recorded, false);
+  assert.doesNotMatch(route.stdout, /workflow 当前节点消息已送达|delivered_via_codex_thread_tool/);
+  assert.notEqual(delivered.status, 0);
+  assert.match(delivered.stderr, /delivered 必须先经过 delivering|阻断或 self step 不能记录为 delivered/);
+});
+
+test("multiagent workflow event record rejects delivered without delivering state", () => {
+  const dir = setupWorkflowRunWorkspace();
+  const definitionPath = writeWorkflowFixture(dir, {
+    testing_intake: {
+      actor_lane: "testing",
+      transitions: {
+        ready_for_design: {
+          target_node: "product_design",
+          target_lane: "product-lead"
+        }
+      }
+    },
+    product_design: {
+      actor_lane: "product-lead",
+      transitions: {}
+    }
+  });
+  const start = startWorkflowRun(dir, definitionPath, "WF-illegal-delivered");
+  const delivered = runCommand([
+    "multiagent", "workflow", "event", "record",
+    "--run", start.run.run_id,
+    "--type", "step_delivered",
+    "--status", "delivered",
+    "--target", dir,
+    "--json",
+    "--yes"
+  ]);
+
+  assert.notEqual(delivered.status, 0);
+  assert.match(delivered.stderr, /delivered 必须先经过 delivering/);
 });
 
 test("multiagent upgrade reads unversioned state and safely migrates before writes", () => {

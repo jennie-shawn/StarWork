@@ -8,6 +8,9 @@
 
 | ID | 标题 | 类型 | 优先级 | 状态 | 负责人 | 来源 | 详情 | 下一步 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ISSUE-029 | Knowledge Skill 缺少资料分类和写入前确认的小白流程 | skill / knowledge / onboarding / product | P1 | closed | development lane | 用户反馈 / Skill UX 审计 / product-mainflow 草案 | [ISSUE-029.md](ISSUE-029.md) | 已关闭：Knowledge Base v0.2 复验通过，资料分类、写入前预览和 `starworkKnowledgeProject` 中文友好化均已落地。 |
+| ISSUE-028 | Init / Doctor 主 Skill 过长，需要短入口 + references 分层 | skill / docs / onboarding / product | P1 | closed | development lane | 用户反馈 / Skill UX 审计 / product-mainflow 草案 | [ISSUE-028.md](ISSUE-028.md) | 已关闭：Mainflow v0.2 复验通过，`starworkInit` / `starworkDoctor` 已改为短主入口 + references。 |
+| ISSUE-027 | MultiAgent workflow 缺少专门管理机制且可能向当前 Agent 自投递 | workflow / skill / cli / core / product | P0 | closed | development lane | 用户反馈 / 真实 workflow 使用 | [ISSUE-027.md](ISSUE-027.md) | 已关闭：v0.14 二次复验通过，run state、Step Router、自投递阻断和 delivered 后 run progression 已落地，两跳 smoke 通过。 |
 | ISSUE-026 | starworkMultiagent Skill 过长导致读取可靠性和维护风险 | skill / docs / product | P1 | closed | product-lead lane | 用户反馈 / product-multiagent 设计 | [ISSUE-026.md](ISSUE-026.md) | 已关闭：v0.13 二次复验通过，主 Skill 已瘦身为短入口 + references；next 安装口径已改为 `@next` CLI + `skills-next --full-depth`。 |
 | ISSUE-025 | MultiAgent workflow 自动流程中 Agent 未自动投递消息导致中断 | skill / workflow / adapter / product | P1 | closed | product-lead lane | 用户反馈 / 截图 | [ISSUE-025.md](ISSUE-025.md) | 已关闭：v0.12 复验通过，workflow / delegation 必须真实投递；工具不可见时进入 discovery / manual handoff，未投递不得记录 delivered。 |
 | ISSUE-024 | MultiAgent 缺少 Workflow Builder / Runner MVP 与 next 同源安装保护 | skill / cli / docs / release / workflow | P1 | closed | product-lead lane | 用户反馈 / product-multiagent 规划 | [ISSUE-024.md](ISSUE-024.md) | 已关闭：MultiAgent next / workflow 复验通过；完整 `starwork skills install` 未实现，按 next 最小保护策略接受。 |

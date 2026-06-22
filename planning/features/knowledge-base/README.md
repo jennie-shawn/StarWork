@@ -10,8 +10,9 @@
 
 ## 当前状态
 
-- 状态：SPEC 已收口，准备进入分阶段开发。
-- 当前生效 SPEC：`specs/v0.1.md`。
+- 状态：v0.2 友好流程已验收通过，v0.1 结构边界保持生效。
+- 当前结构 SPEC：`specs/v0.1.md`。
+- 当前体验 SPEC：`specs/v0.2-friendly-flow.md`。
 - 历史备忘：`discussions/m2.9-knowledge-capability-note.md`。
 
 ## 相关实现
@@ -30,6 +31,7 @@
 - `starworkKnowledge` 是全局入口 Skill，可单独安装。
 - `starworkKnowledgeProject` 是项目内业务 Skill，在项目开启知识库能力后由 CLI 自动装入。
 - v0.1 不把知识库问题塞进默认 `init` 采访链路。
+- v0.2 要求用户给资料时先分类、预览、确认，再写入长期知识库。
 
 ## 后续另开需求
 

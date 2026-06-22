@@ -15,5 +15,6 @@
 - `lane-workspace-output-promotion.md`：lane workspace、shared output、正式输出晋升。
 - `safety-output-rules.md`：写入确认、输出口径和禁止行为。
 - `workflow-builder.md`：next Workflow Builder 的采访、预览和草案保存。
-- `workflow-runner.md`：next Workflow Runner 的确认、instance、投递和本地执行边界。
+- `workflow-runner.md`：next Workflow Runner 的 run state、route、投递和本地执行边界。
+- `workflow-run-state.md`：Workflow Run State schema、状态机和 Step Router 事实源规则。
 - `workflow-packet-budget.md`：compact + reference packet、full packet 和字符预算。
