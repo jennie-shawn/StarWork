@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="StarWork MultiAgent Workflow Next">
+  <rect width="64" height="64" rx="14" fill="#0f766e"/>
+  <path d="M18 21h28v8H18zM18 35h12v8H18zM34 35h12v8H34z" fill="#f8fafc"/>
+  <path d="M30 25h4v17h-4zM26 39h12v4H26z" fill="#99f6e4"/>
+  <circle cx="18" cy="25" r="4" fill="#ccfbf1"/>
+  <circle cx="46" cy="25" r="4" fill="#ccfbf1"/>
+  <circle cx="24" cy="43" r="4" fill="#ccfbf1"/>
+  <circle cx="40" cy="43" r="4" fill="#ccfbf1"/>
+</svg>

@@ -10,6 +10,15 @@ npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills-next --
 
 普通 stable / latest 用户不从这里安装；稳定版本使用 `skills/`。
 
+Codex plugin adapter 内测用户可以改用 plugin package 安装 bundled `starworkMultiagentNext` Skill / references：
+
+```bash
+codex plugin marketplace add product/adapters/codex-plugin --json
+codex plugin add starwork-multiagent-workflow-next --marketplace starwork-codex-plugin --json
+```
+
+plugin 入口只改善 Codex 侧安装和显式触发体验；仍需单独安装 `@jennie-shawn/starwork@next` CLI。
+
 Kit 自带 skill 不放在这里，避免被全局安装命令误识别；它们存放在 `product/kit-skills/`，由 `starwork init` 按工作区类型写入具体工作台。
 
 能力开启后才需要的项目内业务 skill 也不放在这里。例如知识库能力的 `starworkKnowledgeProject` 存放在 `product/core/capabilities/knowledge/skills/`，由 `starwork knowledge init` 写入当前项目。

@@ -274,6 +274,25 @@ npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills-next --
 
 这里同样必须保留 `--full-depth`，否则 workflow Builder / Runner / packet budget references 可能缺失。
 
+#### v0.15 next：Codex Plugin Adapter MVP
+
+Codex plugin adapter 是 workflow next 的实验性安装入口。它替代的是 Codex 侧 Skill / references 安装体验，不替代 CLI、Core、`.starwork/`、`_系统/协作` 或 workflow run state。
+
+```bash
+npm install -g @jennie-shawn/starwork@next
+codex plugin marketplace add product/adapters/codex-plugin --json
+codex plugin list --available --json
+codex plugin add starwork-multiagent-workflow-next --marketplace starwork-codex-plugin --json
+```
+
+安装后请显式触发 bundled Skill，避免命中用户已有的 stable Skill：
+
+```text
+Use $starworkMultiagentNext to check this StarWork workspace, then help me design a MultiAgent workflow. Do not start the workflow until I confirm.
+```
+
+预期：plugin 不声明 MCP、hooks 或 connector，不自带 Codex thread tools；工具不可见时仍进入 `manual_handoff_required`。
+
 不要只安装 stable Skill 目录来测试 workflow。下面这条命令只安装 stable Skills，不是 workflow next Skill 来源：
 
 ```bash

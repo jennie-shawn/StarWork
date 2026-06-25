@@ -1,0 +1,42 @@
+{
+  "name": "starwork-multiagent-workflow-next",
+  "version": "0.15.0-next.0",
+  "description": "Experimental Codex plugin adapter for StarWork MultiAgent Workflow Next.",
+  "author": {
+    "name": "StarWork"
+  },
+  "homepage": "https://github.com/jennie-shawn/StarWork",
+  "repository": "https://github.com/jennie-shawn/StarWork",
+  "license": "MIT",
+  "keywords": [
+    "starwork",
+    "multiagent",
+    "workflow",
+    "codex",
+    "next",
+    "experimental"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "StarWork MultiAgent Workflow Next",
+    "shortDescription": "Design and run StarWork MultiAgent next workflows from Codex.",
+    "longDescription": "Experimental Codex plugin adapter for StarWork MultiAgent Workflow Next. It bundles the $starworkMultiagentNext Skill and references for Codex-side discovery and explicit triggering. StarWork CLI @next is still required; project facts, lane bindings, request records, and workflow run state remain in the StarWork workspace.",
+    "developerName": "StarWork",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/jennie-shawn/StarWork",
+    "defaultPrompt": [
+      "Use $starworkMultiagentNext to check this StarWork workspace, then help me design a MultiAgent workflow. Do not start the workflow until I confirm.",
+      "Use $starworkMultiagentNext to inspect the confirmed workflow definition and show the next route preflight before any delivery.",
+      "Use $starworkMultiagentNext to explain whether this workspace is ready for StarWork MultiAgent Workflow Next."
+    ],
+    "brandColor": "#0F766E",
+    "composerIcon": "./assets/icon.svg",
+    "logo": "./assets/icon.svg",
+    "screenshots": []
+  }
+}

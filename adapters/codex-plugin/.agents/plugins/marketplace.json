@@ -1,0 +1,20 @@
+{
+  "name": "starwork-codex-plugin",
+  "interface": {
+    "displayName": "StarWork Codex Plugin Experiments"
+  },
+  "plugins": [
+    {
+      "name": "starwork-multiagent-workflow-next",
+      "source": {
+        "source": "local",
+        "path": "./starwork-multiagent-workflow-next"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

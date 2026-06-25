@@ -1,0 +1,7 @@
+interface:
+  display_name: "StarWork MultiAgent Workflow Next"
+  short_description: "Experimental StarWork workflow next entry for Codex"
+  default_prompt: "Use $starworkMultiagentNext to check this StarWork workspace, then help me design a MultiAgent workflow. Do not start the workflow until I confirm."
+
+policy:
+  allow_implicit_invocation: false

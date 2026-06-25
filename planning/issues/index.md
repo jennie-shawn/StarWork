@@ -8,6 +8,10 @@
 
 | ID | 标题 | 类型 | 优先级 | 状态 | 负责人 | 来源 | 详情 | 下一步 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ISSUE-033 | MultiAgent Codex Plugin Adapter MVP | adapter / skill / docs / workflow / release | P1 | closed | development lane | 用户反馈 / capability-research / product-multiagent 草案 | [ISSUE-033.md](ISSUE-033.md) | 已关闭：v0.15 复验通过，plugin packaging、bundled `starworkMultiagentNext`、references、local install smoke 和测试均通过。 |
+| ISSUE-032 | Product Lead 可越过模块产品 Agent 直接写正式需求并派发开发 | workflow / product / skill | P0 | new | product-multiagent | 用户反馈 / 真实项目 | [ISSUE-032.md](ISSUE-032.md) | 由 product-multiagent 设计 Product Lead / Module Product Owner 晋升与开发派发 Gate。 |
+| ISSUE-031 | Agent 未识别 STARWORK:MULTIAGENT_MESSAGE 回传消息而误当用户指令 | skill / workflow / product | P0 | new | product-multiagent | 用户反馈 / 真实项目 | [ISSUE-031.md](ISSUE-031.md) | 由 product-multiagent 设计标准消息识别、message_type 路由和 Agent 回传处理规则。 |
+| ISSUE-030 | 本地 StarWork CLI / Skill 安装态漂移导致加载旧版能力 | skill / cli / release / product | P0 | new | product-multiagent | 用户反馈 / 真实项目 | [ISSUE-030.md](ISSUE-030.md) | 由 product-multiagent 设计 CLI / Skill / references / channel 同源检查与旧安装提醒。 |
 | ISSUE-029 | Knowledge Skill 缺少资料分类和写入前确认的小白流程 | skill / knowledge / onboarding / product | P1 | closed | development lane | 用户反馈 / Skill UX 审计 / product-mainflow 草案 | [ISSUE-029.md](ISSUE-029.md) | 已关闭：Knowledge Base v0.2 复验通过，资料分类、写入前预览和 `starworkKnowledgeProject` 中文友好化均已落地。 |
 | ISSUE-028 | Init / Doctor 主 Skill 过长，需要短入口 + references 分层 | skill / docs / onboarding / product | P1 | closed | development lane | 用户反馈 / Skill UX 审计 / product-mainflow 草案 | [ISSUE-028.md](ISSUE-028.md) | 已关闭：Mainflow v0.2 复验通过，`starworkInit` / `starworkDoctor` 已改为短主入口 + references。 |
 | ISSUE-027 | MultiAgent workflow 缺少专门管理机制且可能向当前 Agent 自投递 | workflow / skill / cli / core / product | P0 | closed | development lane | 用户反馈 / 真实 workflow 使用 | [ISSUE-027.md](ISSUE-027.md) | 已关闭：v0.14 二次复验通过，run state、Step Router、自投递阻断和 delivered 后 run progression 已落地，两跳 smoke 通过。 |

@@ -97,6 +97,17 @@ npx skills add https://github.com/jennie-shawn/StarWork/tree/main/skills-next --
 
 命令里的 `--full-depth` 用来确保 `starworkMultiagent/references/` 一起安装。缺少 references 时，AI 会停止 workflow 或跨会话投递这类高风险动作，并提示安装不完整。
 
+Codex plugin adapter 内测用户也可以改用 plugin 入口安装 bundled Skill / references：
+
+```bash
+npm install -g @jennie-shawn/starwork@next
+codex plugin marketplace add product/adapters/codex-plugin --json
+codex plugin list --available --json
+codex plugin add starwork-multiagent-workflow-next --marketplace starwork-codex-plugin --json
+```
+
+plugin 只改善 Codex 侧安装、发现和显式触发体验；它不替代 CLI、`.starwork/`、`_系统/协作` 或 workflow run state，也不自带 Codex thread tools。使用 plugin 时请显式输入 `$starworkMultiagentNext`。
+
 普通用户安装 stable Skill 目录：
 
 ```bash

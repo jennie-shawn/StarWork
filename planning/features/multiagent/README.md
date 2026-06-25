@@ -17,6 +17,8 @@ MultiAgent 已从 Codex 单宿主编排升级为 runtime host routing，并进�
 
 当前最新已验收版本是 v0.14：补 Workflow Run State、Step Router、Self-Delivery Guard 和 workflow run progression，解决 workflow runner 可能把下一步错误投递给当前 Agent 自己的问题。v0.14 的核心边界是：下一步目标 lane 只能来自 Workflow Definition + Workflow Run State + 当前 completion event，不能由当前会话上下文猜测；自投递风险必须结构化阻断，不得记录为 delivered。v0.14 二次复验已通过，`testing -> product-lead -> development` 两跳 smoke 已跑通。
 
+当前最新已验收版本是 v0.15：实验性的 `StarWork MultiAgent Workflow Next` Codex Plugin Adapter。它只负责 Codex 侧安装、发现、显式触发和 bundled Skill + references packaging；不替代 CLI、Core、`.starwork`、workflow run state，也不承诺自带 Codex thread tools。MVP 使用唯一入口 `$starworkMultiagentNext`，避免和用户已安装的 `starworkMultiagent` 同名冲突。v0.15 复验已通过，local plugin marketplace / install smoke 已跑通。
+
 - Codex：保留已验证的多会话 `launch/read/instruct` 主链路。
 - Cursor：通过 Host Adapter v0.2 支持 `agent-transcripts/<uuid>/<uuid>.jsonl` 只读摘要和 `cursor agent status` 安全探测；不做跨 IDE 会话自动投递。
 - Trae：收敛为人工宿主，不读取 `database.db`、`state.vscdb` 或其他私有会话存储。
@@ -39,6 +41,7 @@ MultiAgent 已从 Codex 单宿主编排升级为 runtime host routing，并进�
 - [v0.12 Workflow 投递保证 SPEC](specs/v0.12-workflow-delivery-guarantee.md)
 - [v0.13 starworkMultiagent Skill 瘦身 / 分层 SPEC](specs/v0.13-starworkMultiagent-skill-decomposition.md)
 - [v0.14 Workflow Run State / Self-Delivery Guard SPEC](specs/v0.14-workflow-run-state-self-delivery-guard.md)
+- [v0.15 Codex Plugin Adapter MVP SPEC](specs/v0.15-codex-plugin-adapter-mvp.md)
 - [Lane Workflow / Handoff Rules MVP 讨论](discussions/2026-06-15-lane-workflow-mvp.md)
 - [Workflow Packet Runtime 设计讨论](discussions/2026-06-15-workflow-packet-runtime.md)
 - [v0.2 验收报告](acceptance/2026-06-01-v0.2-acceptance-report.md)

@@ -299,6 +299,102 @@ test("skill next directory separates workflow channel from stable skills", () =>
   assert.doesNotMatch(`${alphaGuide}\n${userGuide}`, /npx skills add jennie-shawn\/StarWork -g -a codex -y/);
 });
 
+test("codex plugin adapter packages workflow next skill and references", () => {
+  const marketplacePath = path.join(root, "adapters", "codex-plugin", ".agents", "plugins", "marketplace.json");
+  const pluginRoot = path.join(root, "adapters", "codex-plugin", "starwork-multiagent-workflow-next");
+  const manifestPath = path.join(pluginRoot, ".codex-plugin", "plugin.json");
+  const pluginSkillDir = path.join(pluginRoot, "skills", "starworkMultiagentNext");
+  const pluginSkillPath = path.join(pluginSkillDir, "SKILL.md");
+  const pluginAgentPath = path.join(pluginSkillDir, "agents", "openai.yaml");
+  const pluginRefsDir = path.join(pluginSkillDir, "references");
+  const sourceRefsDir = path.join(root, "skills-next", "starworkMultiagent", "references");
+  const marketplace = readJson(marketplacePath);
+  const manifest = readJson(manifestPath);
+  const skill = fs.readFileSync(pluginSkillPath, "utf8");
+  const agent = fs.readFileSync(pluginAgentPath, "utf8");
+  const readme = fs.readFileSync(path.join(pluginRoot, "README.md"), "utf8");
+  const smoke = fs.readFileSync(path.join(pluginRoot, "acceptance", "smoke.md"), "utf8");
+  const icon = fs.readFileSync(path.join(pluginRoot, "assets", "icon.svg"), "utf8");
+  const docs = fs.readFileSync(path.join(root, "docs", "codex-plugin-workflow-next.md"), "utf8");
+  const alphaGuide = fs.readFileSync(path.join(root, "docs", "alpha-test-guide.md"), "utf8");
+  const userGuide = fs.readFileSync(path.join(root, "docs", "multiagent-user-guide.md"), "utf8");
+  const nextReadme = fs.readFileSync(path.join(root, "skills-next", "README.md"), "utf8");
+  const forbiddenCodexPath = /starwork multiagent instruct|starwork multiagent launch|multiagent message instruct|multiagent message launch|multiagent read --host codex|multiagent status --host codex|--session-name|--pin/;
+  const requiredReferences = [
+    "README.md",
+    "context-and-compatibility.md",
+    "delivery-guarantee.md",
+    "intent-routing.md",
+    "lane-workspace-output-promotion.md",
+    "message-templates.md",
+    "safety-output-rules.md",
+    "session-tools.md",
+    "team-onboarding.md",
+    "workflow-builder.md",
+    "workflow-packet-budget.md",
+    "workflow-run-state.md",
+    "workflow-runner.md",
+  ];
+
+  assert.equal(marketplace.name, "starwork-codex-plugin");
+  assert.equal(marketplace.interface.displayName, "StarWork Codex Plugin Experiments");
+  assert.deepEqual(marketplace.plugins.map((plugin) => plugin.name), ["starwork-multiagent-workflow-next"]);
+  assert.equal(marketplace.plugins[0].source.source, "local");
+  assert.equal(marketplace.plugins[0].source.path, "./starwork-multiagent-workflow-next");
+
+  assert.equal(manifest.name, "starwork-multiagent-workflow-next");
+  assert.equal(manifest.version, "0.15.0-next.0");
+  assert.equal(manifest.skills, "./skills/");
+  assert.equal(manifest.interface.displayName, "StarWork MultiAgent Workflow Next");
+  assert.match(manifest.interface.shortDescription, /StarWork MultiAgent next workflows/);
+  assert.ok(Array.isArray(manifest.interface.defaultPrompt));
+  assert(manifest.interface.defaultPrompt.some((prompt) => prompt.includes("$starworkMultiagentNext")));
+  assert.equal(Object.hasOwn(manifest, "mcpServers"), false);
+  assert.equal(Object.hasOwn(manifest, "apps"), false);
+  assert.equal(Object.hasOwn(manifest, "hooks"), false);
+  assert.equal(fs.existsSync(path.join(pluginRoot, "README.md")), true);
+  assert.equal(fs.existsSync(path.join(pluginRoot, "acceptance", "smoke.md")), true);
+  assert.match(icon, /<svg/);
+
+  assert.match(skill, /name: starworkMultiagentNext/);
+  assert.match(skill, /starwork_channel: next/);
+  assert.match(skill, /starwork_multiagent: v0\.15-codex-plugin-adapter/);
+  assert.match(skill, /starwork_plugin_adapter: codex/);
+  assert.match(skill, /\$starworkMultiagentNext/);
+  assert.match(skill, /@jennie-shawn\/starwork@next/);
+  assert.match(skill, /Workflow Builder/);
+  assert.match(skill, /Workflow Runner/);
+  assert.match(skill, /workflow-run-state\.md/);
+  assert.match(skill, /manual_handoff_required/);
+  assert.match(skill, /delivered_via_codex_thread_tool/);
+  assert.match(skill, /当前会话 ID/);
+  assert.match(skill, /blocked_self_delivery/);
+  assert.match(skill, /不替代 StarWork CLI、Core/);
+  assert.match(skill, /不自带 `create_thread`、`send_message_to_thread`、`read_thread`/);
+  assert.doesNotMatch(skill, /name: starworkMultiagent\n/);
+  assert.doesNotMatch(skill, forbiddenCodexPath);
+
+  assert.match(agent, /display_name: "StarWork MultiAgent Workflow Next"/);
+  assert.match(agent, /\$starworkMultiagentNext/);
+  assert.match(agent, /allow_implicit_invocation: false/);
+
+  for (const ref of requiredReferences) {
+    const pluginRef = path.join(pluginRefsDir, ref);
+    const sourceRef = path.join(sourceRefsDir, ref);
+    assert.equal(fs.existsSync(pluginRef), true, `plugin reference missing: ${ref}`);
+    assert.equal(fs.readFileSync(pluginRef, "utf8"), fs.readFileSync(sourceRef, "utf8"), `plugin reference drifted from skills-next source: ${ref}`);
+  }
+
+  assert.match(`${readme}\n${smoke}\n${docs}\n${alphaGuide}\n${userGuide}\n${nextReadme}`, /codex plugin marketplace add product\/adapters\/codex-plugin --json/);
+  assert.match(`${readme}\n${smoke}\n${docs}\n${alphaGuide}\n${userGuide}`, /codex plugin add starwork-multiagent-workflow-next --marketplace starwork-codex-plugin --json/);
+  assert.match(`${readme}\n${docs}\n${userGuide}`, /does not replace|不替代/);
+  assert.match(`${readme}\n${docs}\n${alphaGuide}\n${userGuide}`, /@jennie-shawn\/starwork@next/);
+  assert.match(`${readme}\n${docs}\n${alphaGuide}\n${userGuide}`, /manual_handoff_required/);
+  assert.match(`${readme}\n${docs}`, /does not provide|不自带/);
+  assert.match(`${readme}\n${docs}`, /does not include MCP|does not include MCP servers|不包含 MCP/);
+  assert.doesNotMatch(`${readme}\n${docs}\n${alphaGuide}\n${userGuide}`, /后台自动跑完整 workflow|无监督自动流转|替代 StarWork CLI|替代 \\.starwork run state/);
+});
+
 test("starworkMultiagent decomposition keeps main skills short and references installed", () => {
   const stableSkillPath = path.join(root, "skills", "starworkMultiagent", "SKILL.md");
   const nextSkillPath = path.join(root, "skills-next", "starworkMultiagent", "SKILL.md");

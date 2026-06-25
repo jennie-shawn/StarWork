@@ -15,3 +15,4 @@
 | v0.12 | Workflow 投递保证 | accepted | `v0.12-workflow-delivery-guarantee.md` |
 | v0.13 | starworkMultiagent Skill 瘦身 / 分层 | accepted | `v0.13-starworkMultiagent-skill-decomposition.md` |
 | v0.14 | Workflow Run State / Self-Delivery Guard | accepted | `v0.14-workflow-run-state-self-delivery-guard.md` |
+| v0.15 | Codex Plugin Adapter MVP | accepted | `v0.15-codex-plugin-adapter-mvp.md` |
